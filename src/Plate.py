@@ -1,0 +1,703 @@
+'''
+Created on Dec 12, 2009
+
+@author: one
+'''
+from Hole import *
+import imagecanvas
+import os.path
+import platefile
+class Plate(object):
+    '''Class for fiber plug plate'''
+    FIBER_BUNDLES={
+        'armB':( ('B-02-09','B-02-01','B-04-09','B-04-01',
+                  'B-06-09','B-06-01','B-08-09','B-08-01'),
+                 ('B-01-01','B-01-09','B-03-01','B-03-09',
+                  'B-05-01','B-05-09','B-07-01','B-07-09') ),
+        'armR':( ('R-02-09','R-02-01','R-04-09','R-04-01',
+                  'R-06-09','R-06-01','R-08-09','R-08-01'),
+                 ('R-01-01','R-01-09','R-03-01','R-03-09',
+                  'R-05-01','R-05-09','R-07-01','R-07-09') )}
+    LABEL_ANGLE_MULT={
+        '02-09':-1, '02-01':-2,
+        '04-09':-3, '04-01':-4,
+        '06-09':-5, '06-01':-6,
+        '08-09':-7, '08-01':-8,
+        '01-01': 1, '01-09': 2,
+        '03-01': 3, '03-09': 4,
+        '05-01': 5, '05-09': 6,
+        '07-01': 7, '07-09': 8}
+    SCALE=14.25
+    RADIUS=1.0 # 14.25/Plate.SCALE
+    LABEL_INC=20.0 # deg between cassette labels (180/(numcassperchannel+2))
+    LABEL_RADIUS=0.85*RADIUS
+    SH_RADIUS=0.1875
+    HOLE_R_MULT=1.25
+
+
+    def __init__(self):
+        #self.h=0.4039727532995173
+        #x1,y1 = 0.4863742535097986, 0.19906175954231559
+        #x2,y2 = 0.36245210964697655, 0.6497646036144594
+        self.holeSet=set()
+        self.setups={}
+        self.plate_name=''
+        self.doCoordShift=False
+        self.setCoordShiftParams(61.0, 50.68, 13.21875, 0.01)
+
+    def getHole(self, holeID):
+        for h in self.holeSet:
+            if h.hash == long(holeID):
+                return h
+        return None
+
+
+    def getHoleInfo(self, holeID):
+        #compile information for hole specified by holeID
+        info=('Plate coord', 'sky coord', 'Star','additional info') # as a strvar for fiber assignment
+        hole=self.getHole(holeID)
+        if hole:
+            info=hole.getInfo()
+            return (info[0],info[1],info[2])
+        else:
+            return None
+    
+
+    def getFiberforHole(self, holeID, setup='Setup 1'):
+        """ Returns the Fiber which is mapped to a 
+            specified holeID. "None" is returned if
+            there is no mapping. A nonexistent setup
+            is an exception, as is an invalid holeID """
+
+        fiber='None'
+        hole=self.getHole(holeID)
+        if not hole:
+            print '.'+holeID+'.'
+            raise Exception('Invalid holeID'
+                            )
+        if setup not in self.setups:
+            print '.'+setup+'.'
+            raise Exception('spam','Eggs')
+        
+        groups=self.setups[setup]['groups'] #is a list of dictionaries
+        for g in groups:
+            for i, h in enumerate(g['holes']):
+                if h==hole:
+                    fiber=g['fiber_group']
+                    fiber=fiber[0:-2]+"%02i"%(int(fiber[-2:])+i)
+                    break
+            if fiber != 'None':
+                break
+        return fiber
+
+
+    def addHole(self, xin, yin, r, setup='', channel='', info=''):
+        """Used to manually add a hole to the plate.
+           If setup doesn't exist it will be created"""
+        
+        if self.doCoordShift:
+            x,y=self.plateCoordShift(xin, yin)
+        else:
+            x,y=xin,yin
+            
+        hole=Hole(x/Plate.SCALE, y/Plate.SCALE, r/Plate.SCALE, idstr=info)
+        
+        if hole in self.holeSet:
+            for h in self.holeSet:
+                if h.hash==hole.hash:
+                    hole=h
+                    break
+        
+        self.holeSet.add(hole)
+
+        if setup:
+            setupName=setup
+            if setupName not in self.setups:
+                self.setups[setupName]=self.initializeSetup(setupName)
+        
+            if channel:
+                if channel in self.setups[setupName]['channels']:
+                    self.setups[setupName]['channels'][channel].append(hole)
+                else:
+                    self.setups[setupName]['channels'][channel]=[hole]
+            else:
+                self.setups[setupName]['unused_holes'].append(hole)
+            
+
+    def initializeSetup(self, setupName):
+        """Initializes a setup dictionary with name 
+           setupName"""
+        #if setupName is not of the form "Setup #" raise an exception
+        
+        setup={'plate':self.plate_name, 
+               'setup':setupName,
+               'unused_holes':[],
+               'channels':{},
+               'groups':[]}
+        return setup
+
+    def verifySingleton(self):
+        holes=[]
+        for s in self.setups:
+            for c in self.setups[s]:
+                    holes.extend(self.setups[s][c])
+
+    def loadHoles(self,file):
+        ''' Routine to load holes from a file 
+
+        File should have all the holes on the plate
+        separated into groups specifying the setup number.
+        valid lines are of format x y z diam type arbit_fiber channel'''
+
+        self.clear()
+
+        #Add the SH to the global set
+        self.addHole(0.0, 0.0, Plate.SH_RADIUS, info='Shack-Hartman')
+        
+        self.plate_name=os.path.basename(file)[0:-4]
+        plate_name=self.plate_name
+        self.plateHoleInfo=platefile.plateHoleInfo(os.path.dirname(file)+
+                                                   os.path.sep, plate_name)
+        curr_setup=''
+        
+        with open(file,'r') as f:
+
+            for line in f:
+                words=line.split()
+                #If line specifies a setup see if we have already 
+                # loaded holes if so we need store the last setup
+                if words[0]=='Setup':
+                    if curr_setup:
+                        keep=False
+                        for c in self.setups[curr_setup]['channels']:
+                            if self.setups[curr_setup]['channels'][c]!=[]:
+                                keep=True
+                                break
+                        if not keep:
+                            self.setups.pop(curr_setup)
+                            
+                    curr_setup='Setup '+words[1]
+
+                    self.setups[curr_setup]=self.initializeSetup(curr_setup)
+                    
+                else:
+                    x,y,d=map(float,[words[0],words[1],words[3]])
+                    if line[-3:-1]=='17':
+                        
+                        self.addHole(x, y, d/2.0, info=line)
+                        
+                    elif (words[-3] == 'O' or words[-3]=='S'):
+                        
+                        channel='arm'+words[-1]
+                        self.addHole(x, y, d/2.0, setup=curr_setup, channel=channel, info=line)
+                        
+                    else:
+                        self.addHole(x, y, d/2.0, setup=curr_setup, info=line)
+
+
+
+  
+    def clear(self):
+        self.setups={}
+        self.holeSet=set()
+
+
+    def isValidSetup(self,s):
+        ret=True
+        if self.setups:
+            ret='Setup '+s in self.setups
+        return ret
+
+   
+    def determineRoute(self, start, end):
+        pass
+
+    def getInfo(self,active_setup):
+        nr=0
+        nb=0
+        nt=len(self.holeSet)-len(self.holesNotInAnySetup())
+        for s in self.setups:
+            nt-=len(self.setups[s]['unused_holes'])
+
+        if active_setup in self.setups:
+            if 'armR' in self.setups[active_setup]['channels']:
+                nr=len(self.setups[active_setup]['channels']['armR'])
+            if 'armB' in self.setups[active_setup]['channels']:
+                nb=len(self.setups[active_setup]['channels']['armB'])
+        return 'Red: %03d  Blue: %03d  Total: %04d'%(nr,nb,nt)
+
+
+    def findPath(self, holeList, plateSide ):
+        if plateSide == 'left':
+            #we are going left to right
+            holeList.sort(lambda a,b: -cmp(a.x,b.x))
+        else:
+            #we are going right to left to
+            holeList.sort(lambda a,b: cmp(a.x,b.x))
+
+        #The path starts at the first hole
+        path=[]
+        if len(holeList) == 1:
+            path.append([holeList[0].position()])
+        for i in range(len(holeList)-1):
+        #   path.append(self.determineRoute(holeList[i],holeList[i+1]))
+            path.append([holeList[i].position(),holeList[i+1].position()])
+        
+        return path
+
+
+    def regionify(self, active_setup='Setup 1'):
+        initRegion=(-Plate.RADIUS,-Plate.RADIUS,Plate.RADIUS,Plate.RADIUS)
+
+        if active_setup in self.setups:
+            self.setups[active_setup]['groups']=[]
+            for c in self.setups[active_setup]['channels']:
+    
+                holes=[]
+                for h in self.setups[active_setup]['channels'][c]:
+                    if h.inRegion(initRegion):
+                        holes.append(h)
+    
+                #Break the holes on the channel into desired groups of 8 or less
+                regions=Plate.divideRegion((holes,initRegion))
+    
+                #Associate these regions with groups of fibers
+                self.setups[active_setup]['groups'].extend(
+                    Plate.regions2groups(c,regions))
+    
+                #Create a path for the holes
+                for g in self.setups[active_setup]['groups']:
+                    g['path']=self.findPath(g['holes'],g['side'])
+            
+
+    def writeMapFile(self, out_dir, active_setup):
+        if active_setup in self.setups:
+            ofile=''.join([out_dir,self.plate_name,'_',active_setup,'.map'])
+            with open( ofile, "w" ) as fout:
+                fout.write(''.join(['Code Version: Dec 09\n',self.plate_name,'\n']))
+                setup_nfo=self.plateHoleInfo.getSetupInfo(active_setup)
+                for l in setup_nfo:
+                    fout.write(l)
+                for g in self.setups[active_setup]['groups']:
+                    base_fiber_name=g['fiber_group'][0:5]
+                    base_fiber_num=int(g['fiber_group'][5:])
+                    for i,h in enumerate(g['holes']):
+                        fiber=base_fiber_name+'%02d'%(i+base_fiber_num)
+                        nfostr=self.plateHoleInfo.getHoleInfo(active_setup, h)
+                        fout.write(''.join([fiber,'  ',nfostr,'\n']))
+
+    def draw(self, canvas, active_setup=None, channel='all'):
+
+        #Make a circle of appropriate size in the window
+        canvas.drawCircle( (0,0) , Plate.RADIUS)
+        
+        if active_setup and active_setup in self.setups:
+            #the active setup
+            setup=self.setups[active_setup]
+
+            inactiveHoles=self.holeSet.difference(setup['unused_holes'])
+            for key in setup['channels']:
+                inactiveHoles.difference_update(setup['channels'][key])
+    
+            #Draw the holes that aren't in the current setup
+            for h in inactiveHoles:
+                h.draw(canvas)
+
+            #If holes in setup have been grouped then draw the groups
+            # otherwise draw them according to their channel
+            if setup['groups']:
+                self.drawGroup(setup['groups'],canvas,channel=channel)
+            else:
+                if channel=='all':
+                    for c in setup['channels']:
+                        if c=='armB':
+                            for h in setup['channels'][c]:
+                                h.draw(canvas,color='Blue')
+                        else:
+                            for h in setup['channels'][c]:
+                                h.draw(canvas,color='Red')
+                elif channel=='armR' or channel.upper()=='RED':
+                    if 'armB' in setup['channels']:
+                        for h in setup['channels']['armB']:
+                            h.draw(canvas)
+                    if 'armR' in setup['channels']:
+                        for h in setup['channels']['armR']:
+                            h.draw(canvas,color='Red')
+                elif channel=='armB' or channel.upper()=='BLUE':
+                    if 'armR' in setup['channels']:
+                        for h in setup['channels']['armR']:
+                            h.draw(canvas)
+                    if 'armB' in setup['channels']:
+                        for h in setup['channels']['armB']:
+                            h.draw(canvas,color='Blue')
+
+            #Draw the guide and acquisition holes in color
+            for h in setup['unused_holes']:
+                h.draw(canvas,color='Green')
+    
+        else:
+            for h in self.holeSet:
+                h.draw(canvas)
+
+    def drawImage(self, canvas, active_setup=None, channel='all'):
+        
+        if active_setup and active_setup in self.setups:
+            #the active setup
+            setup=self.setups[active_setup]
+
+            #Draw the plate name and active setup
+            canvas.drawText((0,.85), self.plate_name ,color='White',center=0)
+            canvas.drawText((0,.8), active_setup, color='White',center=0)
+    
+            #Draw little white dots where all the other holes are
+            for h in self.holeSet:
+                canvas.drawCircle(h.position(), h.radius/3 ,fill='White',outline='White')
+    
+                #If holes in setup have been grouped then draw the groups
+                # otherwise draw them according to their channel
+                if setup['groups']:
+                    self.drawGroup(setup['groups'],canvas,channel=channel)
+                else:
+                    if channel=='all':
+                        for c in setup['channels']:
+                            if c=='armB':
+                                for h in setup['channels'][c]:
+                                    h.draw(canvas,color='Blue',fcolor='Blue',radmult=1.25)
+                            else:
+                                for h in setup['channels'][c]:
+                                    h.draw(canvas,color='Red',fcolor='Red',radmult=1.25)
+                    elif channel=='armR' or channel.upper()=='RED':
+                        if 'armB' in setup['channels']:
+                            for h in setup['channels']['armB']:
+                                h.draw(canvas)
+                        if 'armR' in setup['channels']:
+                            for h in setup['channels']['armR']:
+                                h.draw(canvas,color='Red',fcolor='Red',radmult=1.25)
+                    elif channel=='armB' or channel.upper()=='BLUE':
+                        if 'armR' in setup['channels']:
+                            for h in setup['channels']['armR']:
+                                h.draw(canvas)
+                        if 'armB' in setup['channels']:
+                            for h in setup['channels']['armB']:
+                                h.draw(canvas,color='Blue',fcolor='Blue',radmult=1.25)
+                    
+            #Draw the guide and acquisition holes in color
+            for h in setup['unused_holes']:
+                h.draw(canvas,color='Yellow',fcolor='Yellow',radmult=1.25)
+    
+            for h in self.holesNotInAnySetup():
+                h.draw(canvas,color='Magenta',fcolor='Magenta',radmult=1.25)
+
+
+    def holesNotInAnySetup(self):
+        otherholes=[]
+        #gather all the holes not in any setup
+        for h in self.holeSet:
+            flag=1
+            for s in self.setups:
+                if h in self.setups[s]['unused_holes']:
+                    flag=0
+                if flag:
+                    for k in self.setups[s]['channels']:
+                        if h in self.setups[s]['channels'][k]:
+                            flag=0
+                            break
+                if flag == 0:
+                    break
+            if flag:
+                otherholes.append(h)
+        return otherholes
+
+    @staticmethod
+    def divideRegion(region):
+        tmpr=Plate.splitRegionHorizontally( region )
+        
+        if len(tmpr)==1:
+            regions=Plate.splitRegionVertically( tmpr[0] )
+        else:
+            regions=Plate.divideRegion( tmpr[0])
+            subregions2=Plate.divideRegion( tmpr[1])
+            regions[len(regions):]=subregions2
+            
+        return regions
+
+                     
+    @staticmethod
+    def splitRegionVertically( (holes, (x0,y0,x1,y1)), nminr=8):
+        if len(holes) <= nminr:
+            regions=[(holes,(x0,y0,x1,y1))]
+        else:
+            holes=sorted(holes, Hole.holeCompareX)
+            nr2=nminr*(len(holes)/nminr/2)+len(holes)%nminr
+            splitx=(holes[-nr2-1].x+holes[-nr2].x)/2.0
+            regions=[(holes[0:-nr2],(x0,y0,splitx,y1)),
+                     (holes[-nr2:],(splitx,y0,x1,y1))]
+        return regions
+
+
+    @staticmethod
+    def splitRegionHorizontally((holes, (x0,y0,x1,y1)), nminr=16):
+        if len(holes) <= nminr:
+            regions=[(holes,(x0,y0,x1,y1))]
+        else:
+            #sort holes by y position increasing
+            holes=sorted(holes, Hole.holeCompareY)
+            #num holes in second group: nr2
+            nr2=nminr*(len(holes)/nminr/2)+len(holes)%nminr
+            #holes in first group: 0:-nr2
+            splity=(holes[-nr2-1].y+holes[-nr2].y)/2.0
+            regions=[(holes[0:-nr2],(x0,y0,x1,splity)),
+                     (holes[-nr2:],(x0,splity,x1,y1))]
+        return regions
+
+
+    @staticmethod
+    def regions2groups(channel, regions):
+        #Associate these regions with groups of fibers
+        #break regions into left and right sides and sort them vertically
+        groups=[]
+    
+        #First figure out which regions are to be associated with left fibers
+        # and which with right side fibers
+        # Compute CoM of holes in each region, of those on the left, the 8 
+        # leftmost go to the left. Of those on the right, the 8 right most go right.
+        # any leftover on either side go on the other side.
+    
+        regionxctr=[math.fsum([h.x for h in r[0]])/float(len(r[0])) for r in regions]
+        num_left=sum([a > 0.0 for a in regionxctr])
+        num_right=len(regions)-num_left
+    
+        #Sort the regions from leftmost to rightmost
+        regions.sort(key=lambda r:math.fsum([h.x for h in r[0]])/float(len(r[0])),reverse=True)
+    
+        #Place first min(8, num regions on left + max(0, num regions on right - 8))
+        # regions on the left, the remainder on the right
+        num_left = min(8, num_left) + max(0, num_right - 8)
+    
+        left=regions[0:num_left]
+        right=regions[num_left:]
+  
+
+        left.sort(lambda a,b: -cmp(a[1][1]+a[1][3],b[1][1]+b[1][3]))
+        right.sort(lambda a,b: -cmp(a[1][1]+a[1][3],b[1][1]+b[1][3]))
+
+        #Do the left and right sides of the plate separately
+            #Now the groups are sorted vertically
+            # so if there are as many of them as there are cassettes
+            # we can just assign them in order
+            # If there are fewer than the number of cassettes we would like 
+            # to associate them with a cassette at roughly the same level
+            #while there are unassociated groups
+            #    if number of free cassettes is equal to number of 
+            #        unassigned groups
+            #        pair them off
+            #    else
+            #        determine the nearest unassociated cassette which leaves
+            #        enough cassetts for the remaining groups and 
+            #        associate it with the first group
+        
+        nextbundle=0
+        numbundles=len(Plate.FIBER_BUNDLES[channel][0])
+        while len(left):
+            assert len(left) <= numbundles-nextbundle
+            if len(left) ==  numbundles-nextbundle:
+                for g in left:
+                    groups.append(Plate.initializeGroup( 
+                                    Plate.FIBER_BUNDLES[channel][0][nextbundle], 
+                                    g[0], g[1], 'left', channel))
+                    nextbundle+=1
+                break
+            else:
+                #get the y position of the hole with the least x value
+                groupy=max(left[0][0],key=lambda a:a.x).y
+                angleoffvert=math.degrees(math.pi/2 - 
+                                math.asin(groupy/Plate.LABEL_RADIUS))
+                tmp=max(angleoffvert/Plate.LABEL_INC-1,0)
+                
+                bundlenum = min(round(tmp), numbundles-len(left) )
+                bundlenum = int(max(bundlenum, nextbundle))
+                
+                groups.append(Plate.initializeGroup( 
+                                Plate.FIBER_BUNDLES[channel][0][bundlenum], 
+                                left[0][0], left[0][1], 'left', channel))
+                
+                nextbundle=bundlenum+1
+
+                left.pop(0)
+        
+        #Now do the same thing for the right side
+        nextbundle=0
+        numbundles=len(Plate.FIBER_BUNDLES[channel][1])
+        while len(right):
+            assert len(right) <= numbundles-nextbundle
+            if len(right) == numbundles-nextbundle:
+                for g in right[:]:
+                    groups.append(Plate.initializeGroup( 
+                                    Plate.FIBER_BUNDLES[channel][1][nextbundle], 
+                                    g[0], g[1], 'right', channel))
+                    nextbundle+=1
+                break
+            else:
+                #get the y position of the hole with the largest x value
+                groupy=min(right[0][0],key=lambda a:a.x).y
+                angleoffvert=math.degrees(math.pi/2 - 
+                                math.asin(groupy/Plate.LABEL_RADIUS))
+
+                tmp=(angleoffvert-Plate.LABEL_INC)/Plate.LABEL_INC
+                
+                bundlenum = min(round(tmp), numbundles-len(right) )
+                bundlenum = int(max(bundlenum, nextbundle))
+
+                groups.append(Plate.initializeGroup( 
+                                Plate.FIBER_BUNDLES[channel][1][bundlenum], 
+                                right[0][0], right[0][1], 'right', channel))
+                
+                nextbundle=bundlenum+1
+                right.pop(0)
+
+        return groups
+
+    @staticmethod
+    def initializeGroup( fiberBundle, holes, region, side, channel):
+        return {'fiber_group':fiberBundle, 
+                'holes':holes,
+                'region':region,
+                'side':side, 
+                'path':[],
+                'channel':channel}
+
+    @staticmethod
+    def drawGroup( holeGroup, canvas,radmult=1.0,channel='all'):    
+        if channel=='all':
+            channeltoshow=['armB','armR']
+        elif channel=='armR' or channel.upper()=='RED':
+            channeltoshow=['armR']
+        elif channel=='armB' or channel.upper()=='BLUE':
+            channeltoshow=['armB']
+        else:
+            channeltoshow=[]
+
+        for i,g in enumerate(holeGroup):
+            if g['channel'] in channeltoshow:
+                if g['channel'] =='armB':
+                    color='Blue'
+                else:
+                    color='Red'
+                
+                #Draw a rectangle around the group
+                #mycanvas.drawRectangle(g['region'],outline=col)
+                
+                #Draw the holes in the group
+                for h in g['holes']:
+                    h.draw(canvas, color=color, fcolor=color,radmult=radmult)
+    
+                # Draw the paths between each of the holes
+                for segment in g['path']:
+                    for i in range(len(segment)-1):
+                        canvas.drawLine(segment[i], segment[i+1], fill=color)
+                
+                #Determine where to stick the text label for the group
+                thmult=Plate.LABEL_ANGLE_MULT[ g['fiber_group'][2:] ]
+                if g['fiber_group'][0]=='R':
+                    thmult+=.5
+                th=math.radians(90.0-thmult*Plate.LABEL_INC)
+                
+                tpos=[ -Plate.LABEL_RADIUS*math.cos(th),
+                       Plate.LABEL_RADIUS*math.sin(th) ]
+                
+                #Determine the text label
+                label=g['fiber_group']+'-'+str(int(g['fiber_group'][-2:])+len(g['holes'])-1)
+        
+                if isinstance(canvas,imagecanvas.ImageCanvas):
+                    t=canvas.getTextSize(g['fiber_group'])
+                    tpos[0]-=t[0]
+                    if g['side']=='left':
+                        tpos[0]-=t[0]
+    
+                #Draw the text label
+                canvas.drawText( tpos, label)   
+    
+                #Draw the path
+                # Draw a line from the label to the first hole
+                canvas.drawLine(tpos, g['path'][0][0], fill=color)
+                                
+                #Draw an x across the first hole
+                radius=2*0.08675*radmult/Plate.SCALE
+                canvas.drawLine((g['path'][0][0][0]-radius,g['path'][0][0][1]+radius),
+                        (g['path'][0][0][0]+radius,g['path'][0][0][1]-radius))
+                canvas.drawLine((g['path'][0][0][0]-radius,g['path'][0][0][1]-radius),
+                        (g['path'][0][0][0]+radius,g['path'][0][0][1]+radius))
+        
+                #Draw a + over the last hole
+                radius*=1.41
+                canvas.drawLine((g['path'][-1][-1][0]-radius,g['path'][-1][-1][1]),
+                        (g['path'][-1][-1][0]+radius,g['path'][-1][-1][1]))
+                canvas.drawLine((g['path'][-1][-1][0],g['path'][-1][-1][1]-radius),
+                        (g['path'][-1][-1][0],g['path'][-1][-1][1]+radius))
+
+    
+    def setCoordShiftParams(self, D, R, rm, a):
+        self.coordShift_D=D
+        self.coordShift_a=a
+        self.coordShift_R=R
+        self.coordShift_rm=rm
+        
+    def validCoordParam_D(self, x):
+        if type(x) in [int,long,float]:
+            return True
+        elif type(x) is str:
+            return x.isdigit()
+        else:
+            return False
+        
+    def validCoordParam_R(self, x):
+        if type(x) in [int,long,float]:
+            return True
+        elif type(x) is str:
+            return x.isdigit()
+        else:
+            return False
+        
+    def validCoordParam_rm(self, x):
+        if type(x) in [int,long,float]:
+            return True
+        elif type(x) is str:
+            return x.isdigit()
+        else:
+            return False
+        
+    def validCoordParam_a(self, x):
+        if type(x) in [int,long,float]:
+            return True
+        elif type(x) is str:
+            return x.isdigit()
+        else:
+            return False
+
+    def toggleCoordShift(self):
+        self.doCoordShift = not self.doCoordShift
+        return self.doCoordShift
+
+        
+    def plateCoordShift(self, x, y):
+
+        if x==0.0 and y==0.0:
+            return (x,y)
+        else:
+            D=self.coordShift_D
+            a=self.coordShift_a
+            R=self.coordShift_R
+            rm=self.coordShift_rm
+            
+            r=math.hypot(x, y)
+            #psi = angle clockwise from vertical
+            #psi=90.0 - math.atan2(y,x)
+            cpsi=y/r
+            spsi=x/r
+            d=math.sqrt(R**2 - r**2) - math.sqrt(R**2 - rm**2)
+            dr=d*r/(D+d)
+            
+            rp=(r-dr)*(1.0+a*cpsi)
+            xp=rp*spsi
+            yp=rp*cpsi
+            return (xp,yp)
