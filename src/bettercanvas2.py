@@ -53,16 +53,16 @@ class BetterCanvas2(Tkinter.Canvas):
               self.canvasCoordx(x1),  
               self.canvasCoordy(y1), kw)  
 
-    def drawLine(*args, **kw):
-        assert len(args) == 3 or len(args) == 4
-        self=args[0]
+    def drawLine(self, *args, **kw):
+        assert len(args) == 2 or len(args) == 3
+
         self.sanitizeColorKW(kw)
-        pos0 = args[1]
-        if len(args) == 3:
-            pos1 = args[2]
+        pos0 = args[0]
+        if len(args) == 2:
+            pos1 = args[1]
         else:
-            l = args[2]
-            th = args[3]
+            l = args[1]
+            th = args[2]
             x2=pos0[0]+l*math.cos(math.radians(th))
             y2=pos0[1]+l*math.sin(math.radians(th))
             pos1=(x2,y2)
@@ -71,6 +71,7 @@ class BetterCanvas2(Tkinter.Canvas):
                          self.canvasCoordy(pos0[1]),
                          self.canvasCoordx(pos1[0]),
                          self.canvasCoordy(pos1[1]),kw)
+
 
     def drawText(self,(x,y),text,color=None):
         kw={'color':color}

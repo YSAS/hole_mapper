@@ -9,12 +9,8 @@ class Hole:
         self.x=float(x)
         self.y=float(y)
         self.radius=float(r)
-        n=3
         self.idstr=idstr
-        
-        self.hash=( 10**(2*n) * long(str.split(str(self.x),'.')[1][0:n])+
-                    10**n * long(str.split(str(self.y),'.')[1][0:n])+
-                    long(str.split(str(self.radius),'.')[1][0:n]) )
+        self.hash=Hole.computeHash(self.x, self.y, self.radius)
 
     def __eq__(self,other):
         return (self.x == other.x and
@@ -64,11 +60,16 @@ class Hole:
         return (self.x,self.y)
 
     def draw(self,canvas,color=None,fcolor='White',radmult=1.0):
-        if canvas.find_withtag(".%i"%self.hash):
+        hashtag=".%i"%self.hash
+        if canvas.find_withtag(hashtag):
             print "drawing dupe"
             print (self.position(),self.radius,self.hash)
             fcolor='DarkGreen'
         canvas.drawCircle( self.position(), self.radius*radmult, 
-                             outline=color, fill=fcolor, tags=('hole',".%i"%self.hash),
+                             outline=color, fill=fcolor, tags=('hole',hashtag),
                              activefill='Green',activeoutline='Green',
                              disabledfill='Orange',disabledoutline='Orange')
+        
+    @staticmethod
+    def computeHash(x,y,r):
+        return ( "%2.3f.%2.3f.%2.3f" % (x,y,r) ).__hash__()
