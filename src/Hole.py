@@ -4,21 +4,29 @@ Created on Dec 12, 2009
 @author: J Bailey
 '''
 import math
-class Hole:
+class Hole(dict):
     def __init__(self, x, y, r, idstr=''):
         self.x=float(x)
         self.y=float(y)
         self.radius=float(r)
         self.idstr=idstr
-        self.hash=Hole.computeHash(self.x, self.y, self.radius)
-
+        self.hash=self.__hash__()
+        
+        #test code
+        self['RA']=(0,0,0.0)
+        self['DEC']=(0,0,0.0)
+        self['GALAXYID']=''
+        self['COLOR']=0.0
+        self['MAGNITUDE']=0.0
+        self['TYPE']=''
+        
     def __eq__(self,other):
         return (self.x == other.x and
                 self.y == other.y and
                 self.radius == other.radius)
    
     def __hash__(self):
-        return self.hash
+        return ( "%2.3f.%2.3f.%2.3f" % (self.x,self.y,self.radius) ).__hash__()
     
     def getInfo(self):
         return ("%.3f %.3f %.3f"%(self.x,self.y,self.radius),"RA DEC",self.idstr)
@@ -69,7 +77,3 @@ class Hole:
                              outline=color, fill=fcolor, tags=('hole',hashtag),
                              activefill='Green',activeoutline='Green',
                              disabledfill='Orange',disabledoutline='Orange')
-        
-    @staticmethod
-    def computeHash(x,y,r):
-        return ( "%2.3f.%2.3f.%2.3f" % (x,y,r) ).__hash__()

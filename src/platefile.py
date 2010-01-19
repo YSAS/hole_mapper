@@ -72,11 +72,11 @@ class ascfile(platefile):
                 #Line is either F, T, or R, all are unused holes
                 pass
 
-    def getLineNofHole(self, hole, setup):
+    def getLineNumOfHole(self, hole, setup):
         return self.setups[setup]['setup_lines'].index(hole.idstr)
         
     def getLineOfHole(self, hole, setup):
-        linenum=self.getLineNofHole(hole, setup)
+        linenum=self.getLineNumOfHole(hole, setup)
         return self.getLineNofSetup(linenum, setup)
 
     def writeWithChannels(self, colorforlessthan129='B'):
@@ -150,20 +150,23 @@ class plateHoleInfo:
         self.rfile=resfile(dir+platename+'.res')
         self.afile=ascfile(dir+platename+'.asc')
         
-    def getHoleInfo(self, setup, hole):
+    def getHoleInfo(self, setupName, hole):
         '''Returns a line containing info about the hole requested,
         lines are of the form:
-        <sky Coords>__<plate Coords>__<hole type>__<additional info from .res file>
+        "<sky Coords RA/DEC>  <plate Coords>  <hole type>  <additional info from .res file>"
         if there are no sky coordinates for the hole (such as for guide reference holes)
         then the sky coordinate string will be '00 00 00.00   00 00 00.0  0000.0'
         '''
-        linenum=self.afile.getLineNofHole(hole, setup)
-        aline=self.afile.getLineNofSetup(linenum, setup)
+        try:
+            linenum=self.afile.getLineNumOfHole(hole, setupName)
+        except KeyError:
+            return ''
+        aline=self.afile.getLineNofSetup(linenum, setupName)
         awords=aline.split()
         holetype=awords[4]
         platecoords=aline[4:38]
         
-        rline=self.rfile.getLineNofSetup(linenum, setup)
+        rline=self.rfile.getLineNofSetup(linenum, setupName)
         if rline!='':
             rwords=rline.split()
             if holetype!=rwords[8]:
@@ -174,8 +177,9 @@ class plateHoleInfo:
             additnfo=rline[52:-1]
         else:
             skycoords='00 00 00.00   00 00 00.0  0000.0'
+            additnfo=''
 
-        return ''.join([skycoords,'  ',platecoords,'  ',holetype,'  ',additnfo])
+        return '  '.join([skycoords,platecoords,holetype,additnfo])
         
     def getSetupInfo(self, setup):
         '''Returns a list of lines about the setup requested,

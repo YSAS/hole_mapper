@@ -4,6 +4,7 @@ Created on Dec 12, 2009
 @author: one
 '''
 from Hole import *
+from compiler.ast import Break
 import imagecanvas
 import os.path
 import platefile
@@ -43,7 +44,10 @@ class Plate(object):
         self.setups={}
         self.plate_name=''
         self.doCoordShift=False
-        self.setCoordShiftParams(61.0, 50.68, 13.21875, 0.01)
+        self.coordShift_D=61.0
+        self.coordShift_R=50.68
+        self.coordShift_rm=13.21875
+        self.coordShift_a=0.01
 
     def getHole(self, holeID):
         for h in self.holeSet:
@@ -51,19 +55,71 @@ class Plate(object):
                 return h
         return None
 
+    def getSetupsUsingHole(self, hole):
+        ret=[]
+        for k in self.setups:
+            v=self.setups[k]
+            if hole in v['unused_holes']:
+                ret.append(k)
+            else:
+                for chan in v['channels']:
+                    if hole in v['channels'][chan]:
+                        ret.append(k)
+                        break
+        return ret
+
 
     def getHoleInfo(self, holeID):
-        #compile information for hole specified by holeID
-        info=('Plate coord', 'sky coord', 'Star','additional info') # as a strvar for fiber assignment
+        """ Returns a dictionary of information for hole
+            corresponding to holeID. Valid keys are:'RA',
+            'DEC','GALAXYID','MAGNITUDE','COLOR','SETUPS',
+            'HOLEID', and 'TYPE'.
+            An invalid holeID is an exception."""
+        
         hole=self.getHole(holeID)
-        if hole:
-            info=hole.getInfo()
-            return (info[0],info[1],info[2])
-        else:
-            return None
+        if not hole:
+            raise Exception('Invalid holeID')
+        
+        ret={'RA':hole['RA'],'DEC':hole['DEC'],
+             'GALAXYID':hole['GALAXYID'],'MAGNITUDE':hole['MAGNITUDE'],
+             'COLOR':hole['COLOR'],'TYPE':hole['TYPE'],
+             'SETUPS':self.getSetupsUsingHole(hole),'HOLEID':holeID,
+             'IDSTR':hole.idstr}
+
+        return ret
+
+
+    def getChannelForHole(self, holeID, setupName):
+        """ Returns the channel of a hole for a given setup.
+            Returns '' for Holes without a channel. An invalid
+            setup is an exception. An invalid holeID is an exception."""
+            #A holeID not in the specified setup is an exception. 
+        
+        hole=self.getHole(holeID)
+        if not hole:
+            raise Exception('Invalid holeID')
+        if setupName not in self.setups:
+            raise Exception('Invalid setupName')
+        
+        ret=None
+        for k in self.setups[setupName]['channels']:
+            v=self.setups[setupName]['channels'][k]
+            if hole in v:
+                ret=k
+                break
+        
+        if ret is None:
+            if hole in self.setups[setupName]['unused_holes']:
+                ret=''
+                
+        if ret is None:
+            ret=''
+            #raise Exception('Hole not in specified setup')
+        
+        return ret
     
 
-    def getFiberforHole(self, holeID, setup='Setup 1'):
+    def getFiberForHole(self, holeID, setupName):
         """ Returns the Fiber which is mapped to a 
             specified holeID. "None" is returned if
             there is no mapping. A nonexistent setup
@@ -72,14 +128,11 @@ class Plate(object):
         fiber='None'
         hole=self.getHole(holeID)
         if not hole:
-            print '.'+holeID+'.'
-            raise Exception('Invalid holeID'
-                            )
-        if setup not in self.setups:
-            print '.'+setup+'.'
-            raise Exception('spam','Eggs')
+            raise Exception('Invalid holeID')
+        if setupName not in self.setups:
+            raise Exception('Invalid setupName')
         
-        groups=self.setups[setup]['groups'] #is a list of dictionaries
+        groups=self.setups[setupName]['groups'] #is a list of dictionaries
         for g in groups:
             for i, h in enumerate(g['holes']):
                 if h==hole:
@@ -91,6 +144,39 @@ class Plate(object):
         return fiber
 
 
+    def getSetupInfo(self,setupName):
+        nr=0
+        nb=0
+        nt=len(self.holeSet)-len(self.getHolesNotInAnySetup())
+        for s in self.setups:
+            nt-=len(self.setups[s]['unused_holes'])
+
+        if setupName in self.setups:
+            if 'armR' in self.setups[setupName]['channels']:
+                nr=len(self.setups[setupName]['channels']['armR'])
+            if 'armB' in self.setups[setupName]['channels']:
+                nb=len(self.setups[setupName]['channels']['armB'])
+        return 'Red: %03d  Blue: %03d  Total: %04d'%(nr,nb,nt)
+
+    def getHolesNotInAnySetup(self):
+        otherholes=[]
+        #gather all the holes not in any setup
+        for h in self.holeSet:
+            flag=1
+            for s in self.setups:
+                if h in self.setups[s]['unused_holes']:
+                    flag=0
+                if flag:
+                    for k in self.setups[s]['channels']:
+                        if h in self.setups[s]['channels'][k]:
+                            flag=0
+                            break
+                if flag == 0:
+                    break
+            if flag:
+                otherholes.append(h)
+        return otherholes
+    
     def addHole(self, xin, yin, r, setup='', channel='', info=''):
         """Used to manually add a hole to the plate.
            If setup doesn't exist it will be created"""
@@ -99,8 +185,20 @@ class Plate(object):
             x,y=self.plateCoordShift(xin, yin)
         else:
             x,y=xin,yin
-            
+        
         hole=Hole(x/Plate.SCALE, y/Plate.SCALE, r/Plate.SCALE, idstr=info)
+        
+        holeinfostr=self.plateHoleInfo.getHoleInfo(setup, hole)
+        if holeinfostr:
+            print holeinfostr
+            holeinfostr=holeinfostr.split()
+            #"<sky Coords>  <plate Coords>  <hole type>  <additional info from .res file>"
+            ra=tuple(map(float,holeinfostr[0:3]))
+            dec=tuple(map(float,holeinfostr[3:6]))
+            type=holeinfostr[11]
+            hole['RA']=ra
+            hole['DEC']=dec
+            hole['TYPE']=type
         
         if hole in self.holeSet:
             for h in self.holeSet:
@@ -135,12 +233,15 @@ class Plate(object):
                'channels':{},
                'groups':[]}
         return setup
-
-    def verifySingleton(self):
-        holes=[]
-        for s in self.setups:
-            for c in self.setups[s]:
-                    holes.extend(self.setups[s][c])
+    
+    @staticmethod
+    def initializeGroup( fiberBundle, holes, region, side, channel):
+        return {'fiber_group':fiberBundle, 
+                'holes':holes,
+                'region':region,
+                'side':side, 
+                'path':[],
+                'channel':channel}
 
     def loadHoles(self,file):
         ''' Routine to load holes from a file 
@@ -151,14 +252,17 @@ class Plate(object):
 
         self.clear()
 
-        #Add the SH to the global set
-        self.addHole(0.0, 0.0, Plate.SH_RADIUS, info='Shack-Hartman')
+
         
         self.plate_name=os.path.basename(file)[0:-4]
         plate_name=self.plate_name
         self.plateHoleInfo=platefile.plateHoleInfo(os.path.dirname(file)+
                                                    os.path.sep, plate_name)
         curr_setup=''
+        
+        #Add the SH to the global set
+        self.addHole(0.0, 0.0, Plate.SH_RADIUS, info='Shack-Hartman')
+        
         
         with open(file,'r') as f:
 
@@ -177,19 +281,17 @@ class Plate(object):
                             self.setups.pop(curr_setup)
                             
                     curr_setup='Setup '+words[1]
-
                     self.setups[curr_setup]=self.initializeSetup(curr_setup)
                     
                 else:
                     x,y,d=map(float,[words[0],words[1],words[3]])
                     if line[-3:-1]=='17':
-                        
                         self.addHole(x, y, d/2.0, info=line)
                         
-                    elif (words[-3] == 'O' or words[-3]=='S'):
-                        
+                    elif words[-3] in ('O','S'):
                         channel='arm'+words[-1]
-                        self.addHole(x, y, d/2.0, setup=curr_setup, channel=channel, info=line)
+                        self.addHole(x, y, d/2.0, setup=curr_setup, 
+                                     channel=channel, info=line)
                         
                     else:
                         self.addHole(x, y, d/2.0, setup=curr_setup, info=line)
@@ -200,32 +302,6 @@ class Plate(object):
     def clear(self):
         self.setups={}
         self.holeSet=set()
-
-
-    def isValidSetup(self,s):
-        ret=True
-        if self.setups:
-            ret='Setup '+s in self.setups
-        return ret
-
-   
-    def determineRoute(self, start, end):
-        pass
-
-    def getInfo(self,active_setup):
-        nr=0
-        nb=0
-        nt=len(self.holeSet)-len(self.holesNotInAnySetup())
-        for s in self.setups:
-            nt-=len(self.setups[s]['unused_holes'])
-
-        if active_setup in self.setups:
-            if 'armR' in self.setups[active_setup]['channels']:
-                nr=len(self.setups[active_setup]['channels']['armR'])
-            if 'armB' in self.setups[active_setup]['channels']:
-                nb=len(self.setups[active_setup]['channels']['armB'])
-        return 'Red: %03d  Blue: %03d  Total: %04d'%(nr,nb,nt)
-
 
     def findPath(self, holeList, plateSide ):
         if plateSide == 'left':
@@ -286,127 +362,37 @@ class Plate(object):
                         nfostr=self.plateHoleInfo.getHoleInfo(active_setup, h)
                         fout.write(''.join([fiber,'  ',nfostr,'\n']))
 
-    def draw(self, canvas, active_setup=None, channel='all'):
 
-        #Make a circle of appropriate size in the window
-        canvas.drawCircle( (0,0) , Plate.RADIUS)
-        
-        if active_setup and active_setup in self.setups:
-            #the active setup
-            setup=self.setups[active_setup]
 
-            inactiveHoles=self.holeSet.difference(setup['unused_holes'])
-            for key in setup['channels']:
-                inactiveHoles.difference_update(setup['channels'][key])
-    
-            #Draw the holes that aren't in the current setup
-            for h in inactiveHoles:
-                h.draw(canvas)
+    def toggleCoordShift(self):
+        self.doCoordShift = not self.doCoordShift
+        return self.doCoordShift
 
-            #If holes in setup have been grouped then draw the groups
-            # otherwise draw them according to their channel
-            if setup['groups']:
-                self.drawGroup(setup['groups'],canvas,channel=channel)
-            else:
-                if channel=='all':
-                    for c in setup['channels']:
-                        if c=='armB':
-                            for h in setup['channels'][c]:
-                                h.draw(canvas,color='Blue')
-                        else:
-                            for h in setup['channels'][c]:
-                                h.draw(canvas,color='Red')
-                elif channel=='armR' or channel.upper()=='RED':
-                    if 'armB' in setup['channels']:
-                        for h in setup['channels']['armB']:
-                            h.draw(canvas)
-                    if 'armR' in setup['channels']:
-                        for h in setup['channels']['armR']:
-                            h.draw(canvas,color='Red')
-                elif channel=='armB' or channel.upper()=='BLUE':
-                    if 'armR' in setup['channels']:
-                        for h in setup['channels']['armR']:
-                            h.draw(canvas)
-                    if 'armB' in setup['channels']:
-                        for h in setup['channels']['armB']:
-                            h.draw(canvas,color='Blue')
+    def plateCoordShift(self, x, y):
 
-            #Draw the guide and acquisition holes in color
-            for h in setup['unused_holes']:
-                h.draw(canvas,color='Green')
-    
+        if x==0.0 and y==0.0:
+            return (x,y)
         else:
-            for h in self.holeSet:
-                h.draw(canvas)
-
-    def drawImage(self, canvas, active_setup=None, channel='all'):
-        
-        if active_setup and active_setup in self.setups:
-            #the active setup
-            setup=self.setups[active_setup]
-
-            #Draw the plate name and active setup
-            canvas.drawText((0,.85), self.plate_name ,color='White',center=0)
-            canvas.drawText((0,.8), active_setup, color='White',center=0)
-    
-            #Draw little white dots where all the other holes are
-            for h in self.holeSet:
-                canvas.drawCircle(h.position(), h.radius/3 ,fill='White',outline='White')
-    
-                #If holes in setup have been grouped then draw the groups
-                # otherwise draw them according to their channel
-                if setup['groups']:
-                    self.drawGroup(setup['groups'],canvas,channel=channel)
-                else:
-                    if channel=='all':
-                        for c in setup['channels']:
-                            if c=='armB':
-                                for h in setup['channels'][c]:
-                                    h.draw(canvas,color='Blue',fcolor='Blue',radmult=1.25)
-                            else:
-                                for h in setup['channels'][c]:
-                                    h.draw(canvas,color='Red',fcolor='Red',radmult=1.25)
-                    elif channel=='armR' or channel.upper()=='RED':
-                        if 'armB' in setup['channels']:
-                            for h in setup['channels']['armB']:
-                                h.draw(canvas)
-                        if 'armR' in setup['channels']:
-                            for h in setup['channels']['armR']:
-                                h.draw(canvas,color='Red',fcolor='Red',radmult=1.25)
-                    elif channel=='armB' or channel.upper()=='BLUE':
-                        if 'armR' in setup['channels']:
-                            for h in setup['channels']['armR']:
-                                h.draw(canvas)
-                        if 'armB' in setup['channels']:
-                            for h in setup['channels']['armB']:
-                                h.draw(canvas,color='Blue',fcolor='Blue',radmult=1.25)
-                    
-            #Draw the guide and acquisition holes in color
-            for h in setup['unused_holes']:
-                h.draw(canvas,color='Yellow',fcolor='Yellow',radmult=1.25)
-    
-            for h in self.holesNotInAnySetup():
-                h.draw(canvas,color='Magenta',fcolor='Magenta',radmult=1.25)
+            D=self.coordShift_D
+            a=self.coordShift_a
+            R=self.coordShift_R
+            rm=self.coordShift_rm
+            
+            r=math.hypot(x, y)
+            #psi = angle clockwise from vertical
+            #psi=90.0 - math.atan2(y,x)
+            cpsi=y/r
+            spsi=x/r
+            d=math.sqrt(R**2 - r**2) - math.sqrt(R**2 - rm**2)
+            dr=d*r/(D+d)
+            
+            rp=(r-dr)*(1.0+a*cpsi)
+            xp=rp*spsi
+            yp=rp*cpsi
+            return (xp,yp)
 
 
-    def holesNotInAnySetup(self):
-        otherholes=[]
-        #gather all the holes not in any setup
-        for h in self.holeSet:
-            flag=1
-            for s in self.setups:
-                if h in self.setups[s]['unused_holes']:
-                    flag=0
-                if flag:
-                    for k in self.setups[s]['channels']:
-                        if h in self.setups[s]['channels'][k]:
-                            flag=0
-                            break
-                if flag == 0:
-                    break
-            if flag:
-                otherholes.append(h)
-        return otherholes
+
 
     @staticmethod
     def divideRegion(region):
@@ -557,14 +543,110 @@ class Plate(object):
 
         return groups
 
-    @staticmethod
-    def initializeGroup( fiberBundle, holes, region, side, channel):
-        return {'fiber_group':fiberBundle, 
-                'holes':holes,
-                'region':region,
-                'side':side, 
-                'path':[],
-                'channel':channel}
+
+    def draw(self, canvas, active_setup=None, channel='all'):
+
+        #Make a circle of appropriate size in the window
+        canvas.drawCircle( (0,0) , Plate.RADIUS)
+        
+        if active_setup and active_setup in self.setups:
+            #the active setup
+            setup=self.setups[active_setup]
+
+            inactiveHoles=self.holeSet.difference(setup['unused_holes'])
+            for key in setup['channels']:
+                inactiveHoles.difference_update(setup['channels'][key])
+    
+            #Draw the holes that aren't in the current setup
+            for h in inactiveHoles:
+                h.draw(canvas)
+
+            #If holes in setup have been grouped then draw the groups
+            # otherwise draw them according to their channel
+            if setup['groups']:
+                self.drawGroup(setup['groups'],canvas,channel=channel)
+            else:
+                if channel=='all':
+                    for c in setup['channels']:
+                        if c=='armB':
+                            for h in setup['channels'][c]:
+                                h.draw(canvas,color='Blue')
+                        else:
+                            for h in setup['channels'][c]:
+                                h.draw(canvas,color='Red')
+                elif channel=='armR' or channel.upper()=='RED':
+                    if 'armB' in setup['channels']:
+                        for h in setup['channels']['armB']:
+                            h.draw(canvas)
+                    if 'armR' in setup['channels']:
+                        for h in setup['channels']['armR']:
+                            h.draw(canvas,color='Red')
+                elif channel=='armB' or channel.upper()=='BLUE':
+                    if 'armR' in setup['channels']:
+                        for h in setup['channels']['armR']:
+                            h.draw(canvas)
+                    if 'armB' in setup['channels']:
+                        for h in setup['channels']['armB']:
+                            h.draw(canvas,color='Blue')
+
+            #Draw the guide and acquisition holes in color
+            for h in setup['unused_holes']:
+                h.draw(canvas,color='Green')
+    
+        else:
+            for h in self.holeSet:
+                h.draw(canvas)
+
+        
+    def drawImage(self, canvas, active_setup=None, channel='all'):
+        
+        if active_setup and active_setup in self.setups:
+            #the active setup
+            setup=self.setups[active_setup]
+
+            #Draw the plate name and active setup
+            canvas.drawText((0,.85), self.plate_name ,color='White',center=0)
+            canvas.drawText((0,.8), active_setup, color='White',center=0)
+    
+            #Draw little white dots where all the other holes are
+            for h in self.holeSet:
+                canvas.drawCircle(h.position(), h.radius/3 ,fill='White',outline='White')
+    
+                #If holes in setup have been grouped then draw the groups
+                # otherwise draw them according to their channel
+                if setup['groups']:
+                    self.drawGroup(setup['groups'],canvas,channel=channel)
+                else:
+                    if channel=='all':
+                        for c in setup['channels']:
+                            if c=='armB':
+                                for h in setup['channels'][c]:
+                                    h.draw(canvas,color='Blue',fcolor='Blue',radmult=1.25)
+                            else:
+                                for h in setup['channels'][c]:
+                                    h.draw(canvas,color='Red',fcolor='Red',radmult=1.25)
+                    elif channel=='armR' or channel.upper()=='RED':
+                        if 'armB' in setup['channels']:
+                            for h in setup['channels']['armB']:
+                                h.draw(canvas)
+                        if 'armR' in setup['channels']:
+                            for h in setup['channels']['armR']:
+                                h.draw(canvas,color='Red',fcolor='Red',radmult=1.25)
+                    elif channel=='armB' or channel.upper()=='BLUE':
+                        if 'armR' in setup['channels']:
+                            for h in setup['channels']['armR']:
+                                h.draw(canvas)
+                        if 'armB' in setup['channels']:
+                            for h in setup['channels']['armB']:
+                                h.draw(canvas,color='Blue',fcolor='Blue',radmult=1.25)
+                    
+            #Draw the guide and acquisition holes in color
+            for h in setup['unused_holes']:
+                h.draw(canvas,color='Yellow',fcolor='Yellow',radmult=1.25)
+    
+            for h in self.getHolesNotInAnySetup():
+                h.draw(canvas,color='Magenta',fcolor='Magenta',radmult=1.25)        
+
 
     @staticmethod
     def drawGroup( holeGroup, canvas,radmult=1.0,channel='all'):    
@@ -635,69 +717,82 @@ class Plate(object):
                 canvas.drawLine((g['path'][-1][-1][0],g['path'][-1][-1][1]-radius),
                         (g['path'][-1][-1][0],g['path'][-1][-1][1]+radius))
 
+        
+    def setCoordShiftD(self, D):
+        if self.isValidCoordParam_D(D):
+            self.coordShift_D=float(D)
+        else:
+            raise ValueError()
     
-    def setCoordShiftParams(self, D, R, rm, a):
-        self.coordShift_D=D
-        self.coordShift_a=a
-        self.coordShift_R=R
-        self.coordShift_rm=rm
-        
-    def validCoordParam_D(self, x):
+    def setCoordShiftR(self, R):
+        if self.isValidCoordParam_D(R):
+            self.coordShift_R=float(R)
+        else:
+            raise ValueError()
+    
+    def setCoordShiftrm(self, rm):
+        if self.isValidCoordParam_rm(rm):
+            self.coordShift_rm=float(rm)
+        else:
+            raise ValueError()
+    
+    def setCoordShifta(self, a):
+        if self.isValidCoordParam_D(a):
+            self.coordShift_a=float(a)
+        else:
+            raise ValueError()
+    
+    def isValidCoordParam_D(self, x):
         if type(x) in [int,long,float]:
             return True
         elif type(x) is str:
-            return x.isdigit()
+            try: 
+                float(x)
+                return True
+            except ValueError:
+                return False
         else:
             return False
         
-    def validCoordParam_R(self, x):
+    def isValidCoordParam_R(self, x):
         if type(x) in [int,long,float]:
             return True
         elif type(x) is str:
-            return x.isdigit()
+            try: 
+                float(x)
+                return True
+            except ValueError:
+                return False
         else:
             return False
         
-    def validCoordParam_rm(self, x):
+    def isValidCoordParam_rm(self, x):
         if type(x) in [int,long,float]:
             return True
         elif type(x) is str:
-            return x.isdigit()
+            try: 
+                float(x)
+                return True
+            except ValueError:
+                return False
         else:
             return False
         
-    def validCoordParam_a(self, x):
+    def isValidCoordParam_a(self, x):
         if type(x) in [int,long,float]:
             return True
         elif type(x) is str:
-            return x.isdigit()
+            try: 
+                float(x)
+                return True
+            except ValueError:
+                return False
         else:
             return False
 
-    def toggleCoordShift(self):
-        self.doCoordShift = not self.doCoordShift
-        return self.doCoordShift
+    def isValidSetup(self,s):
+        ret=True
+        if self.setups:
+            ret=s in self.setups
+        return ret
 
-        
-    def plateCoordShift(self, x, y):
-
-        if x==0.0 and y==0.0:
-            return (x,y)
-        else:
-            D=self.coordShift_D
-            a=self.coordShift_a
-            R=self.coordShift_R
-            rm=self.coordShift_rm
-            
-            r=math.hypot(x, y)
-            #psi = angle clockwise from vertical
-            #psi=90.0 - math.atan2(y,x)
-            cpsi=y/r
-            spsi=x/r
-            d=math.sqrt(R**2 - r**2) - math.sqrt(R**2 - rm**2)
-            dr=d*r/(D+d)
-            
-            rp=(r-dr)*(1.0+a*cpsi)
-            xp=rp*spsi
-            yp=rp*cpsi
-            return (xp,yp)
