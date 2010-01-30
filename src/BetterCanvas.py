@@ -2,7 +2,7 @@ import math
 import Tkinter
 import PIL.ImageColor as imgColor
 
-class BetterCanvas2(Tkinter.Canvas):
+class BetterCanvas(Tkinter.Canvas):
     def __init__(self, parent, width, height, units_hwidth, units_hheight, bg='White'):
         
         Tkinter.Canvas.__init__(self, parent, width=width, height=height, bg=bg)
@@ -33,7 +33,6 @@ class BetterCanvas2(Tkinter.Canvas):
         x2=self.canvasCoordx(x+r)
         y1=self.canvasCoordy(y+r)
         y2=self.canvasCoordy(y-r)
-        #import pdb; pdb.set_trace()
         self.sanitizeColorKW(kw)
         self.create_oval(x1,y1,x2,y2, kw)
 
@@ -53,6 +52,11 @@ class BetterCanvas2(Tkinter.Canvas):
               self.canvasCoordx(x1),  
               self.canvasCoordy(y1), kw)  
 
+    def drawDashedLine(self, *args, **kw):
+        
+        
+        self.drawLine(*args, **kw)
+
     def drawLine(self, *args, **kw):
         assert len(args) == 2 or len(args) == 3
 
@@ -66,6 +70,9 @@ class BetterCanvas2(Tkinter.Canvas):
             x2=pos0[0]+l*math.cos(math.radians(th))
             y2=pos0[1]+l*math.sin(math.radians(th))
             pos1=(x2,y2)
+
+        if kw.pop('dashing',None):
+            print 'Drawing a dashed line'
 
         self.create_line(self.canvasCoordx(pos0[0]),
                          self.canvasCoordy(pos0[1]),

@@ -4,7 +4,6 @@ Created on Dec 12, 2009
 @author: one
 '''
 from Hole import *
-from compiler.ast import Break
 import imagecanvas
 import os.path
 import platefile
@@ -181,12 +180,7 @@ class Plate(object):
         """Used to manually add a hole to the plate.
            If setup doesn't exist it will be created"""
         
-        if self.doCoordShift:
-            x,y=self.plateCoordShift(xin, yin)
-        else:
-            x,y=xin,yin
-        
-        hole=Hole(x/Plate.SCALE, y/Plate.SCALE, r/Plate.SCALE, idstr=info)
+        hole=Hole(xin/Plate.SCALE, yin/Plate.SCALE, r/Plate.SCALE, idstr=info)
         
         holeinfostr=self.plateHoleInfo.getHoleInfo(setup, hole)
         if holeinfostr:
@@ -368,31 +362,6 @@ class Plate(object):
         self.doCoordShift = not self.doCoordShift
         return self.doCoordShift
 
-    def plateCoordShift(self, x, y):
-
-        if x==0.0 and y==0.0:
-            return (x,y)
-        else:
-            D=self.coordShift_D
-            a=self.coordShift_a
-            R=self.coordShift_R
-            rm=self.coordShift_rm
-            
-            r=math.hypot(x, y)
-            #psi = angle clockwise from vertical
-            #psi=90.0 - math.atan2(y,x)
-            cpsi=y/r
-            spsi=x/r
-            d=math.sqrt(R**2 - r**2) - math.sqrt(R**2 - rm**2)
-            dr=d*r/(D+d)
-            
-            rp=(r-dr)*(1.0+a*cpsi)
-            xp=rp*spsi
-            yp=rp*cpsi
-            return (xp,yp)
-
-
-
 
     @staticmethod
     def divideRegion(region):
@@ -544,6 +513,54 @@ class Plate(object):
         return groups
 
 
+    def drawHole(self, hole, canvas, color=None, fcolor='White', radmult=1.0):
+       
+        if self.doCoordShift:
+            x,y=hole.position()
+            pos=self.plateCoordShift(x, y)
+        else:
+            pos=hole.position()
+            
+        hashtag=".%i"%hole.hash
+        if isinstance(canvas,imagecanvas.ImageCanvas):
+            canvas.drawCircle( pos, hole.radius*radmult, 
+                                 outline=color, fill=fcolor)
+        else:
+            if canvas.find_withtag(hashtag):
+                print "drawing dupe in Dark Green @ (%f,%f) ID:%l"%(pos, hole.hash)
+                fcolor='DarkGreen'
+            canvas.drawCircle( pos, hole.radius*radmult, 
+                               outline=color, fill=fcolor, tags=('hole',hashtag),
+                               activefill='Green',activeoutline='Green',
+                               disabledfill='Orange',disabledoutline='Orange')
+
+
+    def plateCoordShift(self, xin, yin):
+        """ Shifts x and y to their new positions in scaled space"""
+        if xin==0.0 and yin==0.0:
+            return (xin,yin)
+        else:
+            D=self.coordShift_D
+            a=self.coordShift_a
+            R=self.coordShift_R
+            rm=self.coordShift_rm
+            
+            x=xin*Plate.SCALE
+            y=yin*Plate.SCALE
+            r=math.hypot(x, y)
+            #psi = angle clockwise from vertical
+            #psi=90.0 - math.atan2(y,x)
+            cpsi=y/r
+            spsi=x/r
+            d=math.sqrt(R**2 - r**2) - math.sqrt(R**2 - rm**2)
+            dr=d*r/(D+d)
+            
+            rp=(r-dr)*(1.0+a*cpsi)
+            xp=rp*spsi
+            yp=rp*cpsi
+            return (xp/Plate.SCALE, yp/Plate.SCALE)
+
+
     def draw(self, canvas, active_setup=None, channel='all'):
 
         #Make a circle of appropriate size in the window
@@ -559,7 +576,7 @@ class Plate(object):
     
             #Draw the holes that aren't in the current setup
             for h in inactiveHoles:
-                h.draw(canvas)
+                self.drawHole(h, canvas)
 
             #If holes in setup have been grouped then draw the groups
             # otherwise draw them according to their channel
@@ -570,32 +587,33 @@ class Plate(object):
                     for c in setup['channels']:
                         if c=='armB':
                             for h in setup['channels'][c]:
-                                h.draw(canvas,color='Blue')
+                                self.drawHole(h, canvas, color='Blue')
                         else:
                             for h in setup['channels'][c]:
-                                h.draw(canvas,color='Red')
+                                self.drawHole(h, canvas, color='Red')
+                                
                 elif channel=='armR' or channel.upper()=='RED':
                     if 'armB' in setup['channels']:
                         for h in setup['channels']['armB']:
-                            h.draw(canvas)
+                            self.drawHole(h, canvas)
                     if 'armR' in setup['channels']:
                         for h in setup['channels']['armR']:
-                            h.draw(canvas,color='Red')
+                            self.drawHole(h, canvas, color='Red')
                 elif channel=='armB' or channel.upper()=='BLUE':
                     if 'armR' in setup['channels']:
                         for h in setup['channels']['armR']:
-                            h.draw(canvas)
+                            self.drawHole(h, canvas)
                     if 'armB' in setup['channels']:
                         for h in setup['channels']['armB']:
-                            h.draw(canvas,color='Blue')
+                            self.drawHole(h, canvas, color='Blue')
 
             #Draw the guide and acquisition holes in color
             for h in setup['unused_holes']:
-                h.draw(canvas,color='Green')
+                self.drawHole(h, canvas, color='Green')
     
         else:
             for h in self.holeSet:
-                h.draw(canvas)
+                self.drawHole(h, canvas)
 
         
     def drawImage(self, canvas, active_setup=None, channel='all'):
@@ -621,31 +639,31 @@ class Plate(object):
                         for c in setup['channels']:
                             if c=='armB':
                                 for h in setup['channels'][c]:
-                                    h.draw(canvas,color='Blue',fcolor='Blue',radmult=1.25)
+                                    self.drawHole(h, canvas,color='Blue',fcolor='Blue',radmult=1.25)
                             else:
                                 for h in setup['channels'][c]:
-                                    h.draw(canvas,color='Red',fcolor='Red',radmult=1.25)
+                                    self.drawHole(h, canvas,color='Red',fcolor='Red',radmult=1.25)
                     elif channel=='armR' or channel.upper()=='RED':
                         if 'armB' in setup['channels']:
                             for h in setup['channels']['armB']:
-                                h.draw(canvas)
+                                self.drawHole(h, canvas)
                         if 'armR' in setup['channels']:
                             for h in setup['channels']['armR']:
-                                h.draw(canvas,color='Red',fcolor='Red',radmult=1.25)
+                                self.drawHole(h, canvas,color='Red',fcolor='Red',radmult=1.25)
                     elif channel=='armB' or channel.upper()=='BLUE':
                         if 'armR' in setup['channels']:
                             for h in setup['channels']['armR']:
-                                h.draw(canvas)
+                                self.drawHole(h, canvas)
                         if 'armB' in setup['channels']:
                             for h in setup['channels']['armB']:
-                                h.draw(canvas,color='Blue',fcolor='Blue',radmult=1.25)
+                                self.drawHole(h, canvas,color='Blue',fcolor='Blue',radmult=1.25)
                     
             #Draw the guide and acquisition holes in color
             for h in setup['unused_holes']:
-                h.draw(canvas,color='Yellow',fcolor='Yellow',radmult=1.25)
+                self.drawHole(h, canvas,color='Yellow',fcolor='Yellow',radmult=1.25)
     
             for h in self.getHolesNotInAnySetup():
-                h.draw(canvas,color='Magenta',fcolor='Magenta',radmult=1.25)        
+                self.drawHole(h, canvas,color='Magenta',fcolor='Magenta',radmult=1.25)        
 
 
     @staticmethod
@@ -671,7 +689,7 @@ class Plate(object):
                 
                 #Draw the holes in the group
                 for h in g['holes']:
-                    h.draw(canvas, color=color, fcolor=color,radmult=radmult)
+                    Plate.drawHole(h, canvas, color=color, fcolor=color,radmult=radmult)
     
                 # Draw the paths between each of the holes
                 for segment in g['path']:
@@ -701,7 +719,7 @@ class Plate(object):
     
                 #Draw the path
                 # Draw a line from the label to the first hole
-                canvas.drawLine(tpos, g['path'][0][0], fill=color)
+                canvas.drawLine(tpos, g['path'][0][0], fill=color, dashing=1)
                                 
                 #Draw an x across the first hole
                 radius=2*0.08675*radmult/Plate.SCALE
@@ -744,11 +762,11 @@ class Plate(object):
     
     def isValidCoordParam_D(self, x):
         if type(x) in [int,long,float]:
-            return True
+            return float(x) > 0.0
         elif type(x) is str:
             try: 
                 float(x)
-                return True
+                return float(x) > 0.0
             except ValueError:
                 return False
         else:
@@ -756,11 +774,10 @@ class Plate(object):
         
     def isValidCoordParam_R(self, x):
         if type(x) in [int,long,float]:
-            return True
+            return float(x)**2-self.coordShift_rm**2 >= 0.0 and float(x) > 0.0
         elif type(x) is str:
             try: 
-                float(x)
-                return True
+                return float(x)**2-self.coordShift_rm**2 >= 0.0 and float(x) > 0.0
             except ValueError:
                 return False
         else:
@@ -768,11 +785,10 @@ class Plate(object):
         
     def isValidCoordParam_rm(self, x):
         if type(x) in [int,long,float]:
-            return True
+            return self.coordShift_R**2-float(x)**2 >= 0.0 and float(x) > 0.0
         elif type(x) is str:
             try: 
-                float(x)
-                return True
+                return self.coordShift_R**2-float(x)**2 >= 0.0 and float(x) > 0.0
             except ValueError:
                 return False
         else:
@@ -795,4 +811,3 @@ class Plate(object):
         if self.setups:
             ret=s in self.setups
         return ret
-

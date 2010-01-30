@@ -1,6 +1,7 @@
-import PIL.Image as Image
-import PIL.ImageDraw as ImageDraw
-import PIL.ImageFont as ImageFont
+import PIL.Image
+import PIL.ImageDraw
+import PIL.ImageFont
+#import PIL.ImageFilter
 import math
 
 class ImageCanvas():
@@ -9,12 +10,13 @@ class ImageCanvas():
         #http://www.pythonware.com/library/pil/handbook/imagedraw.htm for ref
         #create a new image filled black
         self.mult=4
-	self.lwid=int(self.mult+3)
+        self.lwid=int(self.mult+3)
 
         self.default_color='White'
-        self.finishedSize=(width,height) 
-        self.image=Image.new("RGB", (self.mult*width, self.mult*height))
-        self.draw = ImageDraw.Draw(self.image)
+        self.finishedSize=(width,height)
+        
+        self.image= PIL.Image.new("RGB", (self.mult*width, self.mult*height))
+        self.draw = PIL.ImageDraw.Draw(self.image)
         
         self.centerx=self.mult*float(width)/2.0
         self.centery=self.mult*float(height)/2.0
@@ -24,9 +26,8 @@ class ImageCanvas():
         
         
     def save(self, file):
-	import ImageFilter
-	im=self.image.filter(ImageFilter.SMOOTH)
-	im=im.resize(self.finishedSize,Image.ANTIALIAS)
+        #im=self.image.filter(PIL.ImageFilter.SMOOTH)
+        im=self.image.resize(self.finishedSize,PIL.Image.ANTIALIAS)
         im.save(file)
 
 
@@ -95,23 +96,18 @@ class ImageCanvas():
         # when the rectangle is not filled.
         # Not sure if this will be an issue
         self.draw.rectangle((x0c,y0c,x1c,y1c), outline=col[0], fill=col[1])
-
-    ##takes either (x0,y0), (x1,y1)  or (x,y), r,theta
-    def drawLine(*args, **kw):
-        if 'fill' not in kw:
-            fill=None
-        else:
-            fill=kw['fill']
-        assert len(args) == 3 or len(args) == 4
-        self=args[0]
         
+    ##takes either (x0,y0), (x1,y1)  or (x,y), r,theta
+    def drawLine(self, *args, **kw):
+        assert len(args) == 2 or len(args) == 3
+
         # Get the coordinates
-        pos0 = args[1]
-        if len(args) == 3:
-            pos1 = args[2]
+        pos0 = args[0]
+        if len(args) == 2:
+            pos1 = args[1]
         else:
-            l = args[2]
-            th = args[3]
+            l = args[1]
+            th = args[2]
             x2=pos0[0]+l*math.cos(math.radians(th))
             y2=pos0[1]+l*math.sin(math.radians(th))
             pos1=(x2,y2)
@@ -122,7 +118,16 @@ class ImageCanvas():
         y1c=self.canvasCoordy(pos1[1])
         
         #Sort out coloring
-        col=self.setupColors(fill, None)
+        col=self.setupColors(kw.get('fill',None), None)
+        
+        if kw.pop('dashing',None):
+            if x0c > x1c:
+                xi,yi=x1c,y1c
+                xf,yf=x0c,y0c
+            else:
+                xi,yi=x0c,y0c
+                xf,yf=x1c,y1c                
+
         
         self.draw.line((x0c,y0c,x1c,y1c), fill=col[0],width=self.lwid)
 
@@ -134,12 +139,12 @@ class ImageCanvas():
         xc=self.canvasCoordx(x)
         yc=self.canvasCoordy(y)
 
-	thefont=ImageFont.truetype("/Library/Fonts/Arial.ttf", 48)
+        thefont=PIL.ImageFont.truetype("/Library/Fonts/Arial.ttf", 48)
 
-	if center:
-	    tmp=thefont.getsize(text)
-	    xc-=tmp[0]/2.0
-	    yc-=tmp[0]/2.0
+        if center:
+            tmp=thefont.getsize(text)
+            xc-=tmp[0]/2.0
+            yc-=tmp[0]/2.0
 
         #Sort out coloring
         col=self.setupColors(color, None)

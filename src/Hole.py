@@ -66,14 +66,3 @@ class Hole(dict):
     
     def position(self):
         return (self.x,self.y)
-
-    def draw(self,canvas,color=None,fcolor='White',radmult=1.0):
-        hashtag=".%i"%self.hash
-        if canvas.find_withtag(hashtag):
-            print "drawing dupe"
-            print (self.position(),self.radius,self.hash)
-            fcolor='DarkGreen'
-        canvas.drawCircle( self.position(), self.radius*radmult, 
-                             outline=color, fill=fcolor, tags=('hole',hashtag),
-                             activefill='Green',activeoutline='Green',
-                             disabledfill='Orange',disabledoutline='Orange')

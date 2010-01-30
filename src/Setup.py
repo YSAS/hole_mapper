@@ -19,7 +19,6 @@ class Setup(object):
         self.guideHoles=set()
         self.groups=[]
         self.dict={}
-        self.dict.
         for c in channels:
             self.dict[c]=set()
 

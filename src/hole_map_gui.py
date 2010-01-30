@@ -1,8 +1,9 @@
 import Tkinter
-import bettercanvas2
+import BetterCanvas
 import imagecanvas
 import Plate
 import tkMessageBox
+import os
 
 class HoleInfoDialog:
         
@@ -137,13 +138,13 @@ class App(Tkinter.Tk):
         frame2.place(x=0,y=whei-45-1)
 
         #The canvas for drawing the plate        
-        self.canvas=bettercanvas2.BetterCanvas2(self, chei, chei, 1.01, 1.01, bg='White')
+        self.canvas=BetterCanvas.BetterCanvas(self, chei, chei, 1.01, 1.01, bg='White')
         self.canvas.place(x=swid,y=0)
         self.canvas.bind("<Button-1>",self.canvasclick)
 
 
         #Buttons
-        Tkinter.Button(frame, text="Show Holes", command=self.show).pack()
+        Tkinter.Button(frame, text="Show All", command=self.show).pack()
         Tkinter.Button(frame, text="Show Red", 
                        command=lambda:self.show(channel='armR')).pack()
         Tkinter.Button(frame, text="Show Blue", 
@@ -156,8 +157,9 @@ class App(Tkinter.Tk):
         Tkinter.Button(frame, text="Load Holes", command=self.load).pack()
         Tkinter.Button(frame, text="Regionify", command=self.makeRegions).pack()
         Tkinter.Button(frame, text="Write Map", command=self.writeMap).pack()
-        Tkinter.Button(frame, text="Toggle Coord", command=self.toggleCoord).pack()
-       
+        self.coordshft_str=Tkinter.StringVar(value='CShift Off')
+        Tkinter.Button(frame, textvariable=self.coordshft_str, command=self.toggleCoord).pack()
+
         #Input
         #Setup input
         self.setup_str=Tkinter.StringVar(value='1')
@@ -232,6 +234,10 @@ class App(Tkinter.Tk):
 
     def toggleCoord(self):
         self.plate.toggleCoordShift()
+        if self.plate.doCoordShift:
+            self.coordshft_str.set('CShift On')
+        else:
+            self.coordshft_str.set('CShift Off')
         self.show()
 
     def testinit(self):
@@ -254,55 +260,74 @@ class App(Tkinter.Tk):
             self.plate.setCoordShiftD(self.Dparam_str.get())
         else:
             self.Dparam_str.set(str(self.plate.coordShift_D))
+        self.show()
 
     def setCoordShiftR(self,*args):
         if self.plate.isValidCoordParam_R(self.Rparam_str.get()):
             self.plate.setCoordShiftR(self.Rparam_str.get())
         else:
             self.Rparam_str.set(str(self.plate.coordShift_R))
+        self.show()
     
     def setCoordShiftrm(self,*args):
         if self.plate.isValidCoordParam_rm(self.rmparam_str.get()):
             self.plate.setCoordShiftrm(self.rmparam_str.get())
         else:
             self.rmparam_str.set(str(self.plate.coordShift_rm))
+        self.show()
 
     def setCoordShifta(self,*args):
         if self.plate.isValidCoordParam_a(self.aparam_str.get()):
             self.plate.setCoordShifta(self.aparam_str.get())
         else:
             self.aparam_str.set(str(self.plate.coordShift_a))
-
+        self.show()
 
     def getActiveSetup(self):
         return "Setup "+self.setup_str.get()
+
 
     def show(self, channel='all'):
         self.canvas.clear()
         self.info_str.set(self.plate.getSetupInfo(self.getActiveSetup()))
         self.plate.draw(self.canvas, channel=channel, active_setup=self.getActiveSetup())
 
+
     def makeRegions(self):
         self.plate.regionify(active_setup=self.getActiveSetup())
         self.show()
 
+
+    @staticmethod
+    def getPath(sequence):
+        dir=os.path.os.path.join(*sequence)
+        if os.name is 'nt':
+            dir='C:\\'+dir+os.path.sep
+        else:
+            dir=os.path.expanduser('~/')+dir+os.path.sep
+        return dir
+        
     def load(self):
         from tkFileDialog import askopenfilename
-        from os.path import basename
-        dir='/Users/one/Documents/Mario_research/plate_routing/Plates/'
-        file=askopenfilename()
 
-        self.plate.loadHoles(file)
-        self.file_str.set(basename(file))
-        self.show()
+        dir=App.getPath(('hole_mapper','plates'))
+        file=askopenfilename(initialdir=dir, filetypes=[('asc files', '.asc')])
+        if file:
+            self.plate.loadHoles(file)
+            self.file_str.set(os.path.basename(file))
+            self.show()
         
     def writeMap(self):
-        dir='/Users/one/Documents/Mario_research/plate_routing/Plates/'
+        dir=App.getPath(('hole_mapper',self.plate.plate_name))
+        if not os.path.exists(dir):
+            os.makedirs(dir)
         self.plate.writeMapFile(dir, self.getActiveSetup())
         
     def makeImage(self,channel='all'):
         #The image canvas for drawing the plate to a file
-        dir='/Users/one/Documents/Mario_research/plate_routing/Plates/'
+        dir=App.getPath(('hole_mapper',self.plate.plate_name))
+        if not os.path.exists(dir):
+            os.makedirs(dir)
         imgcanvas=imagecanvas.ImageCanvas(768, 768, 1.0, 1.0)
         self.plate.drawImage(imgcanvas, channel=channel, active_setup=self.getActiveSetup())
         imgcanvas.save(dir+self.file_str.get()+'_'+self.getActiveSetup()+'_'+channel+'.bmp')
