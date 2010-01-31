@@ -4,7 +4,7 @@ Created on Dec 12, 2009
 @author: one
 '''
 from Hole import *
-import imagecanvas
+import ImageCanvas
 import os.path
 import platefile
 class Plate(object):
@@ -522,7 +522,7 @@ class Plate(object):
             pos=hole.position()
             
         hashtag=".%i"%hole.hash
-        if isinstance(canvas,imagecanvas.ImageCanvas):
+        if isinstance(canvas,ImageCanvas.ImageCanvas):
             canvas.drawCircle( pos, hole.radius*radmult, 
                                  outline=color, fill=fcolor)
         else:
@@ -665,9 +665,7 @@ class Plate(object):
             for h in self.getHolesNotInAnySetup():
                 self.drawHole(h, canvas,color='Magenta',fcolor='Magenta',radmult=1.25)        
 
-
-    @staticmethod
-    def drawGroup( holeGroup, canvas,radmult=1.0,channel='all'):    
+    def drawGroup(self, holeGroup, canvas,radmult=1.0,channel='all'):    
         if channel=='all':
             channeltoshow=['armB','armR']
         elif channel=='armR' or channel.upper()=='RED':
@@ -689,7 +687,7 @@ class Plate(object):
                 
                 #Draw the holes in the group
                 for h in g['holes']:
-                    Plate.drawHole(h, canvas, color=color, fcolor=color,radmult=radmult)
+                    self.drawHole(h, canvas, color=color, fcolor=color,radmult=radmult)
     
                 # Draw the paths between each of the holes
                 for segment in g['path']:
@@ -708,7 +706,7 @@ class Plate(object):
                 #Determine the text label
                 label=g['fiber_group']+'-'+str(int(g['fiber_group'][-2:])+len(g['holes'])-1)
         
-                if isinstance(canvas,imagecanvas.ImageCanvas):
+                if isinstance(canvas,ImageCanvas.ImageCanvas):
                     t=canvas.getTextSize(g['fiber_group'])
                     tpos[0]-=t[0]
                     if g['side']=='left':

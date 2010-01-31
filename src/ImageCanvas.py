@@ -126,10 +126,29 @@ class ImageCanvas():
                 xf,yf=x0c,y0c
             else:
                 xi,yi=x0c,y0c
-                xf,yf=x1c,y1c                
+                xf,yf=x1c,y1c
+            llen=math.hypot(xf-xi, yf-yi)
+            
+            notdone=True
+            x0,y0=xi,yi
+            dl=20
+            dx,dy=dl*(xf-xi)/llen,dl*(yf-yi)/llen
 
-        
-        self.draw.line((x0c,y0c,x1c,y1c), fill=col[0],width=self.lwid)
+            x1,y1=x0+dx,y0+dy
+            if x1 < xf:
+                while notdone:
+                    
+                    self.draw.line((x0,y0,x1,y1), fill=col[0],width=self.lwid)
+                    x0,y0=x1+dx,y1+dy
+                    x1,y1=x0+dx,y0+dy
+                    if x1 > xf:
+                        self.draw.line((x0,y0,xf,yf), fill=col[0],width=self.lwid)
+                        notdone=False
+            else:    
+                self.draw.line((x0c,y0c,x1c,y1c), fill=col[0],width=self.lwid)
+                
+        else:
+            self.draw.line((x0c,y0c,x1c,y1c), fill=col[0],width=self.lwid)
 
 
     # x,y is at upper left corner of text unless center is set to 1
@@ -139,7 +158,7 @@ class ImageCanvas():
         xc=self.canvasCoordx(x)
         yc=self.canvasCoordy(y)
 
-        thefont=PIL.ImageFont.truetype("/Library/Fonts/Arial.ttf", 48)
+        thefont=PIL.ImageFont.truetype("/Library/Fonts/Arial.ttf", 12*self.mult)
 
         if center:
             tmp=thefont.getsize(text)

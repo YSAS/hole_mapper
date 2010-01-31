@@ -1,6 +1,6 @@
 import Tkinter
 import BetterCanvas
-import imagecanvas
+import ImageCanvas
 import Plate
 import tkMessageBox
 import os
@@ -328,7 +328,7 @@ class App(Tkinter.Tk):
         dir=App.getPath(('hole_mapper',self.plate.plate_name))
         if not os.path.exists(dir):
             os.makedirs(dir)
-        imgcanvas=imagecanvas.ImageCanvas(768, 768, 1.0, 1.0)
+        imgcanvas=ImageCanvas.ImageCanvas(768, 768, 1.0, 1.0)
         self.plate.drawImage(imgcanvas, channel=channel, active_setup=self.getActiveSetup())
         imgcanvas.save(dir+self.file_str.get()+'_'+self.getActiveSetup()+'_'+channel+'.bmp')
                             

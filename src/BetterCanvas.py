@@ -72,7 +72,7 @@ class BetterCanvas(Tkinter.Canvas):
             pos1=(x2,y2)
 
         if kw.pop('dashing',None):
-            print 'Drawing a dashed line'
+            kw['dash']=(3,3)
 
         self.create_line(self.canvasCoordx(pos0[0]),
                          self.canvasCoordy(pos0[1]),
