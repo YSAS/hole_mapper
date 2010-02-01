@@ -513,7 +513,7 @@ class Plate(object):
         return groups
 
 
-    def drawHole(self, hole, canvas, color=None, fcolor='White', radmult=1.0):
+    def drawHole(self, hole, canvas, color=None, fcolor='White', radmult=1.0, drawimage=0):
        
         if self.doCoordShift:
             x,y=hole.position()
@@ -522,12 +522,14 @@ class Plate(object):
             pos=hole.position()
             
         hashtag=".%i"%hole.hash
-        if isinstance(canvas,ImageCanvas.ImageCanvas):
-            canvas.drawCircle( pos, hole.radius*radmult, 
-                                 outline=color, fill=fcolor)
+        if drawimage:
+                canvas.drawCircle( pos, hole.radius*radmult, outline=color, fill=fcolor)
         else:
             if canvas.find_withtag(hashtag):
-                print "drawing dupe in Dark Green @ (%f,%f) ID:%l"%(pos, hole.hash)
+                tmp=list(pos)
+                tmp.append(hole.hash)
+                print tmp
+                print "drawing dupe in Dark Green @ (%f,%f) ID:%i"%tuple(tmp)
                 fcolor='DarkGreen'
             canvas.drawCircle( pos, hole.radius*radmult, 
                                outline=color, fill=fcolor, tags=('hole',hashtag),
@@ -616,8 +618,7 @@ class Plate(object):
                 self.drawHole(h, canvas)
 
         
-    def drawImage(self, canvas, active_setup=None, channel='all'):
-        
+    def drawImage(self, canvas, active_setup=None, channel='all',radmult=1.25):
         if active_setup and active_setup in self.setups:
             #the active setup
             setup=self.setups[active_setup]
@@ -628,44 +629,51 @@ class Plate(object):
     
             #Draw little white dots where all the other holes are
             for h in self.holeSet:
-                canvas.drawCircle(h.position(), h.radius/3 ,fill='White',outline='White')
-    
-                #If holes in setup have been grouped then draw the groups
-                # otherwise draw them according to their channel
-                if setup['groups']:
-                    self.drawGroup(setup['groups'],canvas,channel=channel)
+                if self.doCoordShift:
+                    x,y=h.position()
+                    pos=self.plateCoordShift(x, y)
                 else:
-                    if channel=='all':
-                        for c in setup['channels']:
-                            if c=='armB':
-                                for h in setup['channels'][c]:
-                                    self.drawHole(h, canvas,color='Blue',fcolor='Blue',radmult=1.25)
-                            else:
-                                for h in setup['channels'][c]:
-                                    self.drawHole(h, canvas,color='Red',fcolor='Red',radmult=1.25)
-                    elif channel=='armR' or channel.upper()=='RED':
-                        if 'armB' in setup['channels']:
-                            for h in setup['channels']['armB']:
-                                self.drawHole(h, canvas)
-                        if 'armR' in setup['channels']:
-                            for h in setup['channels']['armR']:
-                                self.drawHole(h, canvas,color='Red',fcolor='Red',radmult=1.25)
-                    elif channel=='armB' or channel.upper()=='BLUE':
-                        if 'armR' in setup['channels']:
-                            for h in setup['channels']['armR']:
-                                self.drawHole(h, canvas)
-                        if 'armB' in setup['channels']:
-                            for h in setup['channels']['armB']:
-                                self.drawHole(h, canvas,color='Blue',fcolor='Blue',radmult=1.25)
+                    pos=h.position()
+                    
+                canvas.drawCircle(pos, h.radius/3 ,fill='White',outline='White')
+    
+            #If holes in setup have been grouped then draw the groups
+            # otherwise draw them according to their channel
+            if setup['groups']:
+                self.drawGroup(setup['groups'],canvas,channel=channel,drawimage=1)
+            else:
+                if channel=='all':
+                    for c in setup['channels']:
+                        if c=='armB':
+                            for h in setup['channels'][c]:
+                                self.drawHole(h, canvas,color='Blue',fcolor='Blue',radmult=radmult,drawimage=1)
+                        else:
+                            for h in setup['channels'][c]:
+                                self.drawHole(h, canvas,color='Red',fcolor='Red',radmult=radmult,drawimage=1)
+                elif channel=='armR' or channel.upper()=='RED':
+                    if 'armB' in setup['channels']:
+                        for h in setup['channels']['armB']:
+                            self.drawHole(h, canvas,drawimage=1)
+                    if 'armR' in setup['channels']:
+                        for h in setup['channels']['armR']:
+                            self.drawHole(h, canvas,color='Red',fcolor='Red',radmult=radmult,drawimage=1)
+                elif channel=='armB' or channel.upper()=='BLUE':
+                    if 'armR' in setup['channels']:
+                        for h in setup['channels']['armR']:
+                            self.drawHole(h, canvas,drawimage=1)
+                    if 'armB' in setup['channels']:
+                        for h in setup['channels']['armB']:
+                            self.drawHole(h, canvas,color='Blue',fcolor='Blue',radmult=radmult,drawimage=1)
                     
             #Draw the guide and acquisition holes in color
             for h in setup['unused_holes']:
-                self.drawHole(h, canvas,color='Yellow',fcolor='Yellow',radmult=1.25)
+                self.drawHole(h, canvas,color='Yellow',fcolor='Yellow',radmult=radmult,drawimage=1)
     
             for h in self.getHolesNotInAnySetup():
-                self.drawHole(h, canvas,color='Magenta',fcolor='Magenta',radmult=1.25)        
+                self.drawHole(h, canvas,color='Magenta',fcolor='Magenta',radmult=radmult,drawimage=1)        
 
-    def drawGroup(self, holeGroup, canvas,radmult=1.0,channel='all'):    
+
+    def drawGroup(self, holeGroup, canvas,radmult=1.0,channel='all',drawimage=0):    
         if channel=='all':
             channeltoshow=['armB','armR']
         elif channel=='armR' or channel.upper()=='RED':
@@ -687,7 +695,7 @@ class Plate(object):
                 
                 #Draw the holes in the group
                 for h in g['holes']:
-                    self.drawHole(h, canvas, color=color, fcolor=color,radmult=radmult)
+                    self.drawHole(h, canvas, color=color, fcolor=color,radmult=radmult,drawimage=drawimage)
     
                 # Draw the paths between each of the holes
                 for segment in g['path']:

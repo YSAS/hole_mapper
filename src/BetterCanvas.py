@@ -80,12 +80,13 @@ class BetterCanvas(Tkinter.Canvas):
                          self.canvasCoordy(pos1[1]),kw)
 
 
-    def drawText(self,(x,y),text,color=None):
+    def drawText(self,(x,y),text,color=None, center=0):
         kw={'color':color}
         self.sanitizeColorKW(kw)
         self.create_text(self.canvasCoordx(x),
                          self.canvasCoordy(y),
                          text=text,fill=kw['color'])
+         
     
     def canvasCoordx(self,x):
         return round(-self.scalex*x+self.centerx)

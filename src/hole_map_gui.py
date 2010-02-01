@@ -241,10 +241,43 @@ class App(Tkinter.Tk):
         self.show()
 
     def testinit(self):
-        #put some holes in the plate
-        #self.load()
+        # create a second window and make it cover the entire projector screen
+        self.proj_win=Tkinter.Toplevel(self.parent)
+        self.proj_win.overrideredirect(1)
+        self.proj_win.geometry("768x768")
+
+        self.moving={'stat':False}
+        self.proj_win.bind("<Button-1>",self.startMove)
+        self.proj_win.bind("<ButtonRelease-1>",self.stopMove)
+        self.proj_win.bind("<B1-Motion>", self.Move)
+        print '.'+self.proj_win.winfo_screen()+'.'
+        
+        self.proj_can=BetterCanvas.BetterCanvas(self.proj_win, 768,768, 1.00, 1.00, bg='Black')
+        self.proj_can.place(x=-3,y=-3)
         self.show()
 
+    def Move(self,event):
+        if self.moving['stat']:
+            
+            dx=event.x_root-self.moving['xs']
+            dy=event.y_root-self.moving['ys']
+            
+            xnew=self.moving['xi']+dx
+            ynew=self.moving['yi']+dy
+            self.proj_win.geometry("768x768+%i+%i"%(xnew,ynew))
+            
+
+    def startMove(self,event):
+        print '.'+self.proj_win.winfo_screen()+'.'
+        self.moving={'stat':True,'xs':event.x_root,'ys':event.y_root,
+                     'xi':self.proj_win.winfo_rootx(),
+                     'yi':self.proj_win.winfo_rooty()}
+        
+    
+    def stopMove(self,event):
+        print '.'+self.proj_win.winfo_screen()+'.'
+        self.moving['stat']=False    
+    
     def canvasclick(self, event):
         #Get holes that are within a few pixels of the mouse position
         items=self.canvas.find_overlapping(event.x - 2, event.y-2, event.x+2, event.y+2)
@@ -289,8 +322,10 @@ class App(Tkinter.Tk):
 
     def show(self, channel='all'):
         self.canvas.clear()
+        self.proj_can.clear()
         self.info_str.set(self.plate.getSetupInfo(self.getActiveSetup()))
         self.plate.draw(self.canvas, channel=channel, active_setup=self.getActiveSetup())
+        self.plate.drawImage(self.proj_can, channel=channel,radmult=1.1, active_setup=self.getActiveSetup())
 
 
     def makeRegions(self):
