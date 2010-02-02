@@ -158,7 +158,7 @@ class ImageCanvas():
         xc=self.canvasCoordx(x)
         yc=self.canvasCoordy(y)
 
-        thefont=PIL.ImageFont.truetype("/Library/Fonts/Arial.ttf", 12*self.mult)
+        thefont=PIL.ImageFont.truetype("Arial.ttf", 12*self.mult)
 
         if center:
             tmp=thefont.getsize(text)

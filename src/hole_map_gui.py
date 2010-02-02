@@ -106,9 +106,6 @@ class HoleInfoDialog:
         
         
 class App(Tkinter.Tk):
-    wh=710
-    ww=610
-    ih=100
     def __init__(self, parent):
         Tkinter.Tk.__init__(self, parent)
         self.parent = parent

@@ -515,11 +515,8 @@ class Plate(object):
 
     def drawHole(self, hole, canvas, color=None, fcolor='White', radmult=1.0, drawimage=0):
        
-        if self.doCoordShift:
-            x,y=hole.position()
-            pos=self.plateCoordShift(x, y)
-        else:
-            pos=hole.position()
+        
+        pos=self.plateCoordShift(hole.position())
             
         hashtag=".%i"%hole.hash
         if drawimage:
@@ -537,9 +534,12 @@ class Plate(object):
                                disabledfill='Orange',disabledoutline='Orange')
 
 
-    def plateCoordShift(self, xin, yin):
-        """ Shifts x and y to their new positions in scaled space"""
-        if xin==0.0 and yin==0.0:
+    def plateCoordShift(self, (xin, yin), force=False):
+        """ Shifts x and y to their new positions in scaled space,
+            if self.doCoordShift is True or force is set to True.
+            out=in otherwise"""
+        if (not self.doCoordShift and
+            not force or (xin==0.0 and yin==0.0)):
             return (xin,yin)
         else:
             D=self.coordShift_D
@@ -629,12 +629,8 @@ class Plate(object):
     
             #Draw little white dots where all the other holes are
             for h in self.holeSet:
-                if self.doCoordShift:
-                    x,y=h.position()
-                    pos=self.plateCoordShift(x, y)
-                else:
-                    pos=h.position()
-                    
+
+                pos=self.plateCoordShift(h.position())    
                 canvas.drawCircle(pos, h.radius/3 ,fill='White',outline='White')
     
             #If holes in setup have been grouped then draw the groups
@@ -700,7 +696,8 @@ class Plate(object):
                 # Draw the paths between each of the holes
                 for segment in g['path']:
                     for i in range(len(segment)-1):
-                        canvas.drawLine(segment[i], segment[i+1], fill=color)
+                        canvas.drawLine(self.plateCoordShift(segment[i]),
+                                        self.plateCoordShift(segment[i+1]), fill=color)
                 
                 #Determine where to stick the text label for the group
                 thmult=Plate.LABEL_ANGLE_MULT[ g['fiber_group'][2:] ]
@@ -721,25 +718,31 @@ class Plate(object):
                         tpos[0]-=t[0]
     
                 #Draw the text label
-                canvas.drawText( tpos, label)   
-    
+                if drawimage:
+                    lblcolor="White"
+                else:
+                    lblcolor="Black"
+
+                canvas.drawText( tpos, label, color=lblcolor)   
+
+                    
                 #Draw the path
                 # Draw a line from the label to the first hole
-                canvas.drawLine(tpos, g['path'][0][0], fill=color, dashing=1)
+                canvas.drawLine(tpos, self.plateCoordShift(g['path'][0][0]), fill=color, dashing=1)
                                 
                 #Draw an x across the first hole
                 radius=2*0.08675*radmult/Plate.SCALE
-                canvas.drawLine((g['path'][0][0][0]-radius,g['path'][0][0][1]+radius),
-                        (g['path'][0][0][0]+radius,g['path'][0][0][1]-radius))
-                canvas.drawLine((g['path'][0][0][0]-radius,g['path'][0][0][1]-radius),
-                        (g['path'][0][0][0]+radius,g['path'][0][0][1]+radius))
+                x,y=g['path'][0][0][0],g['path'][0][0][1]
+                x,y=self.plateCoordShift(g['path'][0][0])
+                canvas.drawLine((x-radius,y+radius),(x+radius,y-radius), fill=lblcolor)
+                canvas.drawLine((x-radius,y-radius),(x+radius,y+radius), fill=lblcolor)
         
                 #Draw a + over the last hole
                 radius*=1.41
-                canvas.drawLine((g['path'][-1][-1][0]-radius,g['path'][-1][-1][1]),
-                        (g['path'][-1][-1][0]+radius,g['path'][-1][-1][1]))
-                canvas.drawLine((g['path'][-1][-1][0],g['path'][-1][-1][1]-radius),
-                        (g['path'][-1][-1][0],g['path'][-1][-1][1]+radius))
+                x,y=g['path'][-1][-1][0],g['path'][-1][-1][1]
+                x,y=self.plateCoordShift(g['path'][-1][-1])
+                canvas.drawLine((x-radius,y),(x+radius,y), fill=lblcolor)
+                canvas.drawLine((x,y-radius),(x,y+radius), fill=lblcolor)
 
         
     def setCoordShiftD(self, D):
