@@ -344,7 +344,7 @@ class Plate(object):
         if active_setup in self.setups:
             ofile=''.join([out_dir,self.plate_name,'_',active_setup,'.map'])
             with open( ofile, "w" ) as fout:
-                fout.write(''.join(['Code Version: Dec 09\n',self.plate_name,'\n']))
+                fout.write(''.join(['Code Version: Feb 10\n',self.plate_name,'\n']))
                 setup_nfo=self.plateHoleInfo.getSetupInfo(active_setup)
                 for l in setup_nfo:
                     fout.write(l)
