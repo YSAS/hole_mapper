@@ -184,7 +184,7 @@ class Plate(object):
         
         holeinfostr=self.plateHoleInfo.getHoleInfo(setup, hole)
         if holeinfostr:
-            print holeinfostr
+            #print holeinfostr
             holeinfostr=holeinfostr.split()
             #"<sky Coords>  <plate Coords>  <hole type>  <additional info from .res file>"
             ra=tuple(map(float,holeinfostr[0:3]))

@@ -119,7 +119,7 @@ class App(Tkinter.Tk):
         #Basic window stuff
         swid=120
         bhei=55
-        whei=855
+        whei=735
         chei=whei-bhei
         wwid=chei+swid
         self.geometry ("%ix%i"%(wwid,whei))
@@ -173,9 +173,9 @@ class App(Tkinter.Tk):
         #entry.bind("<Return>",self.show)
    
         #Coordinate shift input
-        self.Dparam_str=Tkinter.StringVar(value='61')
+        self.Dparam_str=Tkinter.StringVar(value='64')
         self.rmparam_str=Tkinter.StringVar(value='13.21875')
-        self.aparam_str=Tkinter.StringVar(value='0.01')
+        self.aparam_str=Tkinter.StringVar(value='0.03')
         self.Rparam_str=Tkinter.StringVar(value='50.68')
         
         paramw=4
@@ -189,7 +189,7 @@ class App(Tkinter.Tk):
             vcmd=lambda:self.plate.isValidCoordParam_D(self.Dparam_str.get()),
             textvariable=self.Dparam_str)
         entry.pack()
-        entry.bind("<FocusOut>",self.setCoordShiftD)
+        #entry.bind("<FocusOut>",self.setCoordShiftD)
         entry.bind("<Return>",self.setCoordShiftD)
 
         rmframe=Tkinter.LabelFrame(pframe,text='rm',relief='flat')
@@ -199,7 +199,7 @@ class App(Tkinter.Tk):
             vcmd=lambda:self.plate.isValidCoordParam_rm(self.rmparam_str.get()),
             textvariable=self.rmparam_str)
         entry.pack()
-        entry.bind("<FocusOut>",self.setCoordShiftrm)
+        #entry.bind("<FocusOut>",self.setCoordShiftrm)
         entry.bind("<Return>",self.setCoordShiftrm)
         
         Rframe=Tkinter.LabelFrame(pframe,text='R',relief='flat')
@@ -209,7 +209,7 @@ class App(Tkinter.Tk):
             vcmd=lambda:self.plate.isValidCoordParam_R(self.Rparam_str.get()),
             textvariable=self.Rparam_str)
         entry.pack()
-        entry.bind("<FocusOut>",self.setCoordShiftR)
+        #entry.bind("<FocusOut>",self.setCoordShiftR)
         entry.bind("<Return>",self.setCoordShiftR)
 
         aframe=Tkinter.LabelFrame(pframe,text='a',relief='flat')
@@ -219,7 +219,7 @@ class App(Tkinter.Tk):
             vcmd=lambda:self.plate.isValidCoordParam_a(self.aparam_str.get()),
             textvariable=self.aparam_str)
         entry.pack()
-        entry.bind("<FocusOut>",self.setCoordShifta)
+        #entry.bind("<FocusOut>",self.setCoordShifta)
         entry.bind("<Return>",self.setCoordShifta)
 
         #Info output
@@ -241,7 +241,7 @@ class App(Tkinter.Tk):
         # create a second window and make it cover the entire projector screen
         self.proj_win=Tkinter.Toplevel(self.parent)
         self.proj_win.overrideredirect(1)
-        self.proj_win.geometry("768x768")
+        self.proj_win.geometry("768x768+1494+0")
 
         self.moving={'stat':False}
         self.proj_win.bind("<Button-1>",self.startMove)
@@ -290,28 +290,32 @@ class App(Tkinter.Tk):
             self.plate.setCoordShiftD(self.Dparam_str.get())
         else:
             self.Dparam_str.set(str(self.plate.coordShift_D))
-        self.show()
+        if self.plate.doCoordShift:
+            self.show()
 
     def setCoordShiftR(self,*args):
         if self.plate.isValidCoordParam_R(self.Rparam_str.get()):
             self.plate.setCoordShiftR(self.Rparam_str.get())
         else:
             self.Rparam_str.set(str(self.plate.coordShift_R))
-        self.show()
+        if self.plate.doCoordShift:
+            self.show()
     
     def setCoordShiftrm(self,*args):
         if self.plate.isValidCoordParam_rm(self.rmparam_str.get()):
             self.plate.setCoordShiftrm(self.rmparam_str.get())
         else:
             self.rmparam_str.set(str(self.plate.coordShift_rm))
-        self.show()
+        if self.plate.doCoordShift:
+            self.show()
 
     def setCoordShifta(self,*args):
         if self.plate.isValidCoordParam_a(self.aparam_str.get()):
             self.plate.setCoordShifta(self.aparam_str.get())
         else:
             self.aparam_str.set(str(self.plate.coordShift_a))
-        self.show()
+        if self.plate.doCoordShift:
+            self.show()
 
     def getActiveSetup(self):
         return "Setup "+self.setup_str.get()
@@ -344,6 +348,8 @@ class App(Tkinter.Tk):
 
         dir=App.getPath(('hole_mapper','plates'))
         file=askopenfilename(initialdir=dir, filetypes=[('asc files', '.asc')])
+        file=os.path.normpath(file)
+        print file
         if file:
             self.plate.loadHoles(file)
             self.file_str.set(os.path.basename(file))

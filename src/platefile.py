@@ -147,9 +147,9 @@ class plateHoleInfo:
     '''Frontend to the .res & .asc files of a setup
        used to retrieve information about a given hole'''
     def __init__(self,dir,platename):
-        self.rfile=resfile(dir+platename+'.res')
+        self.rfile=resfile(dir+platename.replace('Sum','plate')+'.res')
         self.afile=ascfile(dir+platename+'.asc')
-        
+
     def getHoleInfo(self, setupName, hole):
         '''Returns a line containing info about the hole requested,
         lines are of the form:
