@@ -42,11 +42,11 @@ class Plate(object):
         self.holeSet=set()
         self.setups={}
         self.plate_name=''
-        self.doCoordShift=False
-        self.coordShift_D=61.0
+        self.doCoordShift=True
+        self.coordShift_D=64.0
         self.coordShift_R=50.68
         self.coordShift_rm=13.21875
-        self.coordShift_a=0.01
+        self.coordShift_a=0.03
 
     def getHole(self, holeID):
         for h in self.holeSet:
@@ -624,14 +624,10 @@ class Plate(object):
             setup=self.setups[active_setup]
 
             #Draw the plate name and active setup
-            canvas.drawText((0,.85), self.plate_name ,color='White',center=0)
-            canvas.drawText((0,.8), active_setup, color='White',center=0)
+            canvas.drawText((0,.75), self.plate_name ,color='White',center=0)
+            canvas.drawText((0,.7), active_setup, color='White',center=0)
     
-            #Draw little white dots where all the other holes are
-            for h in self.holeSet:
 
-                pos=self.plateCoordShift(h.position())    
-                canvas.drawCircle(pos, h.radius/3 ,fill='White',outline='White')
     
             #If holes in setup have been grouped then draw the groups
             # otherwise draw them according to their channel
@@ -666,7 +662,20 @@ class Plate(object):
                 self.drawHole(h, canvas,color='Yellow',fcolor='Yellow',radmult=radmult,drawimage=1)
     
             for h in self.getHolesNotInAnySetup():
-                self.drawHole(h, canvas,color='Magenta',fcolor='Magenta',radmult=radmult,drawimage=1)        
+                self.drawHole(h, canvas,color='Magenta',fcolor='Magenta',radmult=radmult,drawimage=1)
+
+            #Draw little white dots where all the other holes are
+            inactiveHoles=self.holeSet.difference(setup['unused_holes'])
+            for key in setup['channels']:
+                if channel==key or channel=='all':
+                    inactiveHoles.difference_update(setup['channels'][key])
+            for h in inactiveHoles:
+                pos=self.plateCoordShift(h.position())    
+                canvas.drawCircle(pos, h.radius/3 ,fill='White',outline='White')
+                
+            #for h in self.holeSet:
+            #    pos=self.plateCoordShift(h.position())    
+            #    canvas.drawCircle(pos, h.radius/3 ,fill='White',outline='White')
 
 
     def drawGroup(self, holeGroup, canvas,radmult=1.0,channel='all',drawimage=0):    
@@ -688,6 +697,22 @@ class Plate(object):
                 
                 #Draw a rectangle around the group
                 #mycanvas.drawRectangle(g['region'],outline=col)
+
+
+                pluscrosscolor='Lime'
+                #Draw an x across the first hole
+                radius=2*0.08675*radmult/Plate.SCALE
+                x,y=g['path'][0][0][0],g['path'][0][0][1]
+                x,y=self.plateCoordShift(g['path'][0][0])
+                canvas.drawLine((x-radius,y+radius),(x+radius,y-radius), fill=pluscrosscolor)
+                canvas.drawLine((x-radius,y-radius),(x+radius,y+radius), fill=pluscrosscolor)
+        
+                #Draw a + over the last hole
+                radius*=1.41
+                x,y=g['path'][-1][-1][0],g['path'][-1][-1][1]
+                x,y=self.plateCoordShift(g['path'][-1][-1])
+                canvas.drawLine((x-radius,y),(x+radius,y), fill=pluscrosscolor)
+                canvas.drawLine((x,y-radius),(x,y+radius), fill=pluscrosscolor)
                 
                 #Draw the holes in the group
                 for h in g['holes']:
@@ -729,20 +754,6 @@ class Plate(object):
                 #Draw the path
                 # Draw a line from the label to the first hole
                 canvas.drawLine(tpos, self.plateCoordShift(g['path'][0][0]), fill=color, dashing=1)
-                                
-                #Draw an x across the first hole
-                radius=2*0.08675*radmult/Plate.SCALE
-                x,y=g['path'][0][0][0],g['path'][0][0][1]
-                x,y=self.plateCoordShift(g['path'][0][0])
-                canvas.drawLine((x-radius,y+radius),(x+radius,y-radius), fill=lblcolor)
-                canvas.drawLine((x-radius,y-radius),(x+radius,y+radius), fill=lblcolor)
-        
-                #Draw a + over the last hole
-                radius*=1.41
-                x,y=g['path'][-1][-1][0],g['path'][-1][-1][1]
-                x,y=self.plateCoordShift(g['path'][-1][-1])
-                canvas.drawLine((x-radius,y),(x+radius,y), fill=lblcolor)
-                canvas.drawLine((x,y-radius),(x,y+radius), fill=lblcolor)
 
         
     def setCoordShiftD(self, D):

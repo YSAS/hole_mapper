@@ -154,7 +154,7 @@ class App(Tkinter.Tk):
         Tkinter.Button(frame, text="Load Holes", command=self.load).pack()
         Tkinter.Button(frame, text="Regionify", command=self.makeRegions).pack()
         Tkinter.Button(frame, text="Write Map", command=self.writeMap).pack()
-        self.coordshft_str=Tkinter.StringVar(value='CShift Off')
+        self.coordshft_str=Tkinter.StringVar(value='CShift On')
         Tkinter.Button(frame, textvariable=self.coordshft_str, command=self.toggleCoord).pack()
 
         #Input

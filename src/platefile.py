@@ -161,6 +161,8 @@ class plateHoleInfo:
             linenum=self.afile.getLineNumOfHole(hole, setupName)
         except KeyError:
             return ''
+        except ValueError:
+            return ''
         aline=self.afile.getLineNofSetup(linenum, setupName)
         awords=aline.split()
         holetype=awords[4]
