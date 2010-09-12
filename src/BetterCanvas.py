@@ -42,7 +42,7 @@ class BetterCanvas(Tkinter.Canvas):
               self.canvasCoordx(x-len/2.),
               self.canvasCoordy(y-len/2.),  
               self.canvasCoordx(x+len/2.),  
-              self.canvasCoordy(y+len/2.), kw) 
+              self.canvasCoordy(y+len/2.), kw)
 
     def drawRectangle(self,(x0,y0,x1,y1), **kw):
         self.sanitizeColorKW(kw)

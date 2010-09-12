@@ -19,14 +19,15 @@ class Plate(object):
                  ('R-01-01','R-01-09','R-03-01','R-03-09',
                   'R-05-01','R-05-09','R-07-01','R-07-09') )}
     LABEL_ANGLE_MULT={
-        '02-09':-1, '02-01':-2,
-        '04-09':-3, '04-01':-4,
-        '06-09':-5, '06-01':-6,
-        '08-09':-7, '08-01':-8,
-        '01-01': 1, '01-09': 2,
-        '03-01': 3, '03-09': 4,
-        '05-01': 5, '05-09': 6,
-        '07-01': 7, '07-09': 8}
+        '02-09':-2.5, '02-01':-3,
+        '04-09':-3.5, '04-01':-4,
+        '06-09':-4.5, '06-01':-5,
+        '08-09':-5.5, '08-01':-6,
+        '01-01': 2.5, '01-09': 3,
+        '03-01': 3.5, '03-09': 4,
+        '05-01': 4.5, '05-09': 5,
+        '07-01': 5.5, '07-09': 6}
+    RED_VS_BLUE_MULT_OFFSET=.25
     SCALE=14.25
     RADIUS=1.0 # 14.25/Plate.SCALE
     LABEL_INC=20.0 # deg between cassette labels (180/(numcassperchannel+2))
@@ -624,8 +625,8 @@ class Plate(object):
             setup=self.setups[active_setup]
 
             #Draw the plate name and active setup
-            canvas.drawText((0,.75), self.plate_name ,color='White',center=0)
-            canvas.drawText((0,.7), active_setup, color='White',center=0)
+            canvas.drawText((0,.7), self.plate_name ,color='White',center=0)
+            canvas.drawText((0,.65), active_setup, color='White',center=0)
     
 
     
@@ -671,7 +672,8 @@ class Plate(object):
                     inactiveHoles.difference_update(setup['channels'][key])
             for h in inactiveHoles:
                 pos=self.plateCoordShift(h.position())    
-                canvas.drawCircle(pos, h.radius/3 ,fill='White',outline='White')
+                #canvas.drawCircle(pos, h.radius/3 ,fill='White',outline='White')
+                canvas.drawSquare(pos,h.radius/3,fill='White',outline='White')
                 
             #for h in self.holeSet:
             #    pos=self.plateCoordShift(h.position())    
@@ -713,6 +715,10 @@ class Plate(object):
                 x,y=self.plateCoordShift(g['path'][-1][-1])
                 canvas.drawLine((x-radius,y),(x+radius,y), fill=pluscrosscolor)
                 canvas.drawLine((x,y-radius),(x,y+radius), fill=pluscrosscolor)
+                #canvas.drawLine(map(round,(x-radius,y)),map(round,(x+radius,y)), fill=pluscrosscolor)
+                #canvas.drawLine(map(round,(x,y-radius)),map(round,(x,y+radius)), fill=pluscrosscolor)
+       
+
                 
                 #Draw the holes in the group
                 for h in g['holes']:
@@ -727,7 +733,7 @@ class Plate(object):
                 #Determine where to stick the text label for the group
                 thmult=Plate.LABEL_ANGLE_MULT[ g['fiber_group'][2:] ]
                 if g['fiber_group'][0]=='R':
-                    thmult+=.5
+                    thmult+=Plate.RED_VS_BLUE_MULT_OFFSET
                 th=math.radians(90.0-thmult*Plate.LABEL_INC)
                 
                 tpos=[ -Plate.LABEL_RADIUS*math.cos(th),
