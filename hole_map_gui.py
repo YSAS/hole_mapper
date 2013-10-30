@@ -122,7 +122,7 @@ class App(Tkinter.Tk):
         whei=735
         chei=whei-bhei
         wwid=chei+swid
-        self.geometry ("%ix%i"%(wwid,whei))
+        self.geometry("%ix%i"%(wwid,whei))
         self.title("Hole App")
         
         
