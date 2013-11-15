@@ -238,7 +238,7 @@ class Plate(object):
                 'path':[],
                 'channel':channel}
 
-    def loadHoles(self,file):
+    def load(self,file):
         ''' Routine to load holes from a file 
 
         File should have all the holes on the plate

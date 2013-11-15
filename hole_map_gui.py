@@ -351,7 +351,7 @@ class App(Tkinter.Tk):
         file=os.path.normpath(file)
         print file
         if file:
-            self.plate.loadHoles(file)
+            self.plate.load(file)
             self.file_str.set(os.path.basename(file))
             self.show()
         

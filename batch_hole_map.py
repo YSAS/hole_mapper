@@ -7,7 +7,7 @@ files=['1_2_3_Sum.asc','411.1_411.2_Sum.asc','419.1_353.1_419.2_353.2_Sum.asc','
 p=Plate.Plate()
 for f in files:
     file=dir+f
-    p.loadHoles(file)
+    p.load(file)
     for s in p.setups.keys():
         p.regionify(active_setup=s)
         ic=ImageCanvas.ImageCanvas(768, 768, 1.0, 1.0)
