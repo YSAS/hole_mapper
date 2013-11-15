@@ -5,6 +5,10 @@ import Plate
 import tkMessageBox
 import os
 
+#mainloop
+#meat: plate.loadHoles then self.show
+#self.plate.regionify(active_setup=self.getActiveSetup())
+
 class HoleInfoDialog:
         
     def __init__(self, parent, canvas, plate, setup, holeIDs):
@@ -36,8 +40,8 @@ class HoleInfoDialog:
 
             info=self.getHoleInfo(id)
             
-            lbl_str=' '.join(['ID:',id,'Type:',info['TYPE'],'Galaxy ID:',
-                               info['GALAXYID'],'other info'])
+            lbl_str=' '.join(['ID:',id,'Type:',info['TYPE'],'Targ ID:',
+                               info['ID'],'other info'])
             Tkinter.Label(self.dialog, text=lbl_str).grid(row=i,column=0)
             
             Tkinter.Button(self.dialog,text='Select',command=getattr(self,'cb'+id)).grid(row=i,column=1)
@@ -58,7 +62,7 @@ class HoleInfoDialog:
         Tkinter.Label(self.dialog, text='Type: '+info['TYPE']).pack(anchor='w')
         if info['TYPE'] in 'OSGA':
 
-            Tkinter.Label(self.dialog, text='Galaxy ID: '+info['GALAXYID']).pack(anchor='w')
+            Tkinter.Label(self.dialog, text='ID: '+info['ID']).pack(anchor='w')
             Tkinter.Label(self.dialog, text='RA: %i %i %2.3f'%info['RA']).pack(anchor='w')
             Tkinter.Label(self.dialog, text='Dec: %i %i %2.3f'%info['DEC']).pack(anchor='w')
             if info['TYPE'] not in 'S':

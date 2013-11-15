@@ -6,7 +6,10 @@ Created on Dec 12, 2009
 from Hole import *
 import ImageCanvas
 import os.path
-import platefile
+from plateHoleInfo import plateHoleInfo
+
+SCALE=14.25 #also change in plateholeinfo.py
+
 class Plate(object):
     '''Class for fiber plug plate'''
     FIBER_BUNDLES={
@@ -28,7 +31,7 @@ class Plate(object):
         '05-01': 4.5, '05-09': 5,
         '07-01': 5.5, '07-09': 6}
     RED_VS_BLUE_MULT_OFFSET=.25
-    SCALE=14.25
+    SCALE=SCALE
     RADIUS=1.0 # 14.25/Plate.SCALE
     LABEL_INC=20.0 # deg between cassette labels (180/(numcassperchannel+2))
     LABEL_RADIUS=0.85*RADIUS
@@ -72,7 +75,7 @@ class Plate(object):
     def getHoleInfo(self, holeID):
         """ Returns a dictionary of information for hole
             corresponding to holeID. Valid keys are:'RA',
-            'DEC','GALAXYID','MAGNITUDE','COLOR','SETUPS',
+            'DEC','ID','MAGNITUDE','COLOR','SETUPS',
             'HOLEID', and 'TYPE'.
             An invalid holeID is an exception."""
         
@@ -81,7 +84,7 @@ class Plate(object):
             raise Exception('Invalid holeID')
         
         ret={'RA':hole['RA'],'DEC':hole['DEC'],
-             'GALAXYID':hole['GALAXYID'],'MAGNITUDE':hole['MAGNITUDE'],
+             'ID':hole['ID'],'MAGNITUDE':hole['MAGNITUDE'],
              'COLOR':hole['COLOR'],'TYPE':hole['TYPE'],
              'SETUPS':self.getSetupsUsingHole(hole),'HOLEID':holeID,
              'IDSTR':hole.idstr}
@@ -177,46 +180,6 @@ class Plate(object):
                 otherholes.append(h)
         return otherholes
     
-    def addHole(self, xin, yin, r, setup='', channel='', info=''):
-        """Used to manually add a hole to the plate.
-           If setup doesn't exist it will be created"""
-        
-        hole=Hole(xin/Plate.SCALE, yin/Plate.SCALE, r/Plate.SCALE, idstr=info)
-        
-        holeinfostr=self.plateHoleInfo.getHoleInfo(setup, hole)
-        if holeinfostr:
-            #print holeinfostr
-            holeinfostr=holeinfostr.split()
-            #"<sky Coords>  <plate Coords>  <hole type>  <additional info from .res file>"
-            ra=tuple(map(float,holeinfostr[0:3]))
-            dec=tuple(map(float,holeinfostr[3:6]))
-            type=holeinfostr[11]
-            hole['RA']=ra
-            hole['DEC']=dec
-            hole['TYPE']=type
-        
-        if hole in self.holeSet:
-            for h in self.holeSet:
-                if h.hash==hole.hash:
-                    hole=h
-                    break
-        
-        self.holeSet.add(hole)
-
-        if setup:
-            setupName=setup
-            if setupName not in self.setups:
-                self.setups[setupName]=self.initializeSetup(setupName)
-        
-            if channel:
-                if channel in self.setups[setupName]['channels']:
-                    self.setups[setupName]['channels'][channel].append(hole)
-                else:
-                    self.setups[setupName]['channels'][channel]=[hole]
-            else:
-                self.setups[setupName]['unused_holes'].append(hole)
-            
-
     def initializeSetup(self, setupName):
         """Initializes a setup dictionary with name 
            setupName"""
@@ -251,48 +214,17 @@ class Plate(object):
         
         self.plate_name=os.path.basename(file)[0:-4]
         plate_name=self.plate_name
-        self.plateHoleInfo=platefile.plateHoleInfo(os.path.dirname(file)+
+        self.plateHoleInfo=plateHoleInfo(os.path.dirname(file)+
                                                    os.path.sep, plate_name)
         curr_setup=''
         
+        self.holeSet=self.plateHoleInfo.holeSet
+        self.setups=self.plateHoleInfo.setups
+        
         #Add the SH to the global set
-        self.addHole(0.0, 0.0, Plate.SH_RADIUS, info='Shack-Hartman')
-        
-        
-        with open(file,'r') as f:
-
-            for line in f:
-                words=line.split()
-                #If line specifies a setup see if we have already 
-                # loaded holes if so we need store the last setup
-                if words[0]=='Setup':
-                    if curr_setup:
-                        keep=False
-                        for c in self.setups[curr_setup]['channels']:
-                            if self.setups[curr_setup]['channels'][c]!=[]:
-                                keep=True
-                                break
-                        if not keep:
-                            self.setups.pop(curr_setup)
-                            
-                    curr_setup='Setup '+words[1]
-                    self.setups[curr_setup]=self.initializeSetup(curr_setup)
-                    
-                else:
-                    x,y,d=map(float,[words[0],words[1],words[3]])
-                    if line[-3:-1]=='17':
-                        self.addHole(x, y, d/2.0, info=line)
-                        
-                    elif words[-3] in ('O','S'):
-                        channel='arm'+words[-1]
-                        self.addHole(x, y, d/2.0, setup=curr_setup, 
-                                     channel=channel, info=line)
-                        
-                    else:
-                        self.addHole(x, y, d/2.0, setup=curr_setup, info=line)
-
-
-
+        self.holeSet.add(Hole(0.0, 0.0, Plate.SH_RADIUS/Plate.SCALE,
+                              idstr='Shack-Hartman'))
+    
   
     def clear(self):
         self.setups={}
@@ -322,7 +254,10 @@ class Plate(object):
 
         if active_setup in self.setups:
             self.setups[active_setup]['groups']=[]
-            for c in self.setups[active_setup]['channels']:
+            
+            channels=[c for c in self.setups[active_setup]['channels']
+                      if len(self.setups[active_setup]['channels'][c]) >0 ]
+            for c in channels:
     
                 holes=[]
                 for h in self.setups[active_setup]['channels'][c]:
@@ -354,7 +289,7 @@ class Plate(object):
                     base_fiber_num=int(g['fiber_group'][5:])
                     for i,h in enumerate(g['holes']):
                         fiber=base_fiber_name+'%02d'%(i+base_fiber_num)
-                        nfostr=self.plateHoleInfo.getHoleInfo(active_setup, h)
+                        nfostr=h.info
                         fout.write(''.join([fiber,'  ',nfostr,'\n']))
 
 

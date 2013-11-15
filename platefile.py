@@ -1,4 +1,4 @@
-class platefile:
+class platefile(object):
     def __init__(self, file):
         self.file=file
         self.parseFile()
@@ -141,52 +141,3 @@ class resfile(platefile):
 
     def prune(self, lineid):
         pass
-
-
-class plateHoleInfo:
-    '''Frontend to the .res & .asc files of a setup
-       used to retrieve information about a given hole'''
-    def __init__(self,dir,platename):
-        self.rfile=resfile(dir+platename.replace('Sum','plate')+'.res')
-        self.afile=ascfile(dir+platename+'.asc')
-
-    def getHoleInfo(self, setupName, hole):
-        '''Returns a line containing info about the hole requested,
-        lines are of the form:
-        "<sky Coords RA/DEC>  <plate Coords>  <hole type>  <additional info from .res file>"
-        if there are no sky coordinates for the hole (such as for guide reference holes)
-        then the sky coordinate string will be '00 00 00.00   00 00 00.0  0000.0'
-        '''
-        try:
-            linenum=self.afile.getLineNumOfHole(hole, setupName)
-        except KeyError:
-            return ''
-        except ValueError:
-            return ''
-        aline=self.afile.getLineNofSetup(linenum, setupName)
-        awords=aline.split()
-        holetype=awords[4]
-        platecoords=aline[4:38]
-        
-        rline=self.rfile.getLineNofSetup(linenum, setupName)
-        if rline!='':
-            rwords=rline.split()
-            if holetype!=rwords[8]:
-                raise LookupError('Hole types different in .rse & .asc')
-            if rwords[0] !=awords[5]:
-                raise LookupError('old fiber assignments differ in .rse & .asc')
-            skycoords=rline[11:43]
-            additnfo=rline[52:-1]
-        else:
-            skycoords='00 00 00.00   00 00 00.0  0000.0'
-            additnfo=''
-
-        return '  '.join([skycoords,platecoords,holetype,additnfo])
-        
-    def getSetupInfo(self, setup):
-        '''Returns a list of lines about the setup requested,
-        lines are from the .asc file are first, followed by lines 
-        from the .res file'''
-        setupNfo=self.afile.setups[setup]['setup_nfo_str']
-        setupNfo.extend(self.rfile.setups[setup]['setup_nfo_str'])
-        return setupNfo
