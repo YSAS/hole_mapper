@@ -5,35 +5,27 @@ Created on Dec 12, 2009
 '''
 from Hole import *
 import ImageCanvas
-import os.path
 from plateHoleInfo import plateHoleInfo
+import operator
 
-SCALE=14.25 #also change in plateholeinfo.py
+
+def distribute(x, min_x, max_x, min_sep):
+    """
+    Adjust x such that all x are min_space apart,
+    near original positions, and within min_x & max_x
+    """
+    import numpy as np
+    return list(np.linspace(min_x, max_x, len(x)))
+
+SCALE=14.25 #also change in plateHoleInfo.py
+
+LABEL_MAX_Y=.7
+MIN_LABEL_Y_SEP=0.05 #must be < 2*LABEL_MAX_Y/16
 
 class Plate(object):
     '''Class for fiber plug plate'''
-    FIBER_BUNDLES={
-        'armB':( ('B-02-09','B-02-01','B-04-09','B-04-01',
-                  'B-06-09','B-06-01','B-08-09','B-08-01'),
-                 ('B-01-01','B-01-09','B-03-01','B-03-09',
-                  'B-05-01','B-05-09','B-07-01','B-07-09') ),
-        'armR':( ('R-02-09','R-02-01','R-04-09','R-04-01',
-                  'R-06-09','R-06-01','R-08-09','R-08-01'),
-                 ('R-01-01','R-01-09','R-03-01','R-03-09',
-                  'R-05-01','R-05-09','R-07-01','R-07-09') )}
-    LABEL_ANGLE_MULT={
-        '02-09':-2.5, '02-01':-3,
-        '04-09':-3.5, '04-01':-4,
-        '06-09':-4.5, '06-01':-5,
-        '08-09':-5.5, '08-01':-6,
-        '01-01': 2.5, '01-09': 3,
-        '03-01': 3.5, '03-09': 4,
-        '05-01': 4.5, '05-09': 5,
-        '07-01': 5.5, '07-09': 6}
-    RED_VS_BLUE_MULT_OFFSET=.25
     SCALE=SCALE
     RADIUS=1.0 # 14.25/Plate.SCALE
-    LABEL_INC=20.0 # deg between cassette labels (180/(numcassperchannel+2))
     LABEL_RADIUS=0.85*RADIUS
     SH_RADIUS=0.1875
     HOLE_R_MULT=1.25
@@ -123,29 +115,22 @@ class Plate(object):
     
 
     def getFiberForHole(self, holeID, setupName):
-        """ Returns the Fiber which is mapped to a 
-            specified holeID. "None" is returned if
-            there is no mapping. A nonexistent setup
-            is an exception, as is an invalid holeID """
-
-        fiber='None'
+        """
+        Returns the Fiber which is mapped to a
+        specified holeID. "None" is returned if
+        there is no mapping. A nonexistent setup
+        is an exception, as is an invalid holeID
+        """
         hole=self.getHole(holeID)
         if not hole:
             raise Exception('Invalid holeID')
         if setupName not in self.setups:
             raise Exception('Invalid setupName')
         
-        groups=self.setups[setupName]['groups'] #is a list of dictionaries
-        for g in groups:
-            for i, h in enumerate(g['holes']):
-                if h==hole:
-                    fiber=g['fiber_group']
-                    fiber=fiber[0:-2]+"%02i"%(int(fiber[-2:])+i)
-                    break
-            if fiber != 'None':
-                break
-        return fiber
-
+        if hole['FIBER'] !='':
+            return hole['FIBER']
+        else:
+            return 'None'
 
     def getSetupInfo(self,setupName):
         nr=0
@@ -209,13 +194,9 @@ class Plate(object):
         valid lines are of format x y z diam type arbit_fiber channel'''
 
         self.clear()
-
-
         
-        self.plate_name=os.path.basename(file)[0:-4]
-        plate_name=self.plate_name
-        self.plateHoleInfo=plateHoleInfo(os.path.dirname(file)+
-                                                   os.path.sep, plate_name)
+        self.plateHoleInfo=plateHoleInfo(file)
+        self.plate_name=self.plateHoleInfo.name
         curr_setup=''
         
         self.holeSet=self.plateHoleInfo.holeSet
@@ -224,57 +205,14 @@ class Plate(object):
         #Add the SH to the global set
         self.holeSet.add(Hole(0.0, 0.0, Plate.SH_RADIUS/Plate.SCALE,
                               idstr='Shack-Hartman'))
-    
   
     def clear(self):
         self.setups={}
         self.holeSet=set()
 
-    def findPath(self, holeList, plateSide ):
-        if plateSide == 'left':
-            #we are going left to right
-            holeList.sort(lambda a,b: -cmp(a.x,b.x))
-        else:
-            #we are going right to left to
-            holeList.sort(lambda a,b: cmp(a.x,b.x))
-
-        #The path starts at the first hole
-        path=[]
-        if len(holeList) == 1:
-            path.append([holeList[0].position()])
-        for i in range(len(holeList)-1):
-        #   path.append(self.determineRoute(holeList[i],holeList[i+1]))
-            path.append([holeList[i].position(),holeList[i+1].position()])
-        
-        return path
-
-
     def regionify(self, active_setup='Setup 1'):
-        initRegion=(-Plate.RADIUS,-Plate.RADIUS,Plate.RADIUS,Plate.RADIUS)
-
         if active_setup in self.setups:
-            self.setups[active_setup]['groups']=[]
-            
-            channels=[c for c in self.setups[active_setup]['channels']
-                      if len(self.setups[active_setup]['channels'][c]) >0 ]
-            for c in channels:
-    
-                holes=[]
-                for h in self.setups[active_setup]['channels'][c]:
-                    if h.inRegion(initRegion):
-                        holes.append(h)
-    
-                #Break the holes on the channel into desired groups of 8 or less
-                regions=Plate.divideRegion((holes,initRegion))
-    
-                #Associate these regions with groups of fibers
-                self.setups[active_setup]['groups'].extend(
-                    Plate.regions2groups(c,regions))
-    
-                #Create a path for the holes
-                for g in self.setups[active_setup]['groups']:
-                    g['path']=self.findPath(g['holes'],g['side'])
-            
+            self.assignFibers(self.setups[active_setup])
 
     def writeMapFile(self, out_dir, active_setup):
         if active_setup in self.setups:
@@ -285,169 +223,134 @@ class Plate(object):
                 for l in setup_nfo:
                     fout.write(l)
                 for g in self.setups[active_setup]['groups']:
-                    base_fiber_name=g['fiber_group'][0:5]
-                    base_fiber_num=int(g['fiber_group'][5:])
                     for i,h in enumerate(g['holes']):
-                        fiber=base_fiber_name+'%02d'%(i+base_fiber_num)
+                        fiber=h['FIBER']
                         nfostr=h.info
                         fout.write(''.join([fiber,'  ',nfostr,'\n']))
-
-
 
     def toggleCoordShift(self):
         self.doCoordShift = not self.doCoordShift
         return self.doCoordShift
 
-
-    @staticmethod
-    def divideRegion(region):
-        tmpr=Plate.splitRegionHorizontally( region )
+    def assignFibers(self, setup):
+        """
+        load holes from file, by default assume all are on same slit and no pattern
         
-        if len(tmpr)==1:
-            regions=Plate.splitRegionVertically( tmpr[0] )
-        else:
-            regions=Plate.divideRegion( tmpr[0])
-            subregions2=Plate.divideRegion( tmpr[1])
-            regions[len(regions):]=subregions2
+        
+        break holes into sets based on slit requirements
+        
+        get cassets for each set of holes based on specification
+        compute number of cassets needed for each set based on fiber pattern for
+        
+        
+        for each set of holes assign holes to nearest suitable casset (with free fibers)
+        assign holes in order of increasing closeness to suitable, non-full cassets
+        compute clossness as sum of distances to relevant casset vertices
+        
+        Consider swapping after algorithm by computing convex hull for each casset and
+        finding interlopers then swapping them
+        
+        
+        #Consider making each hole have a number of targets associated with it
+        # the targets would contain the fiber and target info instead of the hole object
+        # and the hole could be associated with multiple targets (1 per setup)
+        
+        All science & sky holes are loaded, holes with file-specifed fibers or
+        arm/cassette/fiberno and slit constrains are set
+        Cassette slit widths, usable fibers are set. slit widths must be assigned
+        beforehand to prevent a sparse configuration from happening e.g. all but 16
+        furthest are same slit assign 16 furthest -> no available cassettes for rest
+        
+        #    Assign holes without channel to r or b channel
+        #        get holes without channel
+        #        break holes into groups based on required slit
+        #        get number of available fibers on each channel, given slit and filter reqs
+        #        if all fit on one channel, do it, otherwise divide randomly??
+
+        #Barring preassignment, we would like to distribute sky fibers evenly over
+        #cassette groups, where a group is a set of cassettes with same color & slit
+        for i,h in enumerate(skys):
+            h.assignment.cassette=cassette_groups[i mod len(cassette_groups)]
+
+        for each hole w/o preassigned fiber:
+            get cassets available to hole (cassets with correct slit and free fibers)
+            compute distance to each cassette vertex & sum for available vertices
+        
+        sort science holes by distance metric
+        
+        while there are science holes w/o assigned cassette:
+            get first hole
+            get cassets available to hole (cassets with correct slit and free fibers)
+            assign to nearest available casset
+            update cassette availability for each hole (a cassette may have filled)
+            recompute distance metric for each hole
+            sort remaining holes by distance metric
             
-        return regions
-
-                     
-    @staticmethod
-    def splitRegionVertically( (holes, (x0,y0,x1,y1)), nminr=8):
-        if len(holes) <= nminr:
-            regions=[(holes,(x0,y0,x1,y1))]
-        else:
-            holes=sorted(holes, Hole.holeCompareX)
-            nr2=nminr*(len(holes)/nminr/2)+len(holes)%nminr
-            splitx=(holes[-nr2-1].x+holes[-nr2].x)/2.0
-            regions=[(holes[0:-nr2],(x0,y0,splitx,y1)),
-                     (holes[-nr2:],(splitx,y0,x1,y1))]
-        return regions
-
-
-    @staticmethod
-    def splitRegionHorizontally((holes, (x0,y0,x1,y1)), nminr=16):
-        if len(holes) <= nminr:
-            regions=[(holes,(x0,y0,x1,y1))]
-        else:
-            #sort holes by y position increasing
-            holes=sorted(holes, Hole.holeCompareY)
-            #num holes in second group: nr2
-            nr2=nminr*(len(holes)/nminr/2)+len(holes)%nminr
-            #holes in first group: 0:-nr2
-            splity=(holes[-nr2-1].y+holes[-nr2].y)/2.0
-            regions=[(holes[0:-nr2],(x0,y0,x1,splity)),
-                     (holes[-nr2:],(x0,splity,x1,y1))]
-        return regions
-
-
-    @staticmethod
-    def regions2groups(channel, regions):
-        #Associate these regions with groups of fibers
-        #break regions into left and right sides and sort them vertically
-        groups=[]
-    
-        #First figure out which regions are to be associated with left fibers
-        # and which with right side fibers
-        # Compute CoM of holes in each region, of those on the left, the 8 
-        # leftmost go to the left. Of those on the right, the 8 right most go right.
-        # any leftover on either side go on the other side.
-    
-        regionxctr=[math.fsum([h.x for h in r[0]])/float(len(r[0])) for r in regions]
-        num_left=sum([a > 0.0 for a in regionxctr])
-        num_right=len(regions)-num_left
-    
-        #Sort the regions from leftmost to rightmost
-        regions.sort(key=lambda r:math.fsum([h.x for h in r[0]])/float(len(r[0])),reverse=True)
-    
-        #Place first min(8, num regions on left + max(0, num regions on right - 8))
-        # regions on the left, the remainder on the right
-        num_left = min(8, num_left) + max(0, num_right - 8)
-    
-        left=regions[0:num_left]
-        right=regions[num_left:]
-  
-
-        left.sort(lambda a,b: -cmp(a[1][1]+a[1][3],b[1][1]+b[1][3]))
-        right.sort(lambda a,b: -cmp(a[1][1]+a[1][3],b[1][1]+b[1][3]))
-
-        #Do the left and right sides of the plate separately
-            #Now the groups are sorted vertically
-            # so if there are as many of them as there are cassettes
-            # we can just assign them in order
-            # If there are fewer than the number of cassettes we would like 
-            # to associate them with a cassette at roughly the same level
-            #while there are unassociated groups
-            #    if number of free cassettes is equal to number of 
-            #        unassigned groups
-            #        pair them off
-            #    else
-            #        determine the nearest unassociated cassette which leaves
-            #        enough cassetts for the remaining groups and 
-            #        associate it with the first group
+        swap between cassettes as needed
         
-        nextbundle=0
-        numbundles=len(Plate.FIBER_BUNDLES[channel][0])
-        while len(left):
-            assert len(left) <= numbundles-nextbundle
-            if len(left) ==  numbundles-nextbundle:
-                for g in left:
-                    groups.append(Plate.initializeGroup( 
-                                    Plate.FIBER_BUNDLES[channel][0][nextbundle], 
-                                    g[0], g[1], 'left', channel))
-                    nextbundle+=1
-                break
-            else:
-                #get the y position of the hole with the least x value
-                groupy=max(left[0][0],key=lambda a:a.x).y
-                angleoffvert=math.degrees(math.pi/2 - 
-                                math.asin(groupy/Plate.LABEL_RADIUS))
-                tmp=max(angleoffvert/Plate.LABEL_INC-1,0)
-                
-                bundlenum = min(round(tmp), numbundles-len(left) )
-                bundlenum = int(max(bundlenum, nextbundle))
-                
-                groups.append(Plate.initializeGroup( 
-                                Plate.FIBER_BUNDLES[channel][0][bundlenum], 
-                                left[0][0], left[0][1], 'left', channel))
-                
-                nextbundle=bundlenum+1
-
-                left.pop(0)
+        for each cassette
+            assign fiber numbers with x coordinate of holes
+        """
         
-        #Now do the same thing for the right side
-        nextbundle=0
-        numbundles=len(Plate.FIBER_BUNDLES[channel][1])
-        while len(right):
-            assert len(right) <= numbundles-nextbundle
-            if len(right) == numbundles-nextbundle:
-                for g in right[:]:
-                    groups.append(Plate.initializeGroup( 
-                                    Plate.FIBER_BUNDLES[channel][1][nextbundle], 
-                                    g[0], g[1], 'right', channel))
-                    nextbundle+=1
-                break
-            else:
-                #get the y position of the hole with the largest x value
-                groupy=min(right[0][0],key=lambda a:a.x).y
-                angleoffvert=math.degrees(math.pi/2 - 
-                                math.asin(groupy/Plate.LABEL_RADIUS))
+        #Grab all skys and objects that don't have assignments
+        unassigned_skys=[h for h in setup['holes'] if
+                         h.isSky() and not h.isAssigned()]
+        unassigned_objs=[h for h in setup['holes'] if
+                        h.isObject() and not h.isAssigned()]
+                        
+        
+        #Grab the cassettes and cassette groups
+        cassettes=self.plateHoleInfo.cassettes_for_setup(setup['setup'])
+        cassette_groups=self.plateHoleInfo.cassette_groups_for_setup(setup['setup'])
+        
+        #Distribute sky fibers evenly over groups of cassettes with
+        # same color & slit, don't bother factoring in preassigned skys for now
+        for i, h in enumerate(unassigned_skys):
+            group=cassette_groups[i % len(cassette_groups)]
+            h.assign_possible_cassette(group)
+        
+            #Assign to nearest available cassette
+            cassettes[h.nearest_usable_cassette()].assign_hole(h)
+        
 
-                tmp=(angleoffvert-Plate.LABEL_INC)/Plate.LABEL_INC
-                
-                bundlenum = min(round(tmp), numbundles-len(right) )
-                bundlenum = int(max(bundlenum, nextbundle))
+        #List of holes needing assignments
+        holes_to_assign=unassigned_objs
 
-                groups.append(Plate.initializeGroup( 
-                                Plate.FIBER_BUNDLES[channel][1][bundlenum], 
-                                right[0][0], right[0][1], 'right', channel))
-                
-                nextbundle=bundlenum+1
-                right.pop(0)
+        #While there are holes w/o an assigned cassette (groups don't count)
+        while len(holes_to_assign) > 0:
+            #Update cassette availability for each hole (a cassette may have filled)
+            for h in holes_to_assign:
+                #Get cassettes with correct slit and free fibers
+                # n.b these are just cassette name strings
+                possible_cassettes=self.plateHoleInfo.available_cassettes(h,
+                                                    setup['setup'])
+                if len(possible_cassettes)<1:
+                    import pdb;pdb.set_trace()
+                #Set the cassetes that are usable for the hole
+                #  no_add is true so we keep the distribution of sky fibers
+                h.assign_possible_cassette(possible_cassettes,
+                                           update_with_intersection=True)
 
-        return groups
+            #Sort holes by their distance from cassettes
+            holes_to_assign.sort(key=lambda h: h.plug_priority())
 
+            #Get hole furthest from its cassettes
+            h=holes_to_assign.pop()
+
+            #Assign to nearest available cassette
+            cassettes[h.nearest_usable_cassette()].assign_hole(h)
+
+
+        ####All holes have now been assigned to a cassette###
+
+        #Swap between cassettes as needed
+        #TODO
+
+        #For each cassette assign fiber numbers with x coordinate of holes
+        for c in cassettes.itervalues():
+            c.map_fibers()
+        
+        setup['cassetteConfig']=cassettes
 
     def drawHole(self, hole, canvas, color=None, fcolor='White', radmult=1.0, drawimage=0):
        
@@ -498,62 +401,140 @@ class Plate(object):
             yp=rp*cpsi
             return (xp/Plate.SCALE, yp/Plate.SCALE)
 
-
     def draw(self, canvas, active_setup=None, channel='all'):
-
+        
         #Make a circle of appropriate size in the window
         canvas.drawCircle( (0,0) , Plate.RADIUS)
         
         if active_setup and active_setup in self.setups:
             #the active setup
             setup=self.setups[active_setup]
-
+            
             inactiveHoles=self.holeSet.difference(setup['unused_holes'])
             for key in setup['channels']:
                 inactiveHoles.difference_update(setup['channels'][key])
-    
+            
             #Draw the holes that aren't in the current setup
             for h in inactiveHoles:
                 self.drawHole(h, canvas)
-
+            
             #If holes in setup have been grouped then draw the groups
             # otherwise draw them according to their channel
-            if setup['groups']:
-                self.drawGroup(setup['groups'],canvas,channel=channel)
+            if 'cassetteConfig' in setup:
+                self._draw_with_assignements(setup, channel, canvas)
             else:
-                if channel=='all':
-                    for c in setup['channels']:
-                        if c=='armB':
-                            for h in setup['channels'][c]:
-                                self.drawHole(h, canvas, color='Blue')
-                        else:
-                            for h in setup['channels'][c]:
-                                self.drawHole(h, canvas, color='Red')
-                                
-                elif channel=='armR' or channel.upper()=='RED':
-                    if 'armB' in setup['channels']:
-                        for h in setup['channels']['armB']:
-                            self.drawHole(h, canvas)
-                    if 'armR' in setup['channels']:
-                        for h in setup['channels']['armR']:
-                            self.drawHole(h, canvas, color='Red')
-                elif channel=='armB' or channel.upper()=='BLUE':
-                    if 'armR' in setup['channels']:
-                        for h in setup['channels']['armR']:
-                            self.drawHole(h, canvas)
-                    if 'armB' in setup['channels']:
-                        for h in setup['channels']['armB']:
-                            self.drawHole(h, canvas, color='Blue')
-
+                self._draw_without_assignements(setup, channel, canvas)
+            
             #Draw the guide and acquisition holes in color
             for h in setup['unused_holes']:
                 self.drawHole(h, canvas, color='Green')
-    
+        
         else:
             for h in self.holeSet:
                 self.drawHole(h, canvas)
 
+    def _draw_with_assignements(self, setup, channel, canvas):
+        """Does not draw holes for color if not selected"""
+        drawred=True
+        drawblue=True
+        if channel in ['armB', 'BLUE', 'blue']:
+            drawred=False
+        elif channel in ['armR', 'RED', 'red']:
+            drawblue=False
+
+        #List of cassette labels and first hole positions
+        labeldata=[]
+
+        #Draw all the cassettes
+        for cassette in setup['cassetteConfig']:
+            if drawred and cassette.color()=='red':
+                #Draw the cassette
+                self.drawCassette(c, canvas)
+                #Grab the first hole position
+                start_pos=c.first_hole().position()
+                #Grab the label text
+                label=c.label()
+                #Add the label, color, and start pos to the pot
+                labeldata.append(('red',start_pos,label))
+            if drawblue and cassette.color()=='blue':
+                #Draw the cassette
+                self.drawCassette(c, canvas)
+                #Grab the first hole position
+                start_pos=c.first_hole().position()
+                #Grab the label text
+                label=c.label()
+                #Add the label, color, and start pos to the pot
+                labeldata.append(('blue',start_pos,label, c.onRight()))
         
+        #Figure out where all the text labels should go
+        labelpos=range(len(labeldata))
+
+        #Left side positions
+        lefts=filter(lambda i:labeldata[i][3]==False, range(len(labeldata)))
+        y=distribute([labeldata[i][1][1] for i in lefts],
+                     -LABEL_MAX_Y, LABEL_MAX_Y, MIN_LABEL_Y_SEP)
+        x=-(LABEL_RADIUS**2 - y**2)
+        for i in range(len(lefts)):
+            labelpos[lefts[i]]=[x[i], y[i]]
+        
+        #Right side positions
+        rights=filter(lambda i:labeldata[i][3]==True, range(len(labeldata)))
+        y=distribute([labeldata[i][1][1] for i in rights],
+                     -LABEL_MAX_Y, LABEL_MAX_Y, MIN_LABEL_Y_SEP)
+        x=-(LABEL_RADIUS**2 - y**2)
+        for i in range(len(rights)):
+            labelpos[rights[i]]=[x[i], y[i]]
+        
+        #Kludge for image cavas
+        if isinstance(canvas, ImageCanvas.ImageCanvas):
+            for i in range(len(labeldata)):
+                label=labeldata[2]
+                side=labeldata
+                if side: #on right
+                    labelpos[i][0]-=canvas.getTextSize(label)
+                else:
+                    labelpos[i][0]-=2*canvas.getTextSize(label)
+
+        #Draw the labels
+        if drawimage:
+            lblcolor="White"
+        else:
+            lblcolor="Black"
+        for i in xrange(len(labeldata)):
+            color,hpos,label,side=labeldata[i]
+            tpos=labelpos[i]
+
+            #Draw the label
+            canvas.drawText(tpos, label, color=lblcolor)
+
+            #Connect label to cassette path
+            canvas.drawLine(tpos, self.plateCoordShift(hpos),
+                            fill=color, dashing=1)
+    
+    def _draw_without_assignements(self, setup, channel, canvas):
+        if channel == 'all':
+            bluecolor='blue'
+            redcolor='red'
+            nonecolor='purple'
+        elif channel in ['armB', 'BLUE', 'blue']:
+            bluecolor='blue'
+            redcolor=None
+            nonecolor=None
+        else:
+            bluecolor=None
+            redcolor='red'
+            nonecolor=None
+
+        for h in setup['holes']:
+            hcolor=h.assigned_color()
+            if hcolor == 'blue':
+                self.drawHole(h, canvas, color=bluecolor)
+            elif hcolor =='red':
+                self.drawHole(h, canvas, color=redcolor)
+            else:
+                self.drawHole(h, canvas, color=nonecolor)
+
+
     def drawImage(self, canvas, active_setup=None, channel='all',radmult=1.25):
         if active_setup and active_setup in self.setups:
             #the active setup
@@ -614,88 +595,42 @@ class Plate(object):
             #    pos=self.plateCoordShift(h.position())    
             #    canvas.drawCircle(pos, h.radius/3 ,fill='White',outline='White')
 
-
-    def drawGroup(self, holeGroup, canvas,radmult=1.0,channel='all',drawimage=0):    
-        if channel=='all':
-            channeltoshow=['armB','armR']
-        elif channel=='armR' or channel.upper()=='RED':
-            channeltoshow=['armR']
-        elif channel=='armB' or channel.upper()=='BLUE':
-            channeltoshow=['armB']
-        else:
-            channeltoshow=[]
-
-        for i,g in enumerate(holeGroup):
-            if g['channel'] in channeltoshow:
-                if g['channel'] =='armB':
-                    color='Blue'
-                else:
-                    color='Red'
-                
-                #Draw a rectangle around the group
-                #mycanvas.drawRectangle(g['region'],outline=col)
-
-
-                pluscrosscolor='Lime'
-                #Draw an x across the first hole
-                radius=2*0.08675*radmult/Plate.SCALE
-                x,y=g['path'][0][0][0],g['path'][0][0][1]
-                x,y=self.plateCoordShift(g['path'][0][0])
-                canvas.drawLine((x-radius,y+radius),(x+radius,y-radius), fill=pluscrosscolor)
-                canvas.drawLine((x-radius,y-radius),(x+radius,y+radius), fill=pluscrosscolor)
+    def drawCassette(self, cassette, canvas, radmult=1.0, drawimage=0 ):
+        color=cassette.color()
         
-                #Draw a + over the last hole
-                radius*=1.41
-                x,y=g['path'][-1][-1][0],g['path'][-1][-1][1]
-                x,y=self.plateCoordShift(g['path'][-1][-1])
-                canvas.drawLine((x-radius,y),(x+radius,y), fill=pluscrosscolor)
-                canvas.drawLine((x,y-radius),(x,y+radius), fill=pluscrosscolor)
-                #canvas.drawLine(map(round,(x-radius,y)),map(round,(x+radius,y)), fill=pluscrosscolor)
-                #canvas.drawLine(map(round,(x,y-radius)),map(round,(x,y+radius)), fill=pluscrosscolor)
-       
-
-                
-                #Draw the holes in the group
-                for h in g['holes']:
-                    self.drawHole(h, canvas, color=color, fcolor=color,radmult=radmult,drawimage=drawimage)
-    
-                # Draw the paths between each of the holes
-                for segment in g['path']:
-                    for i in range(len(segment)-1):
-                        canvas.drawLine(self.plateCoordShift(segment[i]),
-                                        self.plateCoordShift(segment[i+1]), fill=color)
-                
-                #Determine where to stick the text label for the group
-                thmult=Plate.LABEL_ANGLE_MULT[ g['fiber_group'][2:] ]
-                if g['fiber_group'][0]=='R':
-                    thmult+=Plate.RED_VS_BLUE_MULT_OFFSET
-                th=math.radians(90.0-thmult*Plate.LABEL_INC)
-                
-                tpos=[ -Plate.LABEL_RADIUS*math.cos(th),
-                       Plate.LABEL_RADIUS*math.sin(th) ]
-                
-                #Determine the text label
-                label=g['fiber_group']+'-'+str(int(g['fiber_group'][-2:])+len(g['holes'])-1)
+        if cassette.used==0:
+            return
         
-                if isinstance(canvas,ImageCanvas.ImageCanvas):
-                    t=canvas.getTextSize(g['fiber_group'])
-                    tpos[0]-=t[0]
-                    if g['side']=='left':
-                        tpos[0]-=t[0]
-    
-                #Draw the text label
-                if drawimage:
-                    lblcolor="White"
-                else:
-                    lblcolor="Black"
+        pluscrosscolor='Lime'
+        #Draw an x across the first hole
+        x,y=self.plateCoordShift(cassette.first_hole().position())
+        radius=2*0.08675*radmult/Plate.SCALE
+        canvas.drawLine((x-radius,y+radius),(x+radius,y-radius),
+                        fill=pluscrosscolor)
+        canvas.drawLine((x-radius,y-radius),(x+radius,y+radius),
+                        fill=pluscrosscolor)
+        
+        #Draw a + over the last hole
+        x,y=self.plateCoordShift(cassette.first_hole().position())
+        radius=1.41*2*0.08675*radmult/Plate.SCALE
+        canvas.drawLine((x-radius,y),(x+radius,y), fill=pluscrosscolor)
+        canvas.drawLine((x,y-radius),(x,y+radius), fill=pluscrosscolor)
 
-                canvas.drawText( tpos, label, color=lblcolor)   
+        if cassette.used==1:
+            return
+        
+        holes=cassette.ordered_holes()
+        
+        #Draw the holes in the cassette
+        for h in holes:
+            self.drawHole(h, canvas, color=color, fcolor=color,radmult=radmult,drawimage=drawimage)
 
-                    
-                #Draw the path
-                # Draw a line from the label to the first hole
-                canvas.drawLine(tpos, self.plateCoordShift(g['path'][0][0]), fill=color, dashing=1)
-
+        #Draw the paths between each of the holes
+        for i in range(len(holes)-1):
+            p0=holes[i].position()
+            p0=holes[i+1].position()
+            canvas.drawLine(self.plateCoordShift(p0), self.plateCoordShift(p1),
+                            fill=color)
         
     def setCoordShiftD(self, D):
         if self.isValidCoordParam_D(D):

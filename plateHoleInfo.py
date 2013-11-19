@@ -1,20 +1,61 @@
 from platefile import resfile, ascfile
 from Hole import Hole
+import Cassette
+import Setup
+import os.path
 
 SCALE=14.25
 
+class platefile(object):
+    def __init__(self, filename):
+        self.filename=filename
+
 class plateHoleInfo(object):
-    '''Frontend to the .res & .asc files of a setup
-       used to retrieve information about a given hole'''
-    def __init__(self,dir,platename):
+    """
+    Frontend to the .res & .asc files of a setup
+    used to retrieve information about a given hole
+    """
+    def __init__(self,file):
         
         #load the res & asc files
-        self.rfile=resfile(dir+platename.replace('Sum','plate')+'.res')
-        self.afile=ascfile(dir+platename+'.asc')
+        
+        if 'Sum.asc' in file:
+            self.name=os.path.basename(file)[0:-4]
+            
+            self.rfile=resfile(file.replace('Sum.asc','plate.res'))
+            self.afile=ascfile(file)
+            self.pfile=platefile(file.replace('_Sum.asc','.plate'))
+        else:
+            self.name=os.path.basename(file)[0:-6]
+            self.pfile=platefile(file)
     
+        self.foobar=[]
         self.setups={}
         self.holeSet=set()
         
+        if self.afile !=None:
+            self._init_fromASC()
+        else:
+            self._init_from_plate()
+        
+        #set of cassettes with same color & slit in future this
+        # will come from plate file
+        #h & l are used to divide the physical cassettes into a high-numbered
+        #fiber logical cassette and a low-numbered liber logical cassette
+        #for a given cassette h & l had better be created with the same slit
+        # assignemnts!
+        self.cassette_groups={s:[Cassette.blue_cassette_names(),
+                                 Cassette.red_cassette_names()]
+                              for s in self.setups}
+        
+        self.cassettes={s:Cassette.new_cassette_dict() for s in self.setups}
+        
+        if 'HotJupiters_1' in self.name:
+            _postProcessHJ(self)
+        if 'Carnegie_1' in self.name:
+            _postProcessIan(self)
+
+    def _init_fromASC(self):
         #Go through all the setups in the files
         for setup_name, setup_dict in self.rfile.setups.items():
             
@@ -26,13 +67,8 @@ class plateHoleInfo(object):
                 raise ValueError('Setup must be in both res & asc files')
             
             #create a setup
-            self.setups[setup_name]={'plate':platename,
-                'setup':setup_name,
-                'unused_holes':[],
-                'channels':{'armR':[],'armB':[]},
-                'groups':[]}
-                
-                
+            self.setups[setup_name]=Setup.new_setup(platename=self.name,setup_name=setup_name)
+        
             targets=[]
             other=[]
             
@@ -104,14 +140,18 @@ class plateHoleInfo(object):
             self.setups[setup_name]['unused_holes']=other
 
             #Put science holes into a channel
-            armB, armR = assignTargetsToChannel(targets)
+            self.setups[setup_name]['holes']=targets
+            armB, armR = _assignTargetsToChannel(targets)
 
             self.setups[setup_name]['channels']['armB']=armB
             self.setups[setup_name]['channels']['armR']=armR
     
-            if platename=='HotJupiters_1_Sum':
-                self.setups=postProcessHJ(self.setups)
+    def cassettes_for_setup(self,setup_name):
+        return self.cassettes[setup_name]
     
+    def cassette_groups_for_setup(self, setup_name):
+        return self.cassette_groups[setup_name]
+
     def getSetupInfo(self, setup):
         '''Returns a list of lines about the setup requested,
         lines are from the .asc file are first, followed by lines 
@@ -120,7 +160,19 @@ class plateHoleInfo(object):
         setupNfo.extend(self.rfile.setups[setup]['setup_nfo_str'])
         return setupNfo
 
-def assignTargetsToChannel(targetHoleList):
+    def available_cassettes(self, hole, setup_name):
+        """
+        Return cassette(s) name's containing fibers which can be used for hole
+        """
+        if hole.__hash__()==190951225552046123:
+            import pdb;pdb.set_trace()
+        #Filter cassettes based on slit width & fiber availability
+        available=filter(lambda x: x.slit==hole['SLIT'] and x.n_avail() > 0,
+                         self.cassettes[setup_name].values())
+        ret=[c.name for c in available]
+        return ret
+
+def _assignTargetsToChannel(targetHoleList):
     """
     Break list of holes into two groups: armB & armR
 
@@ -141,11 +193,16 @@ def assignTargetsToChannel(targetHoleList):
         assert len(armB)<129
         return (armB,armR)
     
-def postProcessHJ(setups):
+def _postProcessHJ(plateinfo):
     """ 
     Take the 2 setups for Nov13 Bailey plate and break them into the
     6 real setups
     """
+    
+    for c in plateinfo.cassettes:
+        c.usable=range(2,17,2)
+    
+    setups=plateinfo.setups
     holes=setups['Setup 1']['pool']
     ppool=[] #primary target pool
     tpool=[] #telluric calibrator target pool
@@ -161,4 +218,14 @@ def postProcessHJ(setups):
             ppool.append(h)
 
     return setups
+
+
+def _postProcessIan(plateinfo):
+    """
+        Take the 2 setups for Nov13 Bailey plate and break them into the
+        6 real setups
+        """
+    
+    for c in plateinfo.cassettes:
+        c.usable=[1,8,15] #[1,2,8,9,15,16]
     

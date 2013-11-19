@@ -4,6 +4,25 @@ Created on Jan 19, 2010
 @author: one
 '''
 
+def new_setup(platename='',setup_name='',):
+    #Current setup dict
+    return {
+        'plate':platename,
+        'setup':setup_name,
+        'unused_holes':[], #bit of a misnomer, mechanical & guide would be more apt
+        'holes':[],
+        'channels':{'armR':[],'armB':[]}, #lists of holes
+        'groups':[] # list of fiber_groups, see new_fiber_group()
+        }
+#def new_fiber_group(fiberBundle='', region=(0,0,0,0), channel='', side=''):
+#    return {
+#        'fiber_group':fiberBundle, # e.g. 'B-02-09' or 'B-02-01'
+#        'holes':[], #list of holes
+#        'region':region, #bounding box, (x0, y0,x1,y1)
+#        'side':side, #'left' | 'right'
+#        'path':[], #list of 1 or 2 element lists of (x,y) tuples
+#        'channel':channel} # 'armB' | 'armR'
+
 class Setup(object):
     '''
     classdocs
@@ -56,22 +75,6 @@ class Setup(object):
                 raise Exception('Hole exists in annother channel')
  
         self.dict[channel].add(hole)
-
-    def getFiberForHole(self, hole):
-
-        fiber='None'
-        for group in self.groups:
-
-            for i, h in enumerate(group['holes']):
-                if h==hole:
-                    fiber=group['fiber_group']
-                    fiber=fiber[0:-2]+"%02i"%(int(fiber[-2:])+i)
-                    break
-            if fiber != 'None':
-                break
-        
-        return fiber
-
         
     def addGuiderHole(self, hole):
         """ Adds a guider hole to the setup """
