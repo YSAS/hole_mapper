@@ -32,17 +32,10 @@ def _init_cassette_positions():
     B7
     R7
     
-    left looking at plate:
-    B2
-    R2
-    ...
-    B8
-    R8
-    
     should be:
     left looking at plate:
-    R2
-    B2
+    R2l 
+    B2h
     ...
     R8
     B8
@@ -62,7 +55,7 @@ def _init_cassette_positions():
     #    y=np.linspace(1, -1, 16+2)[1:-1]
     #    x=np.zeros(len(y))+.45
     rightlabels=[c+str(i)+j for i in range(1,9,2) for c in 'BR' for j in 'hl']
-    leftlabels=[c+str(i)+j for i in range(2,9,2) for c in 'BR' for j in 'lh']
+    leftlabels=[c+str(i)+j for i in range(2,9,2) for c in 'RB' for j in 'lh']
     for i,l in enumerate(leftlabels):
         _cassette_positions[l]=(x[i],y[i])
     for i,l in enumerate(rightlabels):
