@@ -488,7 +488,7 @@ class Plate(object):
         lefts=filter(lambda i:labeldata[i][3]==False, range(len(labeldata)))
         y=distribute([labeldata[i][1][1] for i in lefts],
                      -LABEL_MAX_Y, LABEL_MAX_Y, MIN_LABEL_Y_SEP)
-        x=-(Plate.LABEL_RADIUS**2 - y**2)
+        x=(Plate.LABEL_RADIUS**2 - y**2)
         for i in range(len(lefts)):
             labelpos[lefts[i]]=[x[i], y[i]]
 
@@ -496,7 +496,7 @@ class Plate(object):
         rights=filter(lambda i:labeldata[i][3]==True, range(len(labeldata)))
         y=distribute([labeldata[i][1][1] for i in rights],
                      -LABEL_MAX_Y, LABEL_MAX_Y, MIN_LABEL_Y_SEP)
-        x=(Plate.LABEL_RADIUS**2 - y**2)
+        x=-(Plate.LABEL_RADIUS**2 - y**2)
         for i in range(len(rights)):
             labelpos[rights[i]]=[x[i], y[i]]
         

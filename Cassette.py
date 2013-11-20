@@ -14,13 +14,15 @@ def rangify(data):
     return ', '.join(str_list)
 
 
+
+#in res and asc -x is on right looking at plate
 def _init_cassette_positions():
     """
-    left:
-    B1l
-    B1h
-    R1l
+    right looking at plate:
+    B1h 9-16
+    B1l 1-8
     R1h
+    R1l
     
     B3
     R3
@@ -30,12 +32,20 @@ def _init_cassette_positions():
     B7
     R7
     
-    right:
+    left looking at plate:
     B2
     R2
     ...
     B8
     R8
+    
+    should be:
+    left looking at plate:
+    R2
+    B2
+    ...
+    R8
+    B8
     """
     
     #Each cassette (half-cassette?) has a vertex on the plate nominally
@@ -51,8 +61,8 @@ def _init_cassette_positions():
     x=np.sqrt(r**2 - y**2)
     #    y=np.linspace(1, -1, 16+2)[1:-1]
     #    x=np.zeros(len(y))+.45
-    leftlabels=[c+str(i)+j for i in range(1,9,2) for c in 'BR' for j in 'hl']
-    rightlabels=[c+str(i)+j for i in range(2,9,2) for c in 'BR' for j in 'hl']
+    rightlabels=[c+str(i)+j for i in range(1,9,2) for c in 'BR' for j in 'hl']
+    leftlabels=[c+str(i)+j for i in range(2,9,2) for c in 'BR' for j in 'lh']
     for i,l in enumerate(leftlabels):
         _cassette_positions[l]=(x[i],y[i])
     for i,l in enumerate(rightlabels):
@@ -65,9 +75,9 @@ cassette_positions=_init_cassette_positions()
 class Cassette(object):
     def __init__(self, name, slit, usable=None):
         assert 'h' in name or 'l' in name
-        if usable == None and 'l' in name:
+        if usable == None and 'h' in name:
             self.usable=range(9,17)
-        elif usable == None and 'h' in name:
+        elif usable == None and 'l' in name:
             self.usable=range(1,9)
         else:
             self.usable=usable
@@ -144,13 +154,13 @@ class Cassette(object):
 
     def map_fibers(self):
         #assuming -x is to left
-        self.holes.sort(key=operator.attrgetter('x'), reverse=self.onRight())
+        self.holes.sort(key=operator.attrgetter('x'), reverse=not self.onRight())
         #assign the next fiber
         for h in self.holes:
             self.assign_fiber(h)
 
     def onRight(self):
-        return not int(self.name[1]) % 2  == 0
+        return int(self.name[1]) % 2  != 0
 
 def blue_cassette_names():
     return ['B'+str(i)+j for i in range(1,9) for j in 'hl']

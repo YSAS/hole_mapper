@@ -219,12 +219,10 @@ class plateHoleInfo(object):
                 fp.write("[{}:Targets]\n".format(condensed_name))
                 col_header=['RA','Dec','ep','X','Y','Z','R','Type', 'priority',
                             'ID', 'fiber']
-                fp.write("'"+"'\t'".join(col_header)+"'\n")
-                x=("'{RA}'\t'{DE}'\t'{ep}'\t'{x}'\t'{y}'\t'{z}'\t'{r}'\t"
+                fp.write("T:'"+"'\t'".join(col_header)+"'\n")
+                x=("T:'{RA}'\t'{DE}'\t'{ep}'\t'{x}'\t'{y}'\t'{z}'\t'{r}'\t"
                        "'{type}'\t'{priority}'\t'{ID}'\t'{fiber'\n")
                 for h in ob:
-                    x=("'{RA}'\t'{DE}'\t'{ep}'\t'{x}'\t'{y}'\t'{z}'\t'{r}'\t"
-                       "'{type}'\t'{priority}'\t'{ID}'\t'{fiber}'\n")
                     fp.write(x.format(RA=h.ra_string(),
                                       DE=h.de_string(),
                                       ep=h['EPOCH'],
