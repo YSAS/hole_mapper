@@ -65,6 +65,18 @@ class plateHoleInfo(object):
             _postProcessCalvetCassettes(self)
 
     def _init_fromASC(self):
+        
+        #add standard to plate
+        awords=self.afile.seventeen.split()
+    
+        self.holeSet.add(Hole(float(awords[0])/SCALE,
+                        float(awords[1])/SCALE,
+                        float(awords[2])/SCALE,
+                        float(awords[3])/SCALE,
+                        type=awords[4],
+                        mattfib='R-01-17',
+                        idstr=self.afile.seventeen))
+    
         #Go through all the setups in the files
         for setup_name, setup_dict in self.rfile.setups.items():
             
@@ -101,8 +113,6 @@ class plateHoleInfo(object):
                 #Grab Matt's fiber assignment
                 matt_fiber=rwords[0]
                 
-                if matt_fiber=='R-01-17':
-                    import pdb;pdb.set_trace()
                 #Perform a crappy extraction of additional hole information
                 if rtype =='O':
                     if len(rwords) > 10:
