@@ -115,11 +115,15 @@ class plateHoleInfo(object):
                 
                 #Perform a crappy extraction of additional hole information
                 if rtype =='O':
-                    if len(rwords) > 10:
-                        addit=parse_extra_data(self.name,setup_name,rwords[10:])
-                        addit['PRIORITY']=int(rwords[9])
+                    if 'F00' in rwords[9]:
+                        ndx_add=1
                     else:
-                        addit={'PRIORITY':int(rwords[9])}
+                        ndx_add=0
+                    if len(rwords) > 10+ndx_add:
+                        addit=parse_extra_data(self.name,setup_name,rwords[10+ndx_add:])
+                        addit['PRIORITY']=int(rwords[9+ndx_add])
+                    else:
+                        addit={'PRIORITY':int(rwords[9+ndx_add])}
                     
                 #Instantiate a hole
                 hole=Hole(float(awords[0])/SCALE,
