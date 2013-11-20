@@ -76,6 +76,16 @@ class plateHoleInfo(object):
                         type=awords[4],
                         mattfib='R-01-17',
                         idstr=self.afile.seventeen))
+        
+        for l in self.afile.fid_thumb_lines:
+            awords=l.split()
+            self.holeSet.add(Hole(float(awords[0])/SCALE,
+                                  float(awords[1])/SCALE,
+                                  float(awords[2])/SCALE,
+                                  float(awords[3])/SCALE,
+                                  type=awords[4],
+                                  mattfib='',
+                                  idstr=l))
     
         #Go through all the setups in the files
         for setup_name, setup_dict in self.rfile.setups.items():
@@ -327,7 +337,7 @@ def _postProcessIanCassettes(plateinfo):
     6 real setups
     """
     for c in plateinfo.cassettes_for_setup('Setup 2').values():
-        if 'h' in c.name:
+        if 'l' in c.name:
             c.usable=[1,8]
         else:
             c.usable=[9,15,16] #[1,2,8,9,15,16] or [1,8,15]
@@ -335,7 +345,7 @@ def _postProcessIanCassettes(plateinfo):
 def _postProcessHJCassettes(plateinfo):
     for s in ['Setup 1', 'Setup 3','Setup 4', 'Setup 6']:
         for c in plateinfo.cassettes_for_setup(s).values():
-            if 'h' in c.name:
+            if 'l' in c.name:
                 c.usable=[2,4,6,8]
             else:
                 c.usable=[10,12,14,16]
@@ -343,7 +353,7 @@ def _postProcessHJCassettes(plateinfo):
 def _postProcessCalvetCassettes(plateinfo):
     for c_set in plateinfo.cassettes.values():
         for c in c_set.values():
-            if 'h' in c.name:
+            if 'l' in c.name:
                 c.usable=[2,4,6,8]
             else:
                 c.usable=[10,12,14,16]

@@ -39,6 +39,7 @@ class ascfile(platefile):
 
     def parseFile(self):
         self.setups={}
+        self.fid_thumb_lines=[]
         with open(self.file,"r") as fin:
             for line in fin:
                 words=line.split()
@@ -48,6 +49,8 @@ class ascfile(platefile):
                                             'setup_lines':[]}
                 elif words[5][-2:]!='17':
                     self.setups[currsetup]['setup_lines'].append(line)
+                    if currsetup=='Setup 1' and words[4] in 'FT':
+                        self.fid_thumb_lines.append(line)
                 else:
                     self.seventeen=line
         for s in self.setups:

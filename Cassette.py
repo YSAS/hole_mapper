@@ -17,10 +17,10 @@ def rangify(data):
 def _init_cassette_positions():
     """
     left:
-    B1h
     B1l
-    R1h
+    B1h
     R1l
+    R1h
     
     B3
     R3
@@ -65,9 +65,9 @@ cassette_positions=_init_cassette_positions()
 class Cassette(object):
     def __init__(self, name, slit, usable=None):
         assert 'h' in name or 'l' in name
-        if usable == None and 'h' in name:
+        if usable == None and 'l' in name:
             self.usable=range(9,17)
-        elif usable == None and 'l' in name:
+        elif usable == None and 'h' in name:
             self.usable=range(1,9)
         else:
             self.usable=usable
