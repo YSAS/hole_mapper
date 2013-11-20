@@ -10,10 +10,9 @@ SKY_TYPE='S'
 OBJECT_TYPE='O'
 
 class Hole(dict):
-    def __init__(self, x, y, r, ra=(0,0,0.0), de=(0,0,0.0),
-                 id='',color=0.0, mag=0.0, type='', slit=180,
-                 ep=2000.0, mattfib='', extra='', idstr='',
-                 fiber='',channel='', cassette=None, fiberno=0):
+    def __init__(self, x, y, z, r, ra=('0','0','0.0'), de=('0','0','0.0'),
+                 type='', slit=180, ep=2000.0, mattfib='', idstr='',
+                 fiber='',channel='', cassette=None, fiberno=0, **extra):
         
         #cassette 0 not specified, 1-8
         #fiber num 0 not specified 1-16
@@ -21,13 +20,23 @@ class Hole(dict):
         #fiber R-channel-fiberno
         self.x=float(x)
         self.y=float(y)
+        self.z=float(z)
         self.radius=float(r)
-        self.idstr=idstr
+        self.idstr=idstr #this is the string that defines the hole in the asc file
         self.cassette_distances={c:self.distance(Cassette.cassette_positions[c])
                                  for c in Cassette.cassette_positions}
         self.hash=self.__hash__()
         
         assert slit in (180, 125, 95, 75, 58, 45)
+
+        default_id=':'.join(ra)+'_'+':'.join(de)
+        
+        id = extra.pop('ID',default_id)
+        if type=='S':
+            id='sky'+id
+        color=extra.pop('COLOR',0.0)
+        mag=extra.pop('MAGNITUDE',0.0)
+        priority=extra.pop('PRIORITY',0)
         
         self['RA']=ra
         self['DEC']=de
@@ -37,11 +46,18 @@ class Hole(dict):
         self['TYPE']=type
         self['EPOCH']=ep
         self['MATTFIB']=mattfib
-        self['EXTRA']=extra
         self['SLIT']=slit
+        self['PRIORITY']=priority
         self['FIBER']=fiber
         self['ASSIGNMENT']={'CASSETTE':cassette, #cassette or list of viable cassettes e.g. R1, B8
                             'FIBERNO':fiber}
+        self['CUSTOM']=extra
+        for k,v in extra.iteritems():
+            if k not in self:
+                self[k]=v
+            else:
+                raise ValueError('Key {} is reserved'.format(k))
+        
     
     def __eq__(self,other):
         return (self.x == other.x and
@@ -49,14 +65,17 @@ class Hole(dict):
                 self.radius == other.radius)
    
     def __hash__(self):
-        return ( "%2.3f.%2.3f.%2.3f" % (self.x,self.y,self.radius) ).__hash__()
+        return ( "%2.6f.%2.6f.%2.6f" % (self.x,self.y,self.radius) ).__hash__()
     
     def __str__(self):
         return self.idstr
     
     def getInfo(self):
-        return ("%.3f %.3f %.3f"%(self.x,self.y,self.radius),"RA DEC",self.idstr)
-    
+        return ("%.6f %.6f %.6f"%(self.x,self.y,self.radius),"RA DEC",self.idstr)
+
+    def maprecord(self):
+        return ''.join([self['FIBER'],'  ',self.idstr])
+
     def holeCompareX(self,other):
         return cmp(self.x,other.x)
 
@@ -96,7 +115,7 @@ class Hole(dict):
     def assign(self, assignment):
         """assignemnt={'CASSETTE':'','FIBERNO':0}"""
         self['FIBER']=(assignment['CASSETTE']+
-                       '-{:02}'.format(assignment[']FIBERNO']))
+                       '-{:02}'.format(assignment['FIBERNO']))
         self['ASSIGNMENT']=assignment
 
     def assign_possible_cassette(self, cassettes,
@@ -113,18 +132,13 @@ class Hole(dict):
             raise Exception('Fiber already assigned')
         if type(self['ASSIGNMENT']['CASSETTE'])==str:
             raise Exception('Cassette already assigned')
-
-        if len(cassettes)==0:
-            import pdb;pdb.set_trace()
-
-        if self.__hash__()==190951225552046123:
-            if not hasattr(self, 'foobar'):
-                self.foobar=[(cassettes,self['ASSIGNMENT']['CASSETTE'])]
-            if self.foobar[-1]!=cassettes:
-                self.foobar.append((cassettes,self['ASSIGNMENT']['CASSETTE']))
-            if len(cassettes)==0:
-                import pdb;pdb.set_trace()
-
+#        if self.__hash__()==190951225552046123:
+#            if not hasattr(self, 'foobar'):
+#                self.foobar=[(cassettes,self['ASSIGNMENT']['CASSETTE'])]
+#            if self.foobar[-1]!=cassettes:
+#                self.foobar.append((cassettes,self['ASSIGNMENT']['CASSETTE']))
+#            if len(cassettes)==0:
+#                import pdb;pdb.set_trace()
         #If no possibles have ever been set, set and finish
         if self['ASSIGNMENT']['CASSETTE']==None:
             self['ASSIGNMENT']['CASSETTE']=cassettes
@@ -172,7 +186,13 @@ class Hole(dict):
 
     def isAssigned(self):
         return self['FIBER']!=''
-    
+
+    def ra_string(self):
+        return '{} {} {}'.format(*self['RA'])
+
+    def de_string(self):
+        return '{} {} {}'.format(*self['DEC'])
+
     def assigned_color(self):
         """ Return color of assigned cassette else None """
         if type(self['ASSIGNMENT']['CASSETTE'])==str:
@@ -188,3 +208,4 @@ class Hole(dict):
 
     def isObject(self):
         return self['TYPE']==OBJECT_TYPE
+

@@ -46,15 +46,17 @@ def _init_cassette_positions():
     
     #left are at (-x,y) & right @ (x,y)
     _cassette_positions={}
-    r=np.sqrt(.5) #enclose half area
+    r=np.sqrt(.25) #enclose half area
     y=np.linspace(r, -r, 16+2)[1:-1]
     x=np.sqrt(r**2 - y**2)
+    #    y=np.linspace(1, -1, 16+2)[1:-1]
+    #    x=np.zeros(len(y))+.45
     leftlabels=[c+str(i)+j for i in range(1,9,2) for c in 'BR' for j in 'hl']
     rightlabels=[c+str(i)+j for i in range(2,9,2) for c in 'BR' for j in 'hl']
     for i,l in enumerate(leftlabels):
-        _cassette_positions[l]=(-x[i],y[i])
-    for i,l in enumerate(rightlabels):
         _cassette_positions[l]=(x[i],y[i])
+    for i,l in enumerate(rightlabels):
+        _cassette_positions[l]=(-x[i],y[i])
 
     return _cassette_positions
 
@@ -107,11 +109,14 @@ class Cassette(object):
     
     def assign_hole(self, hole):
         """Add the hole to the cassette and assign the cassette to the hole"""
+        if self.n_avail()==0:
+            import pdb;pdb.set_trace()
+            raise Exception('Cassette Full')
         self.consume()
         self.holes.append(hole)
         hole.assign_cassette(self.name)
     
-    def assign_fiber(self, hole, skip_lower=False):
+    def assign_fiber(self, hole):
         """
         Associate hole with the next available fiber. Sets assignment for hole.
         
@@ -120,11 +125,7 @@ class Cassette(object):
         """
         #Get next available fiber
         #min of self.usable not in self.map
-        if skip_lower:
-            min_num=9
-        else:
-            min_num=0
-        free=filter(lambda x: x not in self.map and x >= min_num, self.usable)
+        free=filter(lambda x: x not in self.map, self.usable)
         
         assert len(free)>0
         
@@ -134,66 +135,22 @@ class Cassette(object):
         self.map[num]=hole
         
         #Tell the hole its fiber
-        hole.assign({'CASSETTE':self.name,
+        hole.assign({'CASSETTE':self.name[0:2],
                      'FIBERNO':num})
-    
-    def n_upper_avail(self):
-        return len(filter(lambda x:x>8, self.usable))
-    
-    def n_lower_avail(self):
-        return len(self.usable)-self.n_upper_avail()
-    
+
     def label(self):
         """Return a string label for the cassette e.g. R1 1-8 or B3 1,4,7"""
-        return self.name+' '+rangify(sorted(self.map.keys()))
+        return self.name[0:2]+' '+rangify(sorted(self.map.keys()))
 
     def map_fibers(self):
-        if max(self.n_upper_avail(),self.n_lower_avail()) < self.used:
-            #divide into upper and lower groups
-            #upper group gets upper fibers, lower gets lower, decide which gets
-            #full set by whichever set (upper 8 vs lower 8) has smallest scatter
-            #in y
-            self.holes.sort(key=operator.attrgetter('y'))
-            lower=self.holes[0:self.n_lower_avail()]
-            upper=self.holes[self.n_lower_avail():]
-        elif self.n_upper_avail() >= self.used:
-            upper=self.holes
-            lower=[]
-        else:
-            lower=self.holes
-            upper=[]
-        for holes in [lower, upper]: #assign the lower first (1-8 is on bottom??)
-            #assuming -x is to left
-            holes.sort(key=operator.attrgetter('x'), reverse=self.onRight())
-            #assign the next fiber
-            for h in holes:
-                self.assign_fiber(h, skip_lower=len(lower)==0)
-
-
-#    def map_fibers(self):
-#        if max(self.n_upper_avail(),self.n_lower_avail()) < self.used:
-#            #divide into upper and lower groups
-#            #upper group gets upper fibers, lower gets lower, decide which gets
-#            #full set by whichever set (upper 8 vs lower 8) has smallest scatter
-#            #in y
-#            self.holes.sort(key=operator.attrgetter('y'))
-#            lower=self.holes[0:self.n_lower_avail()]
-#            upper=self.holes[self.n_lower_avail():]
-#        elif self.n_upper_avail() >= self.used:
-#            upper=self.holes
-#            lower=[]
-#        else:
-#            lower=self.holes
-#            upper=[]
-#        for holes in [lower, upper]: #assign the lower first (1-8 is on bottom??)
-#            #assuming -x is to left
-#            holes.sort(key=operator.attrgetter('x'), reverse=self.onRight())
-#            #assign the next fiber
-#            for h in holes:
-#                self.assign_fiber(h, skip_lower=len(lower)==0)
+        #assuming -x is to left
+        self.holes.sort(key=operator.attrgetter('x'), reverse=self.onRight())
+        #assign the next fiber
+        for h in self.holes:
+            self.assign_fiber(h)
 
     def onRight(self):
-        return int(self.name[1]) % 2  == 0
+        return not int(self.name[1]) % 2  == 0
 
 def blue_cassette_names():
     return ['B'+str(i)+j for i in range(1,9) for j in 'hl']

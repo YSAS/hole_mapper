@@ -63,8 +63,8 @@ class HoleInfoDialog:
         if info['TYPE'] in 'OSGA':
 
             Tkinter.Label(self.dialog, text='ID: '+info['ID']).pack(anchor='w')
-            Tkinter.Label(self.dialog, text='RA: %i %i %2.3f'%info['RA']).pack(anchor='w')
-            Tkinter.Label(self.dialog, text='Dec: %i %i %2.3f'%info['DEC']).pack(anchor='w')
+            Tkinter.Label(self.dialog, text='RA: '+info['RA']).pack(anchor='w')
+            Tkinter.Label(self.dialog, text='Dec: '+info['DEC']).pack(anchor='w')
             if info['TYPE'] not in 'S':
                 Tkinter.Label(self.dialog, text='Mag: %f'%info['MAGNITUDE']).pack(anchor='w')
                 Tkinter.Label(self.dialog, text='Color: %f'%info['COLOR']).pack(anchor='w')
@@ -158,6 +158,7 @@ class App(Tkinter.Tk):
         Tkinter.Button(frame, text="Load Holes", command=self.load).pack()
         Tkinter.Button(frame, text="Regionify", command=self.makeRegions).pack()
         Tkinter.Button(frame, text="Write Map", command=self.writeMap).pack()
+        Tkinter.Button(frame, text="Gen .plate", command=self.genPlate).pack()
         self.coordshft_str=Tkinter.StringVar(value='CShift On')
         Tkinter.Button(frame, textvariable=self.coordshft_str, command=self.toggleCoord).pack()
 
@@ -336,6 +337,9 @@ class App(Tkinter.Tk):
     def makeRegions(self):
         self.plate.regionify(active_setup=self.getActiveSetup())
         self.show()
+
+    def genPlate(self):
+        self.plate.plateHoleInfo.write_platefile()
 
 
     @staticmethod

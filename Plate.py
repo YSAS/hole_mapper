@@ -15,18 +15,20 @@ def distribute(x, min_x, max_x, min_sep):
     near original positions, and within min_x & max_x
     """
     import numpy as np
-    return list(np.linspace(min_x, max_x, len(x)))
+    return np.linspace(min_x, max_x, len(x))
 
 SCALE=14.25 #also change in plateHoleInfo.py
 
 LABEL_MAX_Y=.7
 MIN_LABEL_Y_SEP=0.05 #must be < 2*LABEL_MAX_Y/16
 
+PROJ_PLATE_LABEL_Y=.95
+
 class Plate(object):
     '''Class for fiber plug plate'''
     SCALE=SCALE
     RADIUS=1.0 # 14.25/Plate.SCALE
-    LABEL_RADIUS=0.85*RADIUS
+    LABEL_RADIUS=0.95*RADIUS
     SH_RADIUS=0.1875
     HOLE_R_MULT=1.25
 
@@ -54,41 +56,32 @@ class Plate(object):
         ret=[]
         for k in self.setups:
             v=self.setups[k]
-            if hole in v['unused_holes']:
+            if hole in v['unused_holes'] or hole in v['holes']:
                 ret.append(k)
-            else:
-                for chan in v['channels']:
-                    if hole in v['channels'][chan]:
-                        ret.append(k)
-                        break
         return ret
 
-
     def getHoleInfo(self, holeID):
-        """ Returns a dictionary of information for hole
+        """
+        Returns a dictionary of information for hole
             corresponding to holeID. Valid keys are:'RA',
             'DEC','ID','MAGNITUDE','COLOR','SETUPS',
             'HOLEID', and 'TYPE'.
-            An invalid holeID is an exception."""
-        
+            An invalid holeID is an exception.
+        """
         hole=self.getHole(holeID)
         if not hole:
             raise Exception('Invalid holeID')
-        
-        ret={'RA':hole['RA'],'DEC':hole['DEC'],
+        ret={'RA':hole.ra_string(),'DEC':hole.de_string(),
              'ID':hole['ID'],'MAGNITUDE':hole['MAGNITUDE'],
              'COLOR':hole['COLOR'],'TYPE':hole['TYPE'],
              'SETUPS':self.getSetupsUsingHole(hole),'HOLEID':holeID,
-             'IDSTR':hole.idstr}
-
+             'IDSTR':hole.idstr,'CUSTOM':hole['CUSTOM']}
         return ret
-
 
     def getChannelForHole(self, holeID, setupName):
         """ Returns the channel of a hole for a given setup.
             Returns '' for Holes without a channel. An invalid
             setup is an exception. An invalid holeID is an exception."""
-            #A holeID not in the specified setup is an exception. 
         
         hole=self.getHole(holeID)
         if not hole:
@@ -96,24 +89,15 @@ class Plate(object):
         if setupName not in self.setups:
             raise Exception('Invalid setupName')
         
-        ret=None
-        for k in self.setups[setupName]['channels']:
-            v=self.setups[setupName]['channels'][k]
-            if hole in v:
-                ret=k
-                break
-        
-        if ret is None:
-            if hole in self.setups[setupName]['unused_holes']:
-                ret=''
-                
-        if ret is None:
-            ret=''
-            #raise Exception('Hole not in specified setup')
+        ret=''
+
+        if hole in self.setups[setupName]['holes']:
+            color=hole.assigned_color()
+            if color !=None:
+                ret=color
         
         return ret
     
-
     def getFiberForHole(self, holeID, setupName):
         """
         Returns the Fiber which is mapped to a
@@ -135,16 +119,21 @@ class Plate(object):
     def getSetupInfo(self,setupName):
         nr=0
         nb=0
+        ns=0
+        
+        #TODO fix total calculation
         nt=len(self.holeSet)-len(self.getHolesNotInAnySetup())
         for s in self.setups:
             nt-=len(self.setups[s]['unused_holes'])
 
         if setupName in self.setups:
-            if 'armR' in self.setups[setupName]['channels']:
-                nr=len(self.setups[setupName]['channels']['armR'])
-            if 'armB' in self.setups[setupName]['channels']:
-                nb=len(self.setups[setupName]['channels']['armB'])
-        return 'Red: %03d  Blue: %03d  Total: %04d'%(nr,nb,nt)
+            setup=self.setups[setupName]
+            nr=len([h for h in setup['holes'] if 'R' in h['FIBER']])
+            nb=len([h for h in setup['holes'] if 'B' in h['FIBER']])
+            ns=len(setup['holes'])
+        ret='Red: %03d  Blue: %03d  Setup: %03d  Total: %04d'%(nr,nb,ns,nt)
+        ret=ret+' {} Setups'.format(len(self.setups))
+        return ret
 
     def getHolesNotInAnySetup(self):
         otherholes=[]
@@ -152,13 +141,9 @@ class Plate(object):
         for h in self.holeSet:
             flag=1
             for s in self.setups:
-                if h in self.setups[s]['unused_holes']:
+                if (h in self.setups[s]['unused_holes'] or
+                    h in self.setups[s]['holes']):
                     flag=0
-                if flag:
-                    for k in self.setups[s]['channels']:
-                        if h in self.setups[s]['channels'][k]:
-                            flag=0
-                            break
                 if flag == 0:
                     break
             if flag:
@@ -203,7 +188,7 @@ class Plate(object):
         self.setups=self.plateHoleInfo.setups
         
         #Add the SH to the global set
-        self.holeSet.add(Hole(0.0, 0.0, Plate.SH_RADIUS/Plate.SCALE,
+        self.holeSet.add(Hole(0.0, 0.0, 0.0, Plate.SH_RADIUS/Plate.SCALE,
                               idstr='Shack-Hartman'))
   
     def clear(self):
@@ -217,16 +202,16 @@ class Plate(object):
     def writeMapFile(self, out_dir, active_setup):
         if active_setup in self.setups:
             ofile=''.join([out_dir,self.plate_name,'_',active_setup,'.map'])
+            print 'Writing mapfile:'+ofile
             with open( ofile, "w" ) as fout:
-                fout.write(''.join(['Code Version: Feb 10\n',self.plate_name,'\n']))
-                setup_nfo=self.plateHoleInfo.getSetupInfo(active_setup)
-                for l in setup_nfo:
+                fout.write(''.join(['Code Version: Nov 13\n',
+                                    self.plate_name,'\n']))
+                for l in self.setups[active_setup]['setupNfo']:
                     fout.write(l)
-                for g in self.setups[active_setup]['groups']:
-                    for i,h in enumerate(g['holes']):
-                        fiber=h['FIBER']
-                        nfostr=h.info
-                        fout.write(''.join([fiber,'  ',nfostr,'\n']))
+                cassettes=self.setups[active_setup]['cassetteConfig'].values()
+                for c in cassettes:
+                    for h in c.holes:
+                        fout.write(h.maprecord()+'\n')
 
     def toggleCoordShift(self):
         self.doCoordShift = not self.doCoordShift
@@ -308,10 +293,30 @@ class Plate(object):
         for i, h in enumerate(unassigned_skys):
             group=cassette_groups[i % len(cassette_groups)]
             h.assign_possible_cassette(group)
-        
+
+        #While there are holes w/o an assigned cassette (groups don't count)
+        while len(unassigned_skys) > 0:
+            #Update cassette availability for each hole (a cassette may have filled)
+            for h in unassigned_skys:
+                #Get cassettes with correct slit and free fibers
+                # n.b these are just cassette name strings
+                possible_cassettes=self.plateHoleInfo.available_cassettes(h,
+                                                    setup['setup'])
+                if len(possible_cassettes)<1:
+                    import pdb;pdb.set_trace()
+                #Set the cassetes that are usable for the hole
+                #  no_add is true so we keep the distribution of sky fibers
+                h.assign_possible_cassette(possible_cassettes,
+                                           update_with_intersection=True)
+
+            #Sort holes by their distance from cassettes
+            unassigned_skys.sort(key=lambda h: h.plug_priority())
+
+            #Get hole furthest from its cassettes
+            h=unassigned_skys.pop()
+
             #Assign to nearest available cassette
             cassettes[h.nearest_usable_cassette()].assign_hole(h)
-        
 
         #List of holes needing assignments
         holes_to_assign=unassigned_objs
@@ -365,6 +370,9 @@ class Plate(object):
                 tmp=list(pos)
                 tmp.append(hole.hash)
                 print tmp
+                for k,v in hole.items():
+                    print k,v
+                import pdb;pdb.set_trace()
                 print "drawing dupe in Dark Green @ (%f,%f) ID:%i"%tuple(tmp)
                 fcolor='DarkGreen'
             canvas.drawCircle( pos, hole.radius*radmult, 
@@ -411,8 +419,7 @@ class Plate(object):
             setup=self.setups[active_setup]
             
             inactiveHoles=self.holeSet.difference(setup['unused_holes'])
-            for key in setup['channels']:
-                inactiveHoles.difference_update(setup['channels'][key])
+            inactiveHoles.difference_update(setup['holes'])
             
             #Draw the holes that aren't in the current setup
             for h in inactiveHoles:
@@ -428,60 +435,68 @@ class Plate(object):
             #Draw the guide and acquisition holes in color
             for h in setup['unused_holes']:
                 self.drawHole(h, canvas, color='Green')
-        
         else:
             for h in self.holeSet:
                 self.drawHole(h, canvas)
 
-    def _draw_with_assignements(self, setup, channel, canvas):
+    def _draw_with_assignements(self, setup, channel, canvas,
+                                lblcolor='black', drawimage=False):
         """Does not draw holes for color if not selected"""
-        drawred=True
-        drawblue=True
         if channel in ['armB', 'BLUE', 'blue']:
             drawred=False
+            drawblue=True
         elif channel in ['armR', 'RED', 'red']:
             drawblue=False
-
+            drawred=True
+        else:
+            drawred=True
+            drawblue=True
+        
         #List of cassette labels and first hole positions
         labeldata=[]
-
+        
         #Draw all the cassettes
-        for cassette in setup['cassetteConfig']:
+        for cassette in setup['cassetteConfig'].itervalues():
+            #canvas.drawCircle(cassette.pos, .02, outline='pink', fill='pink')
+            if cassette.used==0:
+                continue
             if drawred and cassette.color()=='red':
                 #Draw the cassette
-                self.drawCassette(c, canvas)
+                self.drawCassette(cassette, canvas, drawimage=drawimage)
                 #Grab the first hole position
-                start_pos=c.first_hole().position()
+                start_pos=cassette.first_hole().position()
                 #Grab the label text
-                label=c.label()
+                label=cassette.label()
                 #Add the label, color, and start pos to the pot
-                labeldata.append(('red',start_pos,label))
+                labeldata.append(('red', start_pos, label, cassette.onRight()))
             if drawblue and cassette.color()=='blue':
                 #Draw the cassette
-                self.drawCassette(c, canvas)
+                self.drawCassette(cassette, canvas, drawimage=drawimage)
                 #Grab the first hole position
-                start_pos=c.first_hole().position()
+                start_pos=cassette.first_hole().position()
                 #Grab the label text
-                label=c.label()
+                label=cassette.label()
                 #Add the label, color, and start pos to the pot
-                labeldata.append(('blue',start_pos,label, c.onRight()))
+                labeldata.append(('blue', start_pos, label, cassette.onRight()))
+        
+        labeldata.sort(key=lambda x:x[1][1])
         
         #Figure out where all the text labels should go
         labelpos=range(len(labeldata))
-
+        
         #Left side positions
         lefts=filter(lambda i:labeldata[i][3]==False, range(len(labeldata)))
         y=distribute([labeldata[i][1][1] for i in lefts],
                      -LABEL_MAX_Y, LABEL_MAX_Y, MIN_LABEL_Y_SEP)
-        x=-(LABEL_RADIUS**2 - y**2)
+        x=-(Plate.LABEL_RADIUS**2 - y**2)
         for i in range(len(lefts)):
             labelpos[lefts[i]]=[x[i], y[i]]
-        
+
         #Right side positions
         rights=filter(lambda i:labeldata[i][3]==True, range(len(labeldata)))
         y=distribute([labeldata[i][1][1] for i in rights],
                      -LABEL_MAX_Y, LABEL_MAX_Y, MIN_LABEL_Y_SEP)
-        x=-(LABEL_RADIUS**2 - y**2)
+        x=(Plate.LABEL_RADIUS**2 - y**2)
         for i in range(len(rights)):
             labelpos[rights[i]]=[x[i], y[i]]
         
@@ -490,16 +505,12 @@ class Plate(object):
             for i in range(len(labeldata)):
                 label=labeldata[2]
                 side=labeldata
-                if side: #on right
+                if not side: #on right
                     labelpos[i][0]-=canvas.getTextSize(label)
                 else:
                     labelpos[i][0]-=2*canvas.getTextSize(label)
-
+        
         #Draw the labels
-        if drawimage:
-            lblcolor="White"
-        else:
-            lblcolor="Black"
         for i in xrange(len(labeldata)):
             color,hpos,label,side=labeldata[i]
             tpos=labelpos[i]
@@ -511,7 +522,8 @@ class Plate(object):
             canvas.drawLine(tpos, self.plateCoordShift(hpos),
                             fill=color, dashing=1)
     
-    def _draw_without_assignements(self, setup, channel, canvas):
+    def _draw_without_assignements(self, setup, channel, canvas,
+                                   drawimage=False, radmult=1.0):
         if channel == 'all':
             bluecolor='blue'
             redcolor='red'
@@ -528,12 +540,32 @@ class Plate(object):
         for h in setup['holes']:
             hcolor=h.assigned_color()
             if hcolor == 'blue':
-                self.drawHole(h, canvas, color=bluecolor)
+                if drawimage:
+                    self.drawHole(h, canvas, color=bluecolor,
+                                  drawimage=drawimage,
+                                  fcolor=bluecolor,
+                                  radmult=radmult)
+                else:
+                    self.drawHole(h, canvas, color=bluecolor,
+                                  radmult=radmult)
             elif hcolor =='red':
-                self.drawHole(h, canvas, color=redcolor)
+                if drawimage:
+                    self.drawHole(h, canvas, color=redcolor,
+                                  drawimage=drawimage,
+                                  fcolor=redcolor,
+                                  radmult=radmult)
+                else:
+                    self.drawHole(h, canvas, color=redcolor,
+                                  radmult=radmult)
             else:
-                self.drawHole(h, canvas, color=nonecolor)
-
+                if drawimage:
+                    self.drawHole(h, canvas, color=nonecolor,
+                                  drawimage=drawimage,
+                                  fcolor=nonecolor,
+                                  radmult=radmult)
+                else:
+                    self.drawHole(h, canvas, color=nonecolor,
+                                  radmult=radmult)
 
     def drawImage(self, canvas, active_setup=None, channel='all',radmult=1.25):
         if active_setup and active_setup in self.setups:
@@ -541,61 +573,49 @@ class Plate(object):
             setup=self.setups[active_setup]
 
             #Draw the plate name and active setup
-            canvas.drawText((0,.7), self.plate_name ,color='White',center=0)
-            canvas.drawText((0,.65), active_setup, color='White',center=0)
-    
+            canvas.drawText((0,PROJ_PLATE_LABEL_Y), self.plate_name,
+                            color='White',center=0)
+            canvas.drawText((0,PROJ_PLATE_LABEL_Y-.05), active_setup,
+                            color='White',center=0)
 
-    
-            #If holes in setup have been grouped then draw the groups
-            # otherwise draw them according to their channel
-            if setup['groups']:
-                self.drawGroup(setup['groups'],canvas,channel=channel,drawimage=1)
+            if 'cassetteConfig' in setup:
+                self._draw_with_assignements(setup, channel, canvas,
+                                             drawimage=True,
+                                             lblcolor='white')
             else:
-                if channel=='all':
-                    for c in setup['channels']:
-                        if c=='armB':
-                            for h in setup['channels'][c]:
-                                self.drawHole(h, canvas,color='Blue',fcolor='Blue',radmult=radmult,drawimage=1)
-                        else:
-                            for h in setup['channels'][c]:
-                                self.drawHole(h, canvas,color='Red',fcolor='Red',radmult=radmult,drawimage=1)
-                elif channel=='armR' or channel.upper()=='RED':
-                    if 'armB' in setup['channels']:
-                        for h in setup['channels']['armB']:
-                            self.drawHole(h, canvas,drawimage=1)
-                    if 'armR' in setup['channels']:
-                        for h in setup['channels']['armR']:
-                            self.drawHole(h, canvas,color='Red',fcolor='Red',radmult=radmult,drawimage=1)
-                elif channel=='armB' or channel.upper()=='BLUE':
-                    if 'armR' in setup['channels']:
-                        for h in setup['channels']['armR']:
-                            self.drawHole(h, canvas,drawimage=1)
-                    if 'armB' in setup['channels']:
-                        for h in setup['channels']['armB']:
-                            self.drawHole(h, canvas,color='Blue',fcolor='Blue',radmult=radmult,drawimage=1)
-                    
-            #Draw the guide and acquisition holes in color
+                self._draw_without_assignements(setup, channel, canvas,
+                                                drawimage=True, radmult=radmult)
+
             for h in setup['unused_holes']:
-                self.drawHole(h, canvas,color='Yellow',fcolor='Yellow',radmult=radmult,drawimage=1)
-    
-            for h in self.getHolesNotInAnySetup():
-                self.drawHole(h, canvas,color='Magenta',fcolor='Magenta',radmult=radmult,drawimage=1)
+                self.drawHole(h, canvas,color='Yellow',fcolor='Yellow',
+                              radmult=radmult,drawimage=True)
+
+            sh_and_std=[h for h in self.holeSet if
+                        h.idstr=='Shack-Hartman' or h['MATTFIB']=='R-01-17']
+            for h in sh_and_std:
+                self.drawHole(h, canvas,color='Magenta',fcolor='Magenta',
+                              radmult=radmult,drawimage=True)
+
 
             #Draw little white dots where all the other holes are
             inactiveHoles=self.holeSet.difference(setup['unused_holes'])
-            for key in setup['channels']:
-                if channel==key or channel=='all':
-                    inactiveHoles.difference_update(setup['channels'][key])
+            
+            if channel=='all':
+                inactiveHoles.difference_update(setup['holes'])
+            elif channel=='armR':
+                redholes=[h for h in setup['holes'] if 'R' in h['FIBER']]
+                inactiveHoles.difference_update(redholes)
+            elif channel=='armB':
+                blueholes=[h for h in setup['holes'] if 'B' in h['FIBER']]
+                inactiveHoles.difference_update(blueholes)
+            else:
+                raise Exception('Channel has invalid value:'+channel)
+
             for h in inactiveHoles:
                 pos=self.plateCoordShift(h.position())    
-                #canvas.drawCircle(pos, h.radius/3 ,fill='White',outline='White')
                 canvas.drawSquare(pos,h.radius/3,fill='White',outline='White')
-                
-            #for h in self.holeSet:
-            #    pos=self.plateCoordShift(h.position())    
-            #    canvas.drawCircle(pos, h.radius/3 ,fill='White',outline='White')
-
-    def drawCassette(self, cassette, canvas, radmult=1.0, drawimage=0 ):
+    
+    def drawCassette(self, cassette, canvas, radmult=1.0, drawimage=False):
         color=cassette.color()
         
         if cassette.used==0:
@@ -628,7 +648,7 @@ class Plate(object):
         #Draw the paths between each of the holes
         for i in range(len(holes)-1):
             p0=holes[i].position()
-            p0=holes[i+1].position()
+            p1=holes[i+1].position()
             canvas.drawLine(self.plateCoordShift(p0), self.plateCoordShift(p1),
                             fill=color)
         
