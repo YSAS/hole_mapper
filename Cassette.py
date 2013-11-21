@@ -13,7 +13,11 @@ def rangify(data):
             str_list.append('%d' % ilist[0])
     return ', '.join(str_list)
 
+def left_only(cassette_dict):
+    return {k:v for k,v in cassette_dict.iteritems() if v.pos[0] > 0}
 
+def right_only(cassette_dict):
+    return {k:v for k,v in cassette_dict.iteritems() if v.pos[0] < 0}
 
 #in res and asc -x is on right looking at plate
 def _init_cassette_positions():
@@ -31,10 +35,11 @@ def _init_cassette_positions():
     R5
     B7
     R7
-    
-    should be:
+
     left looking at plate:
-    R2l 
+    R2l 1-8
+    R2h 9-16
+    B2l
     B2h
     ...
     R8
@@ -45,9 +50,10 @@ def _init_cassette_positions():
     # corresponding to the natural location where the fibers want to go
     # for startes we will model that as alternating red and blue
     # y coordinates distributed evenly, x coordinates s.t. it is on the plate radius
-    # evenly dividing area, - for left side, pos for right
+    # evenly dividing area
+    #left side is on +x
+    #right side is on -x
     
-    #left are at (-x,y) & right @ (x,y)
     _cassette_positions={}
     r=np.sqrt(.25) #enclose half area
     y=np.linspace(r, -r, 16+2)[1:-1]
@@ -118,7 +124,21 @@ class Cassette(object):
         self.consume()
         self.holes.append(hole)
         hole.assign_cassette(self.name)
-    
+
+    def unassign_hole(self, hole):
+        """
+        Remove the hole from the cassette and unassign cassette from the hole
+        """
+        if hole not in self.holes:
+            import pdb;pdb.set_trace()
+            raise Exception('Hole not in cassette')
+        self.used-=1
+        self.holes.remove(hole)
+        for k in self.map.keys():
+            if self.map[k]==hole:
+                self.map.pop(k)
+        hole.unassign()
+
     def assign_fiber(self, hole):
         """
         Associate hole with the next available fiber. Sets assignment for hole.
@@ -138,16 +158,18 @@ class Cassette(object):
         self.map[num]=hole
         
         #Tell the hole its fiber
-        hole.assign({'CASSETTE':self.name[0:2],
+        hole.assign({'CASSETTE':self.name,
                      'FIBERNO':num})
 
     def label(self):
         """Return a string label for the cassette e.g. R1 1-8 or B3 1,4,7"""
         return self.name[0:2]+' '+rangify(sorted(self.map.keys()))
 
-    def map_fibers(self):
+    def map_fibers(self, remap=False):
         #assuming -x is to left
         self.holes.sort(key=operator.attrgetter('x'), reverse=not self.onRight())
+        if remap:
+            self.map={}
         #assign the next fiber
         for h in self.holes:
             self.assign_fiber(h)

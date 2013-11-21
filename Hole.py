@@ -38,6 +38,7 @@ class Hole(dict):
         mag=extra.pop('MAGNITUDE',0.0)
         priority=extra.pop('PRIORITY',0)
         
+        self['USER_ASSIGNED']= fiber!=''
         self['RA']=ra
         self['DEC']=de
         self['ID']=id
@@ -118,6 +119,20 @@ class Hole(dict):
                        '-{:02}'.format(assignment['FIBERNO']))
         self['ASSIGNMENT']=assignment
 
+    def unassign(self):
+        """assignemnt={'CASSETTE':'','FIBERNO':0}"""
+        if self['USER_ASSIGNED']==True:
+            raise Exception('User assignments are irrevocable')
+        self['FIBER']=''
+        self['ASSIGNMENT']={'CASSETTE':None,'FIBERNO':0}
+        
+    def assigned_cassette(self):
+        """Return name of assigned cassette or ''"""
+        if type(self['ASSIGNMENT']['CASSETTE'])==str:
+            return self['ASSIGNMENT']['CASSETTE']
+        else:
+            return ''
+
     def assign_possible_cassette(self, cassettes,
                                  update_with_intersection=False):
         """
@@ -184,6 +199,15 @@ class Hole(dict):
             return sum([self.cassette_distances[c]
                         for c in self['ASSIGNMENT']['CASSETTE']])
 
+    def isAssignable(self, cassette=None):
+        """
+        True iff hole can be (re)assigned, optionally to sppecified cassette
+        """
+        ret=self['USER_ASSIGNED']==False
+        if cassette:
+            ret&=cassette.slit==self['SLIT']
+        return ret
+    
     def isAssigned(self):
         return self['FIBER']!=''
 
