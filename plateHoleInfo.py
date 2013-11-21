@@ -220,10 +220,11 @@ class plateHoleInfo(object):
                 col_header=['RA','Dec','ep','X','Y','Z','R','Type', 'priority',
                             'ID', 'fiber']
                 fp.write("T:'"+"'\t'".join(col_header)+"'\n")
-                x=("T:'{RA}'\t'{DE}'\t'{ep}'\t'{x}'\t'{y}'\t'{z}'\t'{r}'\t"
+                x=("T{n}:'{RA}'\t'{DE}'\t'{ep}'\t'{x}'\t'{y}'\t'{z}'\t'{r}'\t"
                        "'{type}'\t'{priority}'\t'{ID}'\t'{fiber'\n")
-                for h in ob:
-                    fp.write(x.format(RA=h.ra_string(),
+                for i,h in enumerate(ob):
+                    fp.write(x.format(n=i,
+                                      RA=h.ra_string(),
                                       DE=h.de_string(),
                                       ep=h['EPOCH'],
                                       x='%.4f'% (h.x*SCALE),
