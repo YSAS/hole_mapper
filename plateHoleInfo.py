@@ -288,6 +288,7 @@ def _postProcessHJSetups(plateinfo):
     import copy
     for k in ['Setup 1','Setup 2','Setup 3']:
         new_setups[k]=copy.copy(setups['Setup 1'])
+        new_setups[k]['setup']=k
     new_setups['Setup 1']['holes']=tpool
     new_setups['Setup 2']['holes']=lpool
     new_setups['Setup 3']['holes']=ppool
@@ -302,6 +303,7 @@ def _postProcessHJSetups(plateinfo):
 
     for k in ['Setup 4','Setup 5','Setup 6']:
         new_setups[k]=copy.copy(setups['Setup 2'])
+        new_setups[k]['setup']=k
     new_setups['Setup 4']['holes']=tpool
     new_setups['Setup 5']['holes']=lpool
     new_setups['Setup 6']['holes']=ppool
@@ -337,12 +339,18 @@ def _postProcessIanCassettes(plateinfo):
             c.usable=[9,15,16] #[1,2,8,9,15,16] or [1,8,15]
 
 def _postProcessHJCassettes(plateinfo):
-    for s in ['Setup 1', 'Setup 3','Setup 4', 'Setup 6']:
+    for s in ['Setup 3','Setup 6']:
         for c in plateinfo.cassettes_for_setup(s).values():
             if 'l' in c.name:
                 c.usable=[2,4,6,8]
             else:
                 c.usable=[10,12,14,16]
+    for s in ['Setup 1','Setup 4']:
+        for c in plateinfo.cassettes_for_setup(s).values():
+            if 'l' in c.name:
+                c.usable=[2]
+            else:
+                c.usable=[16]
 
 def _postProcessCalvetCassettes(plateinfo):
     for c_set in plateinfo.cassettes.values():
