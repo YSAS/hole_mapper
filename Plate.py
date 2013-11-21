@@ -635,15 +635,15 @@ class Plate(object):
         radius=1.41*2*0.08675*radmult/Plate.SCALE
         canvas.drawLine((x-radius,y),(x+radius,y), fill=pluscrosscolor)
         canvas.drawLine((x,y-radius),(x,y+radius), fill=pluscrosscolor)
-
-        if cassette.used==1:
-            return
         
         holes=cassette.ordered_holes()
-        
+
         #Draw the holes in the cassette
         for h in holes:
             self.drawHole(h, canvas, color=color, fcolor=color,radmult=radmult,drawimage=drawimage)
+
+        if cassette.used==1:
+            return
 
         #Draw the paths between each of the holes
         for i in range(len(holes)-1):
