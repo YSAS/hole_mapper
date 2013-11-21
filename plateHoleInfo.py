@@ -351,6 +351,12 @@ def _postProcessHJCassettes(plateinfo):
                 c.usable=[2]
             else:
                 c.usable=[16]
+    for s in ['Setup 2','Setup 5']:
+        for c in plateinfo.cassettes_for_setup(s).values():
+            if 'l' in c.name:
+                c.usable=range(1,8,2)
+            else:
+                c.usable=range(9,16,2)
 
 def _postProcessCalvetCassettes(plateinfo):
     for c_set in plateinfo.cassettes.values():
