@@ -124,6 +124,7 @@ class plateHoleInfo(object):
                 matt_fiber=rwords[0]
                 
                 #Perform a crappy extraction of additional hole information
+                addit={}
                 if rtype =='O':
                     if 'F00' in rwords[9]:
                         ndx_add=1
@@ -134,6 +135,7 @@ class plateHoleInfo(object):
                         addit['PRIORITY']=int(rwords[9+ndx_add])
                     else:
                         addit={'PRIORITY':int(rwords[9+ndx_add])}
+
                     
                 #Instantiate a hole
                 hole=Hole(float(awords[0])/SCALE,
@@ -219,9 +221,9 @@ class plateHoleInfo(object):
                 fp.write("[{}:Targets]\n".format(condensed_name))
                 col_header=['RA','Dec','ep','X','Y','Z','R','Type', 'priority',
                             'ID', 'fiber']
-                fp.write("T:'"+"'\t'".join(col_header)+"'\n")
+                fp.write("H:'"+"'\t'".join(col_header)+"'\n")
                 x=("T{n}:'{RA}'\t'{DE}'\t'{ep}'\t'{x}'\t'{y}'\t'{z}'\t'{r}'\t"
-                       "'{type}'\t'{priority}'\t'{ID}'\t'{fiber'\n")
+                       "'{type}'\t'{priority}'\t'{ID}'\t'{fiber}'\n")
                 for i,h in enumerate(ob):
                     fp.write(x.format(n=i,
                                       RA=h.ra_string(),
@@ -275,38 +277,31 @@ def _postProcessHJSetups(plateinfo):
     new_setups={}
     
     holes=setups['Setup 1']['holes']
-    ppool=[] #primary target pool
-    tpool=[] #telluric calibrator target pool
-    lpool=[] #lo res target pool
-    for h in holes:
-        subclass=h['subclass']
-        if 'Telluric' in subclass:
-            tpool.append(h)
-        elif 'Extra' in subclass:
-            lpool.append(h)
-        else:
-            ppool.append(h)
+    
+    #telluric calibrator target pool
+    tpool=[h for h in holes if h.get('subclass','')=='Telluric']
+    #hires targets
+    ppool=[h for h in holes if h.get('subclass','')=='']
+    #lo res target pool
+    lpool=[h for h in holes if h.get('subclass','')=='Extra']
+
+    import copy
     for k in ['Setup 1','Setup 2','Setup 3']:
-        new_setups[k]=setups['Setup 1']
+        new_setups[k]=copy.copy(setups['Setup 1'])
     new_setups['Setup 1']['holes']=tpool
     new_setups['Setup 2']['holes']=lpool
     new_setups['Setup 3']['holes']=ppool
 
     holes=setups['Setup 2']['holes']
-    ppool=[] #primary target pool
-    tpool=[] #telluric calibrator target pool
-    lpool=[] #lo res target pool
-    for h in holes:
-        subclass=h['subclass']
-        if 'Telluric' in subclass:
-            tpool.append(h)
-        elif 'Extra' in subclass:
-            lpool.append(h)
-        else:
-            ppool.append(h)
+    #telluric calibrator target pool
+    tpool=[h for h in holes if h.get('subclass','')=='Telluric']
+    #hires targets
+    ppool=[h for h in holes if h.get('subclass','')=='']
+    #lo res target pool
+    lpool=[h for h in holes if h.get('subclass','')=='Extra']
 
     for k in ['Setup 4','Setup 5','Setup 6']:
-        new_setups[k]=setups['Setup 2']
+        new_setups[k]=copy.copy(setups['Setup 2'])
     new_setups['Setup 4']['holes']=tpool
     new_setups['Setup 5']['holes']=lpool
     new_setups['Setup 6']['holes']=ppool
@@ -360,6 +355,7 @@ def _postProcessCalvetCassettes(plateinfo):
 def parse_extra_data(name,setup, words):
     ret={}
     #import pdb;pdb.set_trace()
+    #Carnegie
     if name=='Carnegie_1_Sum':
         if setup=='Setup 1':
             x,y,z=words[0].split('_')
@@ -377,9 +373,18 @@ def parse_extra_data(name,setup, words):
                 ret['COLOR']=float(ret['V-I'])
             if 'V' in ret:
                 ret['MAGNITUDE']=float(ret['V'])
-
         if setup=='Setup 3':
             ret['ID']=words[0]
+    #Nuria 1
+    if name=='Calvet_1_Sum':
+        if setup in ['Setup 1','Setup 2','Setup 6']:
+            id,mag=words[0].split('_')
+        else:
+            id1,id2,mag=words[0].split('_')
+            id=id1+'_'+id2
+        ret['ID']=id
+        ret['MAGNITUDE']=float(mag)
+    #Jeb
     if name=='HotJupiters_1_Sum':
         l=words[0].split('_')
         ret['ID']=l[0]

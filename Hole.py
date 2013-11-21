@@ -29,11 +29,11 @@ class Hole(dict):
         
         assert slit in (180, 125, 95, 75, 58, 45)
 
-        default_id=':'.join(ra)+'_'+':'.join(de)
-        
-        id = extra.pop('ID',default_id)
         if type=='S':
-            id='sky'+id
+            id='sky'+extra.pop('ID','')
+        else:
+            id=extra.pop('ID',':'.join(ra)+'_'+':'.join(de))
+        
         color=extra.pop('COLOR',0.0)
         mag=extra.pop('MAGNITUDE',0.0)
         priority=extra.pop('PRIORITY',0)
