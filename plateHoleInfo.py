@@ -219,25 +219,37 @@ class plateHoleInfo(object):
                 #Write out objects & sky
                 ob=[h for h in setup['holes'] ]#if h.isObject()]
                 fp.write("[{}:Targets]\n".format(condensed_name))
-                col_header=['RA','Dec','ep','X','Y','Z','R','Type', 'priority',
-                            'ID', 'fiber']
-                fp.write("H:'"+"'\t'".join(col_header)+"'\n")
-                x=("T{n}:'{RA}'\t'{DE}'\t'{ep}'\t'{x}'\t'{y}'\t'{z}'\t'{r}'\t"
-                       "'{type}'\t'{priority}'\t'{ID}'\t'{fiber}'\n")
+                base_col_header=['ra','dec','ep','x','y','z','r','type', 'priority',
+                            'id', 'fiber']
+                
+                extra_col_header=[]
+                for h in ob:
+                    extra_col_header.extend(h['CUSTOM'].keys())
+                extra_col_header=list(set(extra_col_header))
+                
+                fp.write("H:'"+
+                         "'\t'".join(base_col_header+extra_col_header)+
+                         "'\n")
+                fmt_str=("T{n}:'{"+
+                        "}'\t'{".join(base_col_header+extra_col_header)+
+                        "}'\n")
+                
                 for i,h in enumerate(ob):
-                    fp.write(x.format(n=i,
-                                      RA=h.ra_string(),
-                                      DE=h.de_string(),
-                                      ep=h['EPOCH'],
-                                      x='%.4f'% (h.x*SCALE),
-                                      y='%.4f'% (h.y*SCALE),
-                                      z='%.4f'% (h.z*SCALE),
-                                      r='%.4f'% (h.radius*SCALE),
-                                      type=h['TYPE'],
-                                      priority=h['PRIORITY'],
-                                      ID=h['ID'],
-                                      fiber=h['FIBER']
-                                      ))
+                    fmt_dict={'n':i,
+                        'ra':h.ra_string(),
+                        'dec':h.de_string(),
+                        'ep':h['EPOCH'],
+                        'x':'%.4f'% (h.x*SCALE),
+                        'y':'%.4f'% (h.y*SCALE),
+                        'z':'%.4f'% (h.z*SCALE),
+                        'r':'%.4f'% (h.radius*SCALE),
+                        'type':h['TYPE'],
+                        'priority':h['PRIORITY'],
+                        'id':h['ID'],
+                        'fiber':h['FIBER']}
+                    for k in extra_col_header:
+                        fmt_dict[k]=h.get(k,'')
+                    fp.write(fmt_str.format(**fmt_dict))
 
 
 
@@ -397,6 +409,7 @@ def parse_extra_data(name,setup, words):
             id1,id2,mag=words[0].split('_')
             id=id1+'_'+id2
         ret['ID']=id
+        ret['V?']=mag
         ret['MAGNITUDE']=float(mag)
     #Jeb
     if name=='HotJupiters_1_Sum':
@@ -406,5 +419,9 @@ def parse_extra_data(name,setup, words):
         ret['MAGNITUDE']=float(l[1])
         if len(l)>2:
             ret['subclass']=l[2]
-
+    #Fornax_1
+    if name=='Fornax_1_Sum':
+        l=words[0].split('=')
+        ret['V']=l[1]
+        ret['MAGNITUDE']=float(l[1])
     return ret

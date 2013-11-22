@@ -52,7 +52,7 @@ class Hole(dict):
         self['FIBER']=fiber
         self['ASSIGNMENT']={'CASSETTE':cassette, #cassette or list of viable cassettes e.g. R1, B8
                             'FIBERNO':fiber}
-        self['CUSTOM']=extra
+        self['CUSTOM']=extra #keys and values should be strings!
         for k,v in extra.iteritems():
             if k not in self:
                 self[k]=v
