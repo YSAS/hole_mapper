@@ -17,6 +17,55 @@ def distribute(x, min_x, max_x, min_sep):
     import numpy as np
     return np.linspace(min_x, max_x, len(x))
 
+def rejigger_cassette_assignemnts(cassette_dict):
+    """Go through the cassettes swapping holes to eliminate
+    verticle excursions"""
+    cassettes=cassette_dict.values()
+    cassettes.sort(key=lambda c: c.pos[1])
+    for i in range(len(cassettes)-1):
+        cassette=cassettes[i]
+        higer_cassettes=cassettes[i:]
+
+        swappable_cassette_holes=[h for h in cassette.holes
+                                  if h.isAssignable()]
+
+        swappable_higher_cassette_holes=[h
+                                         for c in higer_cassettes
+                                         for h in c.holes
+                                         if h.isAssignable(cassette=cassette)]
+        if len(swappable_higher_cassette_holes) ==0:
+            continue
+        
+        holes=swappable_cassette_holes+swappable_higher_cassette_holes
+        holes.sort(key=operator.attrgetter('y'))
+        #Find index of lowest hole not in the cassette
+        sort_ndxs=[holes.index(h) for h in swappable_cassette_holes]
+        for i in range(len(sort_ndxs)):
+            if i not in sort_ndxs:
+                first_higher_hole_ndx=i
+                break
+        #For holes not at start of sorted list
+        for i in sort_ndxs:
+            if i > first_higher_hole_ndx:
+                low_hole=holes[i]
+                #attempt exchange with lower holes
+                for j in range(first_higher_hole_ndx, i):
+                    #nb high cassette might be same
+                    high_cassette=cassette_dict[holes[j].assigned_cassette()]
+                    if high_cassette==cassette:
+                        continue
+                    if (holes[j].isAssignable(cassette=cassette) and
+                        low_hole.isAssignable(cassette=high_cassette)):
+                        #Unassign
+                        high_cassette.unassign_hole(holes[j])
+                        cassette.unassign_hole(low_hole)
+                        #Assign
+                        high_cassette.assign_hole(low_hole)
+                        cassette.assign_hole(holes[j])
+                        break
+
+
+
 SCALE=14.25 #also change in plateHoleInfo.py
 
 LABEL_MAX_Y=.7
@@ -356,60 +405,15 @@ class Plate(object):
         #TODO
         
         #Rejigger the fibers
-        self.rejigger_cassette_assignemnts(Cassette.left_only(cassettes))
-        self.rejigger_cassette_assignemnts(Cassette.right_only(cassettes))
+        rejigger_cassette_assignemnts(Cassette.left_only(cassettes))
+        rejigger_cassette_assignemnts(Cassette.right_only(cassettes))
         
         #Remap fibers in c
         for c in cassettes.itervalues():
             c.map_fibers(remap=True)
 
         setup['cassetteConfig']=cassettes
-
-    def rejigger_cassette_assignemnts(self, cassette_dict):
-        cassettes=cassette_dict.values()
-        cassettes.sort(key=lambda c: c.pos[1])
-        for i in range(len(cassettes)-1):
-            cassette=cassettes[i]
-            higer_cassettes=cassettes[i:]
-
-            swappable_cassette_holes=[h for h in cassette.holes
-                                      if h.isAssignable()]
-
-            swappable_higher_cassette_holes=[h
-                                             for c in higer_cassettes
-                                             for h in c.holes
-                                             if h.isAssignable(cassette=cassette)]
-            if len(swappable_higher_cassette_holes) ==0:
-                continue
-            
-            holes=swappable_cassette_holes+swappable_higher_cassette_holes
-            holes.sort(key=operator.attrgetter('y'))
-            #Find index of lowest hole not in the cassette
-            sort_ndxs=[holes.index(h) for h in swappable_cassette_holes]
-            for i in range(len(sort_ndxs)):
-                if i not in sort_ndxs:
-                    first_higher_hole_ndx=i
-                    break
-            #For holes not at start of sorted list
-            for i in sort_ndxs:
-                if i > first_higher_hole_ndx:
-                    low_hole=holes[i]
-                    #attempt exchange with lower holes
-                    for j in range(first_higher_hole_ndx, i):
-                        #nb high cassette might be same
-                        high_cassette=cassette_dict[holes[j].assigned_cassette()]
-                        if high_cassette==cassette:
-                            continue
-                        if (holes[j].isAssignable(cassette=cassette) and
-                            low_hole.isAssignable(cassette=high_cassette)):
-                            #Unassign
-                            high_cassette.unassign_hole(holes[j])
-                            cassette.unassign_hole(low_hole)
-                            #Assign
-                            high_cassette.assign_hole(low_hole)
-                            cassette.assign_hole(holes[j])
-                            break
-
+        
     def drawHole(self, hole, canvas, color=None, fcolor='White', radmult=1.0, drawimage=0):
        
         
