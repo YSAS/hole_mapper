@@ -85,6 +85,7 @@ def rejigger_cassette_assignemnts(cassette_dict):
         holes.sort(key=operator.attrgetter('y'))
         #Find index of lowest hole not in the cassette
         sort_ndxs=[holes.index(h) for h in swappable_cassette_holes]
+        first_higher_hole_ndx=len(sort_ndxs)
         for i in range(len(sort_ndxs)):
             if i not in sort_ndxs:
                 first_higher_hole_ndx=i
