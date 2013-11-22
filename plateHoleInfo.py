@@ -390,49 +390,95 @@ def _postProcessCalvetCassettes(plateinfo):
                 c.usable=[10,12,14,16]
 
 def _postProcessNideverCassettes(plateinfo):
-    #Setups 1, 2, 4
+    #Setups 1, 2, 3, 4
+    ok=['B1','B5','B2','B6']
     for c in plateinfo.cassettes_for_setup('Setup 1').values():
-        if 'l' in c.name:
-            c.usable=[ 1,  4,  7]
+        if c.name[0:2] in ok:
+            if 'l' in c.name:
+                c.usable=range(1,9)
+            else:
+                c.usable=range(9,17)
         else:
-            c.usable=[10, 13, 16]
+            c.usable=[]
+    plateinfo.cassette_groups['Setup 1']=[[i+k for i in ok for k in 'lh']]
+
+    ok=['R1','R5','R2','R6']
     for c in plateinfo.cassettes_for_setup('Setup 2').values():
-        if 'l' in c.name:
-            c.usable=[ 2,  5,  8]
+        if c.name[0:2] in ok:
+            if 'l' in c.name:
+                c.usable=range(1,9)
+            else:
+                c.usable=range(9,17)
         else:
-            c.usable=[11, 14]
-    for c in plateinfo.cassettes_for_setup('Setup 4').values():
-        if 'l' in c.name:
-            c.usable=[ 3,  6]
-        else:
-            c.usable=[9, 12, 15]
-    #Setups 3, 6, 7
+            c.usable=[]
+    plateinfo.cassette_groups['Setup 2']=[[i+k for i in ok for k in 'lh']]
+
+    ok=['B3','B7','B4','B8']
     for c in plateinfo.cassettes_for_setup('Setup 3').values():
-        if 'l' in c.name:
-            c.usable=[ 1,  4,  7]
+        if c.name[0:2] in ok:
+            if 'l' in c.name:
+                c.usable=range(1,9)
+            else:
+                c.usable=range(9,17)
         else:
-            c.usable=[10, 13, 16]
-    for c in plateinfo.cassettes_for_setup('Setup 6').values():
-        if 'l' in c.name:
-            c.usable=[ 2,  5,  8]
+            c.usable=[]
+    plateinfo.cassette_groups['Setup 3']=[[i+k for i in ok for k in 'lh']]
+
+    ok=['R3','R7','R4','R8']
+    for c in plateinfo.cassettes_for_setup('Setup 4').values():
+        if c.name[0:2] in ok:
+            if 'l' in c.name:
+                c.usable=range(1,9)
+            else:
+                c.usable=range(9,17)
         else:
-            c.usable=[11, 14]
-    for c in plateinfo.cassettes_for_setup('Setup 7').values():
-        if 'l' in c.name:
-            c.usable=[ 3,  6]
-        else:
-            c.usable=[9, 12, 15]
-    #Setups 5, 8
+            c.usable=[]
+    plateinfo.cassette_groups['Setup 4']=[[i+k for i in ok for k in 'lh']]
+
+    #Setups 5, 6, 7, 8
+    ok=['B1','B5','B2','B6']
     for c in plateinfo.cassettes_for_setup('Setup 5').values():
-        if 'l' in c.name:
-            c.usable=[ 1,  4,  7]
+        if c.name[0:2] in ok:
+            if 'l' in c.name:
+                c.usable=range(1,9)
+            else:
+                c.usable=range(9,17)
         else:
-            c.usable=[10, 13, 16]
+            c.usable=[]
+    plateinfo.cassette_groups['Setup 5']=[[i+k for i in ok for k in 'lh']]
+
+    ok=['R1','R5','R2','R6']
+    for c in plateinfo.cassettes_for_setup('Setup 6').values():
+        if c.name[0:2] in ok:
+            if 'l' in c.name:
+                c.usable=range(1,9)
+            else:
+                c.usable=range(9,17)
+        else:
+            c.usable=[]
+    plateinfo.cassette_groups['Setup 6']=[[i+k for i in ok for k in 'lh']]
+
+    ok=['B3','B7','B4','B8']
+    for c in plateinfo.cassettes_for_setup('Setup 7').values():
+        if c.name[0:2] in ok:
+            if 'l' in c.name:
+                c.usable=range(1,9)
+            else:
+                c.usable=range(9,17)
+        else:
+            c.usable=[]
+    plateinfo.cassette_groups['Setup 7']=[[i+k for i in ok for k in 'lh']]
+
+    ok=['R3','R7','R4','R8']
     for c in plateinfo.cassettes_for_setup('Setup 8').values():
-        if 'l' in c.name:
-            c.usable=[ 2,  5,  8]
+        if c.name[0:2] in ok:
+            if 'l' in c.name:
+                c.usable=range(1,9)
+            else:
+                c.usable=range(9,17)
         else:
-            c.usable=[11, 14]
+            c.usable=[]
+    plateinfo.cassette_groups['Setup 8']=[[i+k for i in ok for k in 'lh']]
 
 def nanfloat(s):
     """Convert string to float or nan if can't"""
