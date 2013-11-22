@@ -360,12 +360,20 @@ def _postProcessHJCassettes(plateinfo):
                 c.usable=[2,4,6,8]
             else:
                 c.usable=[10,12,14,16]
-    for s in ['Setup 1','Setup 4']:
-        for c in plateinfo.cassettes_for_setup(s).values():
+    for c in plateinfo.cassettes_for_setup('Setup 4').values():
+        if 'l' in c.name:
+            c.usable=[2]
+        else:
+            c.usable=[16]
+    for c in plateinfo.cassettes_for_setup('Setup 1').values():
+        #have 8 want in fiber 8 of every other tetris
+        if c.name[1] in ['1','3','5','7']:
             if 'l' in c.name:
-                c.usable=[2]
+                c.usable=[8]
             else:
-                c.usable=[16]
+                c.usable=[]
+        else:
+            c.usable=[]
     for s in ['Setup 2','Setup 5']:
         for c in plateinfo.cassettes_for_setup(s).values():
             if 'l' in c.name:
