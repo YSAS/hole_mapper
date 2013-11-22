@@ -27,23 +27,38 @@ def _init_cassette_positions():
     B1l 1-8
     R1h
     R1l
+    B3h 9-16
+    B3l 1-8
+    R3h
+    R3l
     
-    B3
-    R3
-    
-    B5
-    R5
-    B7
-    R7
-
+    R5h 9-16
+    R5l 1-8
+    B5h
+    B5l
+    R7h 9-16
+    R7l 1-8
+    B7h
+    B7l
+  
     left looking at plate:
     R2l 1-8
     R2h 9-16
     B2l
     B2h
-    ...
-    R8
-    B8
+    R4l
+    R4h
+    B4l
+    B4h
+    
+    B6l
+    B6h
+    R6l
+    R6h
+    Bhl
+    B8h
+    R8l
+    R8h
     """
     
     #Each cassette (half-cassette?) has a vertex on the plate nominally
@@ -60,8 +75,10 @@ def _init_cassette_positions():
     x=np.sqrt(r**2 - y**2)
     #    y=np.linspace(1, -1, 16+2)[1:-1]
     #    x=np.zeros(len(y))+.45
-    rightlabels=[c+str(i)+j for i in range(1,9,2) for c in 'BR' for j in 'hl']
-    leftlabels=[c+str(i)+j for i in range(2,9,2) for c in 'RB' for j in 'lh']
+    rightlabels=([c+str(i)+j for i in range(1,5,2) for c in 'BR' for j in 'hl']+
+                 [c+str(i)+j for i in range(5,9,2) for c in 'RB' for j in 'hl'])
+    leftlabels=([c+str(i)+j for i in range(2,6,2) for c in 'RB' for j in 'lh']+
+                [c+str(i)+j for i in range(6,9,2) for c in 'BR' for j in 'lh'])
     for i,l in enumerate(leftlabels):
         _cassette_positions[l]=(x[i],y[i])
     for i,l in enumerate(rightlabels):
