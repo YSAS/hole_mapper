@@ -25,6 +25,7 @@ def condense_cassette_assignemnts(cassette_dict):
               
     to_check=list(non_full)
     to_check.sort(key= lambda x: x.n_avail())
+    
     while to_check:
         
         trial=to_check.pop()
@@ -51,10 +52,14 @@ def condense_cassette_assignemnts(cassette_dict):
     
         #If we were emptied the cassette then don't add anything to it
         if trial.used == 0:
-            non_full.remove(trial)
-        
-        #Redetermine what is full
-        non_full=[c for c in non_full if c.n_avail()>0]
+            try:
+                non_full.remove(trial)
+            except ValueError,e:
+                #it is possible that trial filled up, was dropped from non_full
+                # or something like that
+                pass
+    
+        #Update sort of to check
         to_check.sort(key= lambda x: x.n_avail())
 
 def rejigger_cassette_assignemnts(cassette_dict):
