@@ -17,6 +17,46 @@ def distribute(x, min_x, max_x, min_sep):
     import numpy as np
     return np.linspace(min_x, max_x, len(x))
 
+
+def condense_cassette_assignemnts(cassette_dict):
+    #Grab cassettes with available fibers
+    non_full=[c for c in cassette_dict.itervalues()
+              if c.n_avail()>0 and c.used>0]
+              
+    to_check=list(non_full)
+    to_check.sort(key= lambda x: x.n_avail())
+    while to_check:
+        
+        trial=to_check.pop()
+        
+    
+        #Try to reassign all holes to non full cassettes
+        holes=list(trial.holes)
+        for h in holes:
+            #If hole can't be assigned then screw it
+            if not h.isAssignable():
+                break
+            #Try assigning the hole to another tetris
+            recomp_non_full=False
+            for c in non_full:
+                if h.isAssignable(cassette=c):
+                    trial.unassign_hole(h)
+                    c.assign_hole(h)
+                    recomp_non_full=True
+                    break
+            if recomp_non_full:
+                #Redetermine what is full
+                recomp_non_full=False
+                non_full=[c for c in non_full if c.n_avail()>0]
+    
+        #If we were emptied the cassette then don't add anything to it
+        if trial.used == 0:
+            non_full.remove(trial)
+        
+        #Redetermine what is full
+        non_full=[c for c in non_full if c.n_avail()>0]
+        to_check.sort(key= lambda x: x.n_avail())
+
 def rejigger_cassette_assignemnts(cassette_dict):
     """Go through the cassettes swapping holes to eliminate
     verticle excursions"""
@@ -402,7 +442,8 @@ class Plate(object):
             c.map_fibers()
         
         #Compact the assignments (get rid of underutillized cassettes)
-        #TODO
+        condense_cassette_assignemnts(Cassette.left_only(cassettes))
+        condense_cassette_assignemnts(Cassette.right_only(cassettes))
         
         #Rejigger the fibers
         rejigger_cassette_assignemnts(Cassette.left_only(cassettes))
