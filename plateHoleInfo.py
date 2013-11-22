@@ -41,7 +41,7 @@ class plateHoleInfo(object):
         if 'HotJupiters_1' in self.name:
             _postProcessHJSetups(self)
 
-        if 'Calvet_1' in self.name:
+        if 'Calvet' in self.name:
             _postProcessCalvetSetups(self)
 
         #set of cassettes with same color & slit in future this
@@ -61,8 +61,11 @@ class plateHoleInfo(object):
         if 'HotJupiters_1' in self.name:
             _postProcessHJCassettes(self)
 
-        if 'Calvet_1' in self.name:
+        if 'Calvet' in self.name:
             _postProcessCalvetCassettes(self)
+
+        if 'Outer_LMC_1' in self.name:
+            _postProcessNideverCassettes(self)
 
     def _init_fromASC(self):
         
@@ -378,6 +381,58 @@ def _postProcessCalvetCassettes(plateinfo):
             else:
                 c.usable=[10,12,14,16]
 
+def _postProcessNideverCassettes(plateinfo):
+    #Setups 1, 2, 4
+    for c in plateinfo.cassettes_for_setup('Setup 1').values():
+        if 'l' in c.name:
+            c.usable=[ 1,  4,  7]
+        else:
+            c.usable=[10, 13, 16]
+    for c in plateinfo.cassettes_for_setup('Setup 2').values():
+        if 'l' in c.name:
+            c.usable=[ 2,  5,  8]
+        else:
+            c.usable=[11, 14]
+    for c in plateinfo.cassettes_for_setup('Setup 4').values():
+        if 'l' in c.name:
+            c.usable=[ 3,  6]
+        else:
+            c.usable=[9, 12, 15]
+    #Setups 3, 6, 7
+    for c in plateinfo.cassettes_for_setup('Setup 3').values():
+        if 'l' in c.name:
+            c.usable=[ 1,  4,  7]
+        else:
+            c.usable=[10, 13, 16]
+    for c in plateinfo.cassettes_for_setup('Setup 6').values():
+        if 'l' in c.name:
+            c.usable=[ 2,  5,  8]
+        else:
+            c.usable=[11, 14]
+    for c in plateinfo.cassettes_for_setup('Setup 7').values():
+        if 'l' in c.name:
+            c.usable=[ 3,  6]
+        else:
+            c.usable=[9, 12, 15]
+    #Setups 5, 8
+    for c in plateinfo.cassettes_for_setup('Setup 5').values():
+        if 'l' in c.name:
+            c.usable=[ 1,  4,  7]
+        else:
+            c.usable=[10, 13, 16]
+    for c in plateinfo.cassettes_for_setup('Setup 8').values():
+        if 'l' in c.name:
+            c.usable=[ 2,  5,  8]
+        else:
+            c.usable=[11, 14]
+
+def nanfloat(s):
+    """Convert string to float or nan if can't"""
+    try:
+        return float(s)
+    except Exception:
+        return float('nan')
+
 def parse_extra_data(name,setup, words):
     ret={}
     #import pdb;pdb.set_trace()
@@ -396,9 +451,9 @@ def parse_extra_data(name,setup, words):
                 if len(field)>1:
                     ret[keys[i]]=field[1]
             if 'V-I' in ret:
-                ret['COLOR']=float(ret['V-I'])
+                ret['COLOR']=nanfloat(ret['V-I'])
             if 'V' in ret:
-                ret['MAGNITUDE']=float(ret['V'])
+                ret['MAGNITUDE']=nanfloat(ret['V'])
         if setup=='Setup 3':
             ret['ID']=words[0]
     #Nuria 1
@@ -410,18 +465,33 @@ def parse_extra_data(name,setup, words):
             id=id1+'_'+id2
         ret['ID']=id
         ret['V?']=mag
-        ret['MAGNITUDE']=float(mag)
+        ret['MAGNITUDE']=nanfloat(mag)
+    #Nuria 1
+    if name=='Calvet_2_Sum':
+        if setup in ['Setup 1','Setup 2','Setup 3','Setup 4','Setup 5']:
+            id,mag=words[0].split('_')
+        else:
+            id1,id2,mag=words[0].split('_')
+            id=id1+'_'+id2
+        ret['ID']=id
+        ret['V?']=mag
+        ret['MAGNITUDE']=nanfloat(mag)
     #Jeb
     if name=='HotJupiters_1_Sum':
         l=words[0].split('_')
         ret['ID']=l[0]
         ret['V']=l[1]
-        ret['MAGNITUDE']=float(l[1])
+        ret['MAGNITUDE']=nanfloat(l[1])
         if len(l)>2:
             ret['subclass']=l[2]
     #Fornax_1
     if name=='Fornax_1_Sum':
         l=words[0].split('=')
         ret['V']=l[1]
-        ret['MAGNITUDE']=float(l[1])
+        ret['MAGNITUDE']=nanfloat(l[1])
+    if name=='Outer_LMC_1_Sum':
+        ret['ID']=words[0]
+
+
     return ret
+
