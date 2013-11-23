@@ -505,6 +505,9 @@ class Plate(object):
             inactiveHoles=self.holeSet.difference(setup['unused_holes'])
             inactiveHoles.difference_update(setup['holes'])
             
+            inactiveHoles.add(self.plateHoleInfo.standard['hole'])
+            inactiveHoles.add(self.plateHoleInfo.sh_hole)
+            
             #Draw the holes that aren't in the current setup
             for h in inactiveHoles:
                 self.drawHole(h, canvas)
