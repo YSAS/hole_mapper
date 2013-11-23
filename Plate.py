@@ -121,11 +121,8 @@ PROJ_PLATE_LABEL_Y=.95
 
 class Plate(object):
     '''Class for fiber plug plate'''
-    SCALE=SCALE
-    RADIUS=1.0 # 14.25/Plate.SCALE
+    RADIUS=1.0 # 14.25/SCALE
     LABEL_RADIUS=0.95*RADIUS
-    SH_RADIUS=0.1875
-    HOLE_R_MULT=1.25
 
 
     def __init__(self):
@@ -484,8 +481,8 @@ class Plate(object):
             R=self.coordShift_R
             rm=self.coordShift_rm
             
-            x=xin*Plate.SCALE
-            y=yin*Plate.SCALE
+            x=xin*SCALE
+            y=yin*SCALE
             r=math.hypot(x, y)
             #psi = angle clockwise from vertical
             #psi=90.0 - math.atan2(y,x)
@@ -497,7 +494,7 @@ class Plate(object):
             rp=(r-dr)*(1.0+a*cpsi)
             xp=rp*spsi
             yp=rp*cpsi
-            return (xp/Plate.SCALE, yp/Plate.SCALE)
+            return (xp/SCALE, yp/SCALE)
 
     def draw(self, canvas, active_setup=None, channel='all'):
         
@@ -714,15 +711,15 @@ class Plate(object):
         pluscrosscolor='Lime'
         #Draw an x across the first hole
         x,y=self.plateCoordShift(cassette.first_hole().position())
-        radius=2*0.08675*radmult/Plate.SCALE
+        radius=2*0.08675*radmult/SCALE
         canvas.drawLine((x-radius,y+radius),(x+radius,y-radius),
                         fill=pluscrosscolor)
         canvas.drawLine((x-radius,y-radius),(x+radius,y+radius),
                         fill=pluscrosscolor)
         
         #Draw a + over the last hole
-        x,y=self.plateCoordShift(cassette.first_hole().position())
-        radius=1.41*2*0.08675*radmult/Plate.SCALE
+        x,y=self.plateCoordShift(cassette.last_hole().position())
+        radius=1.41*2*0.08675*radmult/SCALE
         canvas.drawLine((x-radius,y),(x+radius,y), fill=pluscrosscolor)
         canvas.drawLine((x,y-radius),(x,y+radius), fill=pluscrosscolor)
         
