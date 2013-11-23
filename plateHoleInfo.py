@@ -10,6 +10,34 @@ class platefile(object):
     def __init__(self, filename):
         self.filename=filename
 
+
+def _setup_nfo_to_dict(setup_nfo_list):
+    nfo=setup_nfo_list
+    #nfo 4 lines with endings
+    #first from ascfile
+    words=nfo[0].split()
+    ha=words[4]
+    st=words[5]
+    airm=words[8]
+    az=words[12]
+    el=words[11]
+    
+    #last 3 from resfile
+    words=nfo[1].split()
+    ra=' '.join(words[0:3])
+    de=' '.join(words[3:6])
+    ep=' '.join(words[6])
+
+    import datetime
+    words=nfo[3].split()
+    setup_time_utc=datetime.datetime(int(words[5]), int(words[4]),
+                                     int(words[3]), int(words[0]),
+                                     int(words[1]), int(words[2]))
+    return {'RA':ra,'DE':de,'EPOCH':ep,'UTC':setup_time_utc,
+            'EL':el,'AZ':az,'AIRMASS':airm,'SIDEREAL_TIME':st,
+            'OBSERVATORY':'LCO/Magellan',
+            'TELESCOPE':'Clay'}
+
 class plateHoleInfo(object):
     """
     Frontend to the .res & .asc files of a setup
@@ -185,6 +213,7 @@ class plateHoleInfo(object):
             setupNfo=self.afile.setups[setup_name]['setup_nfo_str']
             setupNfo.extend(self.rfile.setups[setup_name]['setup_nfo_str'])
             self.setups[setup_name]['setupNfo']=setupNfo
+            self.setups[setup_name]['INFO']=_setup_nfo_to_dict(setupNfo)
     
     def cassettes_for_setup(self,setup_name):
         return self.cassettes[setup_name]
@@ -217,7 +246,12 @@ class plateHoleInfo(object):
                 #Write out setup description section
                 fp.write("[{}]\n".format(condensed_name))
                 fp.write("name={}\n".format(s))
-                fp.write("foo=bar\n")
+                
+                #determine whitespace
+                key_col_wid=max([len(k) for k in setup['INFO'].iterkeys()])+6
+                for k, v in setup['INFO'].iteritems():
+                    fp.write("{k}={space}{v}\n".format(k=k,v=v,
+                        space=' '*(key_col_wid-len(k)-1)))
 
                 #Write out objects & sky
                 ob=[h for h in setup['holes'] ]#if h.isObject()]
