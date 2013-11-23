@@ -141,6 +141,8 @@ class resfile(platefile):
                     else:
                         if words[0][-2:]!='17':
                             self.setups['Setup %d'%currsetup]['setup_lines'].append(line)
+                        else:
+                            self.seventeen=line
 
     def prune(self, lineid):
         pass

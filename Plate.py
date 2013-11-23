@@ -278,10 +278,7 @@ class Plate(object):
         
         self.holeSet=self.plateHoleInfo.holeSet
         self.setups=self.plateHoleInfo.setups
-        
-        #Add the SH to the global set
-        self.holeSet.add(Hole(0.0, 0.0, 0.0, Plate.SH_RADIUS/Plate.SCALE,
-                              idstr='Shack-Hartman'))
+    
   
     def clear(self):
         self.setups={}
@@ -677,11 +674,13 @@ class Plate(object):
                 self.drawHole(h, canvas,color='Yellow',fcolor='Yellow',
                               radmult=radmult,drawimage=True)
 
-            sh_and_std=[h for h in self.holeSet if
-                        h.idstr=='Shack-Hartman' or h['MATTFIB']=='R-01-17']
-            for h in sh_and_std:
-                self.drawHole(h, canvas,color='Magenta',fcolor='Magenta',
+            #draw standard and shack hartman
+            self.drawHole(self.plateHoleInfo.standard['hole'], canvas,
+                              color='Magenta',fcolor='Magenta',
                               radmult=radmult,drawimage=True)
+            self.drawHole(self.plateHoleInfo.sh_hole, canvas,
+                          color='Magenta',fcolor='Magenta',
+                          radmult=radmult,drawimage=True)
 
 
             #Draw little white dots where all the other holes are

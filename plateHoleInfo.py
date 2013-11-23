@@ -3,12 +3,66 @@ from Hole import Hole
 import Cassette
 import Setup
 import os.path
-
+import math
 SCALE=14.25
+SH_RADIUS=0.1875
 
 class platefile(object):
     def __init__(self, filename):
         self.filename=filename
+
+def nanfloat(s):
+    """Convert string to float or nan if can't"""
+    try:
+        return float(s)
+    except Exception:
+        return float('nan')
+
+def std_offset(c1,c2):
+    """c1 sh, c2 std"""
+
+    c1=(tuple([float(x) for x in c1[0].split()]),
+        tuple([float(x) for x in c1[1].split()]))
+    c2=(tuple([float(x) for x in c2[0].split()]),
+        tuple([float(x) for x in c2[1].split()]))
+
+    ra1=(c1[0][0]+c1[0][1]/60.0+c1[0][2]/3600.0)*15.0
+    
+    de1=c1[1][0]
+    if de1<0:
+        de1-=c1[1][1]/60.0+c1[1][2]/3600.0
+    else:
+        de1+=c1[1][1]/60.0+c1[1][2]/3600.0
+    
+    ra2=(c2[0][0]+c2[0][1]/60.0+c2[0][2]/3600.0)*15.0
+    
+    de2=c2[1][0]
+    if de2<0:
+        de2-=c2[1][1]/60.0+c2[1][2]/3600.0
+    else:
+        de2+=c2[1][1]/60.0+c2[1][2]/3600.0
+
+    ra1*=math.pi/180.0
+    de1*=math.pi/180.0
+    ra2*=math.pi/180.0
+    de2*=math.pi/180.0
+
+    seps=math.acos(math.sin(de1)*math.sin(de2) +
+                   math.cos(de1)*math.cos(de2)*math.cos(ra2-ra1) )
+
+
+    if abs(de1-de2) > abs(ra1-ra2):
+        #dom change dec
+        if de2>de1:
+            dir='North'
+        else:
+            dir='East'
+    else:
+        if ra2>ra1:
+            dir='East'
+        else:
+            dir='West'
+    return str(round(seps*180*60.0/math.pi,1))+' '+dir
 
 
 def _setup_nfo_to_dict(setup_nfo_list):
@@ -26,7 +80,7 @@ def _setup_nfo_to_dict(setup_nfo_list):
     words=nfo[1].split()
     ra=' '.join(words[0:3])
     de=' '.join(words[3:6])
-    ep=' '.join(words[6])
+    ep=words[6]
 
     import datetime
     words=nfo[3].split()
@@ -60,12 +114,15 @@ class plateHoleInfo(object):
         self.foobar=[]
         self.setups={}
         self.holeSet=set()
+        self.sh_hole=None#'hole'
+        self.standard={'hole':None,'offset':0.0}
+        self.mechanical_holes=[]
         
         if self.afile !=None:
             self._init_fromASC()
         else:
             self._init_from_plate()
-
+        
         if 'HotJupiters_1' in self.name:
             _postProcessHJSetups(self)
 
@@ -96,27 +153,38 @@ class plateHoleInfo(object):
             _postProcessNideverCassettes(self)
 
     def _init_fromASC(self):
+        #add shack hartman holes
+        
+        #Add the SH to the global set
+        self.sh_hole=Hole(0.0, 0.0, 0.0, SH_RADIUS/SCALE, type='C')
+        self.holeSet.add(self.sh_hole)
         
         #add standard to plate
         awords=self.afile.seventeen.split()
-    
-        self.holeSet.add(Hole(float(awords[0])/SCALE,
-                        float(awords[1])/SCALE,
-                        float(awords[2])/SCALE,
-                        float(awords[3])/SCALE,
-                        type=awords[4],
-                        mattfib='R-01-17',
-                        idstr=self.afile.seventeen))
+        rwords=self.rfile.seventeen.split()
+        std_ra=' '.join(rwords[1:4])
+        std_de=' '.join(rwords[4:7])
         
+        std_hole=Hole(float(awords[0])/SCALE, float(awords[1])/SCALE,
+                      float(awords[2])/SCALE, float(awords[3])/SCALE,
+                      type=awords[4], mattfib='R-01-17',
+                      idstr=self.afile.seventeen)
+        self.holeSet.add(std_hole)
+        
+        self.standard['hole']=std_hole
+        
+        
+        
+        #add fiducial & thumbscrew holes
         for l in self.afile.fid_thumb_lines:
             awords=l.split()
-            self.holeSet.add(Hole(float(awords[0])/SCALE,
-                                  float(awords[1])/SCALE,
-                                  float(awords[2])/SCALE,
-                                  float(awords[3])/SCALE,
-                                  type=awords[4],
-                                  mattfib='',
-                                  idstr=l))
+            h=Hole(float(awords[0])/SCALE,
+                   float(awords[1])/SCALE,
+                   float(awords[2])/SCALE,
+                   float(awords[3])/SCALE,
+                   type=awords[4])
+            self.mechanical_holes.append(h)
+            self.holeSet.add(h)
     
         #Go through all the setups in the files
         for setup_name, setup_dict in self.rfile.setups.items():
@@ -201,7 +269,7 @@ class plateHoleInfo(object):
                 else:
                     other.append(hole)
             
-            #other holes go into unused
+            #other holes go into unused, bit of a misnomer
             self.setups[setup_name]['unused_holes']=other
 
             #Put science holes into a channel
@@ -209,7 +277,16 @@ class plateHoleInfo(object):
             setupNfo=self.afile.setups[setup_name]['setup_nfo_str']
             setupNfo.extend(self.rfile.setups[setup_name]['setup_nfo_str'])
             self.setups[setup_name]['INFO']=_setup_nfo_to_dict(setupNfo)
-    
+
+            if setup_name=='Setup 1':
+                #compute the offset to the stadard star
+                self.standard['offset']=std_offset(
+                        (self.setups[setup_name]['INFO']['RA'],
+                            self.setups[setup_name]['INFO']['DE']),
+                            (std_ra,std_de))
+            self.setups[setup_name]['INFO']['NAME']=setup_name
+
+
     def cassettes_for_setup(self,setup_name):
         return self.cassettes[setup_name]
     
@@ -231,20 +308,44 @@ class plateHoleInfo(object):
         #get list of crap for the plate
         with open(self.pfile.filename,'w') as fp:
             fp.write("[Plate]\n")
-            fp.write("formatversion=0.1\n")
-            fp.write("name={}\n".format(self.name))
-
+            fp.write("formatversion= 0.1\n")
+            fp.write("NAME= {}\n".format(self.name))
+            fp.write("STD_OFFSET= {}\n".format(self.standard['offset']))
+            
+            
+            #Write out mechanical holes
+            fp.write("[PlateHoles]\n")
+            plate_holes=(self.mechanical_holes+
+                        [self.sh_hole,self.standard['hole']])
+            base_col_header=['x','y','z','r','type']
+            fp.write("H:'" + "'\t'".join(base_col_header) + "'\n")
+            fmt_str="H{n}:'{" + "}'\t'{".join(base_col_header) + "}'\n"
+            for i,h in enumerate(plate_holes):
+                fmt_dict={'n':i,
+                          'x':'%.4f'% (h.x*SCALE),
+                          'y':'%.4f'% (h.y*SCALE),
+                          'z':'%.4f'% (h.z*SCALE),
+                          'r':'%.4f'% (h.radius*SCALE),
+                          'type':h['TYPE']}
+                fp.write(fmt_str.format(**fmt_dict))
+    
+            #Write out the setups
             s_sorted=sorted(self.setups.keys(),key=lambda s: int(s.split()[1]))
             for s in s_sorted:
                 condensed_name=''.join(s.split())
                 setup=self.setups[s]
                 #Write out setup description section
                 fp.write("[{}]\n".format(condensed_name))
-                fp.write("name={}\n".format(s))
                 
-                #determine whitespace
+                #Determine whitespace for setup keys & write out
                 key_col_wid=max([len(k) for k in setup['INFO'].iterkeys()])+6
+                k='NAME'
+                v=setup['INFO']['NAME']
+                fp.write("{k}={space}{v}\n".format(k=k,v=v,
+                    space=' '*(key_col_wid-len(k)-1)))
                 for k, v in setup['INFO'].iteritems():
+                    if k=='NAME':
+                        continue
                     fp.write("{k}={space}{v}\n".format(k=k,v=v,
                         space=' '*(key_col_wid-len(k)-1)))
 
@@ -283,28 +384,39 @@ class plateHoleInfo(object):
                         fmt_dict[k]=h.get(k,'')
                     fp.write(fmt_str.format(**fmt_dict))
 
+                #Write out guide & acquisition
+                ga=[h for h in setup['unused_holes'] if h['TYPE'] in ['G','A'] ]
+                fp.write("[{}:Guide]\n".format(condensed_name))
+                
+                base_col_header=['ra','dec','ep','x','y','z','r','type']
+                
+                extra_col_header=[]
+                for h in ga:
+                    extra_col_header.extend(h['CUSTOM'].keys())
+                extra_col_header=list(set(extra_col_header))
+                
+                fp.write("H:'"+
+                         "'\t'".join(base_col_header+extra_col_header)+
+                         "'\n")
+                fmt_str=("G{n}:'{"+
+                        "}'\t'{".join(base_col_header+extra_col_header)+
+                        "}'\n")
+                
+                for i,h in enumerate(ga):
+                    fmt_dict={'n':i,
+                        'ra':h.ra_string(),
+                        'dec':h.de_string(),
+                        'ep':h['EPOCH'],
+                        'x':'%.4f'% (h.x*SCALE),
+                        'y':'%.4f'% (h.y*SCALE),
+                        'z':'%.4f'% (h.z*SCALE),
+                        'r':'%.4f'% (h.radius*SCALE),
+                        'type':h['TYPE']}
+                    for k in extra_col_header:
+                        fmt_dict[k]=h.get(k,'')
+                    fp.write(fmt_str.format(**fmt_dict))
 
 
-def _assignTargetsToChannel(targetHoleList):
-    """
-    Break list of holes into two groups: armB & armR
-
-    Default puts all in armB if fewer than 1-128
-    if more divide evenly with boths arms, apportion sky
-    evenly as well
-    """
-    skys=[h for h in targetHoleList if h.isSky()]
-    objs=[h for h in targetHoleList if h.isObject()]
-    if len(objs)+len(skys) < 129:
-        return (objs+skys,[])
-    else:
-        import random
-        random.shuffle(objs)
-        armB=objs[0:len(objs)/2]+skys[0:len(skys)/2]
-        armR=objs[len(objs)/2:]+skys[len(skys)/2:]
-        assert len(armR)<129
-        assert len(armB)<129
-        return (armB,armR)
     
 def _postProcessHJSetups(plateinfo):
     """ 
@@ -508,13 +620,6 @@ def _postProcessNideverCassettes(plateinfo):
         else:
             c.usable=[]
     plateinfo.cassette_groups['Setup 8']=[[i+k for i in ok for k in 'lh']]
-
-def nanfloat(s):
-    """Convert string to float or nan if can't"""
-    try:
-        return float(s)
-    except Exception:
-        return float('nan')
 
 def parse_extra_data(name,setup, words):
     ret={}
