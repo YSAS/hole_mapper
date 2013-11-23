@@ -114,8 +114,11 @@ class Hole(dict):
         return (self.x,self.y)
     
     def assign(self, assignment):
-        """assignemnt={'CASSETTE':'','FIBERNO':0}"""
-        self['FIBER']=(assignment['CASSETTE']+
+        """
+        assignemnt={'CASSETTE':'','FIBERNO':0} 
+        removes the h or l from cassette
+        """
+        self['FIBER']=(assignment['CASSETTE'][0:2]+
                        '-{:02}'.format(assignment['FIBERNO']))
         self['ASSIGNMENT']=assignment
 
