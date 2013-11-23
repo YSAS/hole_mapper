@@ -158,7 +158,6 @@ class App(Tkinter.Tk):
                        command=lambda:self.makeImage(channel='armB')).pack()
         Tkinter.Button(frame, text="Load Holes", command=self.load).pack()
         Tkinter.Button(frame, text="Regionify", command=self.makeRegions).pack()
-        Tkinter.Button(frame, text="Write Map", command=self.writeMap).pack()
         Tkinter.Button(frame, text="Gen .plate", command=self.genPlate).pack()
         self.coordshft_str=Tkinter.StringVar(value='CShift On')
         Tkinter.Button(frame, textvariable=self.coordshft_str, command=self.toggleCoord).pack()
@@ -363,12 +362,6 @@ class App(Tkinter.Tk):
             self.plate.load(file)
             self.file_str.set(os.path.basename(file))
             self.show()
-        
-    def writeMap(self):
-        dir=App.getPath(('hole_mapper',self.plate.plate_name))
-        if not os.path.exists(dir):
-            os.makedirs(dir)
-        self.plate.writeMapFile(dir, self.getActiveSetup())
         
     def makeImage(self,channel='all'):
         #The image canvas for drawing the plate to a file

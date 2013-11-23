@@ -294,20 +294,6 @@ class Plate(object):
         if active_setup in self.setups:
             self.assignFibers(self.setups[active_setup])
 
-    def writeMapFile(self, out_dir, active_setup):
-        if active_setup in self.setups:
-            ofile=''.join([out_dir,self.plate_name,'_',active_setup,'.map'])
-            print 'Writing mapfile:'+ofile
-            with open( ofile, "w" ) as fout:
-                fout.write(''.join(['Code Version: Nov 13\n',
-                                    self.plate_name,'\n']))
-                for l in self.setups[active_setup]['setupNfo']:
-                    fout.write(l)
-                cassettes=self.setups[active_setup]['cassetteConfig'].values()
-                for c in cassettes:
-                    for h in c.holes:
-                        fout.write(h.maprecord()+'\n')
-
     def toggleCoordShift(self):
         self.doCoordShift = not self.doCoordShift
         return self.doCoordShift

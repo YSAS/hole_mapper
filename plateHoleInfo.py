@@ -206,13 +206,8 @@ class plateHoleInfo(object):
 
             #Put science holes into a channel
             self.setups[setup_name]['holes']=targets
-            armB, armR = _assignTargetsToChannel(targets)
-
-            self.setups[setup_name]['channels']['armB']=armB
-            self.setups[setup_name]['channels']['armR']=armR
             setupNfo=self.afile.setups[setup_name]['setup_nfo_str']
             setupNfo.extend(self.rfile.setups[setup_name]['setup_nfo_str'])
-            self.setups[setup_name]['setupNfo']=setupNfo
             self.setups[setup_name]['INFO']=_setup_nfo_to_dict(setupNfo)
     
     def cassettes_for_setup(self,setup_name):
