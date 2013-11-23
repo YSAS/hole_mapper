@@ -4,8 +4,14 @@ import Cassette
 import Setup
 import os.path
 import math
+
 SCALE=14.25
 SH_RADIUS=0.1875
+ORDERED_FIBER_NAMES=['{}{}-{:02}'.format(color,cnum,fnum)
+                     for color in 'RB'
+                     for cnum in range(1,9)
+                     for fnum in range(1,17)]
+
 
 class platefile(object):
     def __init__(self, filename):
@@ -62,7 +68,7 @@ def std_offset(c1,c2):
             dir='East'
         else:
             dir='West'
-    return str(round(seps*180*60.0/math.pi,1))+' '+dir
+    return str(round(seps*180*60.0/math.pi,4))+' '+dir
 
 
 def _setup_nfo_to_dict(setup_nfo_list):
@@ -308,7 +314,7 @@ class plateHoleInfo(object):
         #get list of crap for the plate
         with open(self.pfile.filename,'w') as fp:
             fp.write("[Plate]\n")
-            fp.write("formatversion= 0.1\n")
+            fp.write("formatversion= 0.2\n")
             fp.write("NAME= {}\n".format(self.name))
             fp.write("STD_OFFSET= {}\n".format(self.standard['offset']))
             
@@ -319,7 +325,7 @@ class plateHoleInfo(object):
                         [self.sh_hole,self.standard['hole']])
             base_col_header=['x','y','z','r','type']
             fp.write("H:'" + "'\t'".join(base_col_header) + "'\n")
-            fmt_str="H{n}:'{" + "}'\t'{".join(base_col_header) + "}'\n"
+            fmt_str="H{n:<3}:'{" + "}'\t'{".join(base_col_header) + "}'\n"
             for i,h in enumerate(plate_holes):
                 fmt_dict={'n':i,
                           'x':'%.4f'% (h.x*SCALE),
@@ -353,7 +359,7 @@ class plateHoleInfo(object):
                 ob=[h for h in setup['holes'] ]#if h.isObject()]
                 fp.write("[{}:Targets]\n".format(condensed_name))
                 base_col_header=['ra','dec','ep','x','y','z','r','type', 'priority',
-                            'id', 'fiber']
+                            'id']
                 
                 extra_col_header=[]
                 for h in ob:
@@ -363,27 +369,37 @@ class plateHoleInfo(object):
                 fp.write("H:'"+
                          "'\t'".join(base_col_header+extra_col_header)+
                          "'\n")
-                fmt_str=("T{n}:'{"+
+                fmt_str=("{fiber} : '{"+
                         "}'\t'{".join(base_col_header+extra_col_header)+
                         "}'\n")
-                
-                for i,h in enumerate(ob):
-                    fmt_dict={'n':i,
-                        'ra':h.ra_string(),
-                        'dec':h.de_string(),
-                        'ep':h['EPOCH'],
-                        'x':'%.4f'% (h.x*SCALE),
-                        'y':'%.4f'% (h.y*SCALE),
-                        'z':'%.4f'% (h.z*SCALE),
-                        'r':'%.4f'% (h.radius*SCALE),
-                        'type':h['TYPE'],
-                        'priority':h['PRIORITY'],
-                        'id':h['ID'],
-                        'fiber':h['FIBER']}
-                    for k in extra_col_header:
-                        fmt_dict[k]=h.get(k,'')
-                    fp.write(fmt_str.format(**fmt_dict))
-
+                        
+                for fiber in ORDERED_FIBER_NAMES:
+                    h=[h for h in setup['holes'] if h['FIBER']==fiber]
+                    assert len(h)<=1
+                    if h:
+                        h=h[0]
+                        fmt_dict={'ra':h.ra_string(),
+                                'dec':h.de_string(),
+                                'ep':h['EPOCH'],
+                                'x':'%.4f'% (h.x*SCALE),
+                                'y':'%.4f'% (h.y*SCALE),
+                                'z':'%.4f'% (h.z*SCALE),
+                                'r':'%.4f'% (h.radius*SCALE),
+                                'type':h['TYPE'],
+                                'priority':h['PRIORITY'],
+                                'id':h['ID'],
+                                'fiber':fiber}
+                        for k in extra_col_header:
+                            fmt_dict[k]=h.get(k,'')
+                        fp.write(fmt_str.format(**fmt_dict))
+                    else:
+                        fmt_dict={'ra':'', 'dec':'', 'ep':'', 'x':'',
+                            'y':'','z':'', 'r':'', 'type':'',
+                            'priority':'', 'id':'','fiber':fiber}
+                        for k in extra_col_header:
+                            fmt_dict[k]=''
+                        fp.write(fmt_str.format(**fmt_dict))
+    
                 #Write out guide & acquisition
                 ga=[h for h in setup['unused_holes'] if h['TYPE'] in ['G','A'] ]
                 fp.write("[{}:Guide]\n".format(condensed_name))
@@ -398,7 +414,7 @@ class plateHoleInfo(object):
                 fp.write("H:'"+
                          "'\t'".join(base_col_header+extra_col_header)+
                          "'\n")
-                fmt_str=("G{n}:'{"+
+                fmt_str=("G{n:<3}:'{"+
                         "}'\t'{".join(base_col_header+extra_col_header)+
                         "}'\n")
                 
