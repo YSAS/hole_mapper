@@ -138,6 +138,9 @@ class plateHoleInfo(object):
 
             if 'Outer_LMC_1' in self.name:
                 _postProcessNideverCassettes(self)
+    
+            if 'Vasily' in self.name:
+                _postProcessVasilyCassettes(self)
         
         else:
             self.name=os.path.basename(file)[0:-6]
@@ -623,6 +626,30 @@ def _postProcessCalvetCassettes(plateinfo):
                 c.usable=[2,4,6,8]
             else:
                 c.usable=[10,12,14,16]
+
+def _postProcessVasilyCassettes(plateinfo):
+    #Setups 1, 2, 3, 4
+    ok=['B1','R1','B5','R5','B2','R2','B6','R6']
+    for c in plateinfo.cassettes_for_setup('Setup 1').values():
+        if c.name[0:2] in ok:
+            if 'l' in c.name:
+                c.usable=range(1,9)
+            else:
+                c.usable=range(9,17)
+        else:
+            c.usable=[]
+    plateinfo.cassette_groups['Setup 1']=[[i+k for i in ok for k in 'lh']]
+    
+    ok=['B3','R3','B7','R7','B4','R4','B8','R8']
+    for c in plateinfo.cassettes_for_setup('Setup 2').values():
+        if c.name[0:2] in ok:
+            if 'l' in c.name:
+                c.usable=range(1,9)
+            else:
+                c.usable=range(9,17)
+        else:
+            c.usable=[]
+    plateinfo.cassette_groups['Setup 2']=[[i+k for i in ok for k in 'lh']]
 
 def _postProcessNideverCassettes(plateinfo):
     #Setups 1, 2, 3, 4
