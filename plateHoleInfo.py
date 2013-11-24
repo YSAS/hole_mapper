@@ -94,58 +94,57 @@ class plateHoleInfo(object):
     """
     def __init__(self,file):
         
-        #load the res & asc files
+        self.setups={}
+        self.cassettes={}
+        self.cassette_groups={}
+        self.holeSet=set()
+        self.sh_hole=None#'hole'
+        self.standard={'hole':None,'offset':0.0}
+        self.mechanical_holes=[]
         
         if 'Sum.asc' in file:
             self.name=os.path.basename(file)[0:-4]
             
             self.rfile=resfile(file.replace('Sum.asc','plate.res'))
             self.afile=ascfile(file)
-            self.pfile=platefile(file.replace('_Sum.asc','.plate'))
+            self.pfile_filename=file.replace('_Sum.asc','.plate')
+            self._init_fromASC()
+        
+            if 'HotJupiters_1' in self.name:
+                _postProcessHJSetups(self)
+
+            if 'Calvet' in self.name:
+                _postProcessCalvetSetups(self)
+
+            #set of cassettes with same color & slit in future this
+            # will come from plate file
+            #h & l are used to divide the physical cassettes into a high-numbered
+            #fiber logical cassette and a low-numbered liber logical cassette
+            #for a given cassette h & l had better be created with the same slit
+            # assignemnts!
+            self.cassettes={s:Cassette.new_cassette_dict() for s in self.setups}
+            self.cassette_groups={s:[Cassette.blue_cassette_names(),
+                                     Cassette.red_cassette_names()]
+                                  for s in self.setups}
+        
+            if 'Carnegie_1' in self.name:
+                _postProcessIanCassettes(self)
+
+            if 'HotJupiters_1' in self.name:
+                _postProcessHJCassettes(self)
+
+            if 'Calvet' in self.name:
+                _postProcessCalvetCassettes(self)
+
+            if 'Outer_LMC_1' in self.name:
+                _postProcessNideverCassettes(self)
+        
         else:
             self.name=os.path.basename(file)[0:-6]
-            self.pfile=platefile(file)
-    
-        self.foobar=[]
-        self.setups={}
-        self.holeSet=set()
-        self.sh_hole=None#'hole'
-        self.standard={'hole':None,'offset':0.0}
-        self.mechanical_holes=[]
+            self.pfile_filename=file
+            self._init_from_plate(file)
         
-        if self.afile !=None:
-            self._init_fromASC()
-        else:
-            self._init_from_plate()
-        
-        if 'HotJupiters_1' in self.name:
-            _postProcessHJSetups(self)
 
-        if 'Calvet' in self.name:
-            _postProcessCalvetSetups(self)
-
-        #set of cassettes with same color & slit in future this
-        # will come from plate file
-        #h & l are used to divide the physical cassettes into a high-numbered
-        #fiber logical cassette and a low-numbered liber logical cassette
-        #for a given cassette h & l had better be created with the same slit
-        # assignemnts!
-        self.cassettes={s:Cassette.new_cassette_dict() for s in self.setups}
-        self.cassette_groups={s:[Cassette.blue_cassette_names(),
-                                 Cassette.red_cassette_names()]
-                              for s in self.setups}
-    
-        if 'Carnegie_1' in self.name:
-            _postProcessIanCassettes(self)
-
-        if 'HotJupiters_1' in self.name:
-            _postProcessHJCassettes(self)
-
-        if 'Calvet' in self.name:
-            _postProcessCalvetCassettes(self)
-
-        if 'Outer_LMC_1' in self.name:
-            _postProcessNideverCassettes(self)
 
     def _init_fromASC(self):
         #add shack hartman holes
@@ -180,12 +179,9 @@ class plateHoleInfo(object):
                    type=awords[4])
             self.mechanical_holes.append(h)
             self.holeSet.add(h)
-    
+        
         #Go through all the setups in the files
         for setup_name, setup_dict in self.rfile.setups.items():
-            
-            #add holes to R side first
-            channel='armR'
             
             #make sure setup is in both
             if setup_name not in self.afile.setups.keys():
@@ -226,9 +222,9 @@ class plateHoleInfo(object):
                         ndx_add=0
                     if len(rwords) > 10+ndx_add:
                         addit=parse_extra_data(self.name,setup_name,rwords[10+ndx_add:])
-                        addit['PRIORITY']=int(rwords[9+ndx_add])
+                        addit['priority']=int(rwords[9+ndx_add])
                     else:
-                        addit={'PRIORITY':int(rwords[9+ndx_add])}
+                        addit={'priority':int(rwords[9+ndx_add])}
 
                     
                 #Instantiate a hole
@@ -281,6 +277,98 @@ class plateHoleInfo(object):
                             (std_ra,std_de))
             self.setups[setup_name]['INFO']['NAME']=setup_name
 
+    def _init_from_plate(self, file):
+    
+        def plateDict_2_Hole(d):
+            addit=d.copy()
+            try:
+                return Hole(float(addit.pop('x'))/SCALE,
+                            float(addit.pop('y'))/SCALE,
+                            float(addit.pop('z'))/SCALE,
+                            float(addit.pop('r'))/SCALE,
+                            **addit)
+            except ValueError:
+                return None
+        from m2fscontrolPlate import Plate
+        plate=Plate(file)
+        #Add the SH to the global set
+
+        self.sh_hole=plateDict_2_Hole(plate.shackhartman)
+        
+        self.holeSet.add(self.sh_hole)
+        
+        #Add standard to plate
+        std_hole=plateDict_2_Hole(plate.standard)
+        self.holeSet.add(std_hole)
+        self.standard={'hole':std_hole, 'offset':plate.standard_offset}
+        
+        #add fiducial & thumbscrew holes
+        self.mechanical_holes=[plateDict_2_Hole(d) for d in plate.mechanical]
+        self.holeSet.update(self.mechanical_holes)
+    
+        #Go through all the setups in the files
+        for setup_name, setup in plate.setups.iteritems():
+            
+            targets=[]
+            other=[]
+            for t in setup._target_list:
+                hole=plateDict_2_Hole(t)
+                if not hole:
+                    #fiber mightnot be plugged
+                    continue
+                #Enforce holes exist only once
+                if hole in self.holeSet:
+                    print "Duplicate hole: {}".format(hole)
+                    for h in self.holeSet:
+                        if h.hash==hole.hash:
+                            hole=h
+                            break
+                else:
+                    self.holeSet.add(hole)
+                
+                targets.append(hole)
+
+            for t in setup._guide_list:
+                hole=plateDict_2_Hole(t)
+                #Enforce holes exist only once
+                if hole in self.holeSet:
+                    print "Duplicate hole: {}".format(hole)
+                    for h in self.holeSet:
+                        if h.hash==hole.hash:
+                            hole=h
+                            break
+                else:
+                    self.holeSet.add(hole)
+                
+                other.append(hole)
+            
+            if targets:
+                #create a setup
+                self.setups[setup_name]=Setup.new_setup(platename=self.name,
+                                                        setup_name=setup_name)
+                                                    
+
+                #other holes go into unused, bit of a misnomer
+                self.setups[setup_name]['unused_holes']=other
+
+                #Put science holes into a channel
+                self.setups[setup_name]['holes']=targets
+                self.setups[setup_name]['INFO']=setup.attrib.copy()
+
+                self.cassettes[setup_name]=Cassette.new_cassette_dict()
+                for h in targets:
+                    if h['FIBER']:
+                        cname=h['ASSIGNMENT']['CASSETTE']
+                        fnum=h['ASSIGNMENT']['FIBERNO']
+                        self.cassettes[setup_name][cname].map[fnum]=h
+                        self.cassettes[setup_name][cname].holes.append(h)
+                        self.cassettes[setup_name][cname].used+=1
+                
+                self.setups[setup_name]['cassetteConfig']=self.cassettes[setup_name]
+                self.cassette_groups[setup_name]=[Cassette.blue_cassette_names(),
+                                                  Cassette.red_cassette_names()]
+
+        self.plate=plate
 
     def cassettes_for_setup(self,setup_name):
         return self.cassettes[setup_name]
@@ -301,7 +389,7 @@ class plateHoleInfo(object):
     def write_platefile(self):
 
         #get list of crap for the plate
-        with open(self.pfile.filename,'w') as fp:
+        with open(self.pfile_filename,'w') as fp:
             fp.write("[Plate]\n")
             fp.write("formatversion= 0.2\n")
             fp.write("NAME= {}\n".format(self.name))
@@ -348,7 +436,7 @@ class plateHoleInfo(object):
                 ob=[h for h in setup['holes'] ]#if h.isObject()]
                 fp.write("[{}:Targets]\n".format(condensed_name))
                 base_col_header=['ra','dec','ep','x','y','z','r','type', 'priority',
-                            'id']
+                            'slit', 'id']
                 
                 extra_col_header=[]
                 for h in ob:
@@ -377,7 +465,8 @@ class plateHoleInfo(object):
                                 'type':h['TYPE'],
                                 'priority':h['PRIORITY'],
                                 'id':h['ID'],
-                                'fiber':fiber}
+                                'fiber':fiber,
+                                'slit':h['SLIT']}
                         for k in extra_col_header:
                             fmt_dict[k]=h.get(k,'')
                         fp.write(fmt_str.format(**fmt_dict))
