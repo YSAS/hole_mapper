@@ -476,7 +476,7 @@ class plateHoleInfo(object):
                     else:
                         fmt_dict={'ra':'', 'dec':'', 'ep':'', 'x':'',
                             'y':'','z':'', 'r':'', 'type':'',
-                            'priority':'', 'id':'','fiber':fiber}
+                            'priority':'', 'id':'','fiber':fiber,'slit':''}
                         for k in extra_col_header:
                             fmt_dict[k]=''
                         fp.write(fmt_str.format(**fmt_dict))
