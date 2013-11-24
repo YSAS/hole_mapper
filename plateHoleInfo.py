@@ -57,18 +57,7 @@ def std_offset(c1,c2):
                    math.cos(de1)*math.cos(de2)*math.cos(ra2-ra1) )
 
 
-    if abs(de1-de2) > abs(ra1-ra2):
-        #dom change dec
-        if de2>de1:
-            dir='North'
-        else:
-            dir='East'
-    else:
-        if ra2>ra1:
-            dir='East'
-        else:
-            dir='West'
-    return str(round(seps*180*60.0/math.pi,4))+' '+dir
+    return str(round(seps*180*3600/math.pi,2))
 
 
 def _setup_nfo_to_dict(setup_nfo_list):
