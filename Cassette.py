@@ -13,11 +13,31 @@ def rangify(data):
             str_list.append('%d' % ilist[0])
     return ', '.join(str_list)
 
-def left_only(cassette_dict):
-    return {k:v for k,v in cassette_dict.iteritems() if v.pos[0] > 0}
+def left_only(cassettes):
+    if not cassettes:
+        return type(cassettes)()
+    if type(cassettes) == dict:
+        return {k:v for k,v in cassettes.iteritems() if v.onLeft()}
+    elif type(cassettes) in [list, tuple]:
+        if type(cassettes[0])==Cassette:
+            return [c for c in cassettes if c.onLeft()]
+        else:
+            #assume list of cassette names
+            _cass=new_cassette_dict()
+            return [c for c in cassettes if _cass[c].onLeft()]
 
-def right_only(cassette_dict):
-    return {k:v for k,v in cassette_dict.iteritems() if v.pos[0] < 0}
+def right_only(cassettes):
+    if not cassettes:
+        return type(cassettes)()
+    if type(cassettes) == dict:
+        return {k:v for k,v in cassettes.iteritems() if v.onRight()}
+    elif type(cassettes) in [list, tuple]:
+        if type(cassettes[0])==Cassette:
+            return [c for c in cassettes if c.onRight()]
+        else:
+            #assume list of cassette names
+            _cass=new_cassette_dict()
+            return [c for c in cassettes if _cass[c].onRight()]
 
 #in res and asc -x is on right looking at plate
 def _init_cassette_positions():
@@ -191,8 +211,13 @@ class Cassette(object):
         for h in self.holes:
             self.assign_fiber(h)
 
+    def onLeft(self):
+        return not self.onRight()
+
     def onRight(self):
-        return int(self.name[1]) % 2  != 0
+        side=int(self.name[1]) % 2  != 0
+        assert side == (self.pos[0] < 0)
+        return side
 
 def blue_cassette_names():
     return ['B'+str(i)+j for i in range(1,9) for j in 'hl']
