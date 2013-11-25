@@ -1,36 +1,48 @@
 #! /usr/bin/env python
 import glob
-import argv
+import sys
+from m2fscontrolPlate import Plate
 
+def target(name, ra, de, ep=2000.0):
+    return {'name':name,'ra':ra,'de':de,'epoch':ep}
+
+extra=[target('HD223311','23 49 14.1','-06 18 20'),
+       target('HIP48331','09 51 06.68','-43 30 05.9'),
+       target('HIP10798','02 18 58.65','-25 56 48.4')]
 
 def write_summary_file(sfile, platefiles):
     tlist=[]
     platerec='{name:<10} {ns:<2}\n'
-    setuprec='     {name:<11} {ra:<11} {de:<11} '
-             '{epoch:<6} {sidereal_time:<10} {airmass:<4} {n:<3}\n'
+    setuprec=('     {name:<11} {ra:<12} {de:<12} '
+             '{epoch:<11} {sidereal_time:<11} {airmass:<11} {n:<11}\n')
     with open(sfile,'w') as fp:
         for f in platefiles:
             try:
                 p=Plate(f)
-                if p.file_version()=='0.1':
-                    raise Exception("Can't process v0.1")
+                if p.file_version=='0.1':
+                    raise Exception("Can't process v0.1"+f)
             except Exception, e:
                 print 'Platefile Error: {}'.format(e)
-                    continue
+                continue
 
             fp.write(platerec.format(name=p.name, ns=p.n_setups))
 
+            fp.write(setuprec.format(name='Name', ra='RA',
+                de='DE',epoch='Epoch', sidereal_time='ST',
+                airmass='Air', n='N'))
             for sname, setup in p.setups.iteritems():
-                fp.setuprec.format(setup.attrib)
-                tlist.append(setup.attrib)
+                fp.write(setuprec.format(**setup.attrib))
+                attrib=setup.attrib.copy()
+                attrib['name']=p.name+' '+attrib['name']
+                tlist.append(attrib)
     return tlist
 
 def write_target_list(tfile, recs):
     """rec iterable of dicts with 'name' 'ra', 'de', & 'epoch'"""
     with open(tfile,'w') as fp:
-        obsfmt='{n:<3} {id:<15} {ra:<11} {de:<11} {eq:<6} {pmRA:<4} {pmDE:<4} '
-        '{irot:<3} {rotmode:<4} {gra1:<11} {gde1:<11} {geq:<6} '
-        '{gra2:<11} {gde2:<11} {geq2:<6}'
+        obsfmt=('{n:<3} {id:<30} {ra:<12} {de:<12} {eq:<11} {pmRA:<11} {pmDE:<11} '
+        '{irot:<11} {rotmode:<11} {gra1:<11} {gde1:<11} {geq1:<11} '
+        '{gra2:<11} {gde2:<11} {geq2:<11}')
         header=obsfmt.format(n='#',
         id='ID',
         ra='RA',
@@ -38,7 +50,7 @@ def write_target_list(tfile, recs):
         eq='Eq',
         pmRA='pmRA',
         pmDE='pmDE',
-        irot='Rot'
+        irot='Rot',
         rotmode='Mode',
         gra1='GRA1',
         gde1='GDE1',
@@ -48,9 +60,9 @@ def write_target_list(tfile, recs):
         geq1='GEQ1')
         
         fp.write(header+'\n')
-        obsfmt='{n:<3} {id:<15} {ra:<11} {de:<11} {eq:<6} {pmRA:<5.2f} '
-        '{pmDE:<5.2f} {irot:<3} {rotmode:<4} {gra1:<11} {gde1:<11} {geq:<6} '
-        '{gra2:<11} {gde2:<11} {geq2:<6}'
+        obsfmt=('{n:<3} {id:<30} {ra:<12} {de:<12} {eq:<11} {pmRA:<11.2f} '
+        '{pmDE:<11.2f} {irot:<11} {rotmode:<11} {gra1:<11} {gde1:<11} {geq1:<11} '
+        '{gra2:<11} {gde2:<11} {geq2:<11}')
         for i,r in enumerate(recs):
             s=obsfmt.format(n=i+1,
             id=r['name'].replace(' ', '_'),
@@ -59,7 +71,7 @@ def write_target_list(tfile, recs):
             eq=r['epoch'],
             pmRA=0,
             pmDE=0,
-            irot='7.2'
+            irot='-7.2',
             rotmode='EQU',
             gra1=sexiegesmal_fmt(0),
             gde1=sexiegesmal_fmt(0),
@@ -79,7 +91,7 @@ def sexiegesmal_fmt(n, ra=False):
             return ':'.join(n.split())
     if type(n) in [tuple, list]:
         return ':'.join([str(x) for x in n])
-    if type(n)==float:
+    if type(n) in (float, int):
         if ra:
             sec=3600*n/15.0
             hord=int(sec)/3600
@@ -100,4 +112,4 @@ if __name__ == '__main__':
     files = glob.glob('*.plate')
     
     trec=write_summary_file(sfile, files)
-    write_target_list(tfile, trec)
+    write_target_list(tfile, trec+extra)
