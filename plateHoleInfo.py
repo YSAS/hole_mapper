@@ -218,7 +218,7 @@ class plateHoleInfo(object):
                 
                 #Perform a crappy extraction of additional hole information
                 addit={}
-                if rtype =='O':
+                if rtype =='O' and len(rwords) > 9:
                     if 'F00' in rwords[9]:
                         ndx_add=1
                     else:
@@ -798,9 +798,15 @@ def parse_extra_data(name,setup, words):
         l=words[0].split('=')
         ret['V']=l[1]
         ret['MAGNITUDE']=nanfloat(l[1])
+    #David
     if name=='Outer_LMC_1_Sum':
         ret['ID']=words[0]
-
+    #Carina_1
+    if name=='VasilyStream_1_Sum':
+        l=words[0].split('_')
+        ret['i']=l[3]
+        ret['g']=l[2]
+        ret['MAGNITUDE']=nanfloat(l[2])
 
     return ret
 
