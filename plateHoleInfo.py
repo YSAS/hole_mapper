@@ -141,6 +141,9 @@ class plateHoleInfo(object):
     
             if 'Vasily' in self.name:
                 _postProcessVasilyCassettes(self)
+                
+            if 'Kounkel_2' in self.name:
+                _postProcessKounkel2Cassettes(self)
         
         else:
             self.name=os.path.basename(file)[0:-6]
@@ -650,6 +653,39 @@ def _postProcessVasilyCassettes(plateinfo):
         else:
             c.usable=[]
     plateinfo.cassette_groups['Setup 2']=[[i+k for i in ok for k in 'lh']]
+
+def _postProcessKounkel2Cassettes(plateinfo):
+    cnames=Cassette.new_cassette_dict().keys()
+
+    ok3=['B1h','R3h','B5h','R7h']
+    ok5=['R2l','R6h','R6l']
+    filtered_left=[c for c in Cassette.left_only(cnames) if c not in ok5]
+    filtered_right=[c for c in Cassette.right_only(cnames) if c not in ok3]
+    ok3+=filtered_left
+    ok5+=filtered_right
+    #Setups 3
+    ok=ok3
+    for c in plateinfo.cassettes_for_setup('Setup 3').values():
+        if c.name in ok:
+            if 'l' in c.name:
+                c.usable=range(1,9)
+            else:
+                c.usable=range(9,17)
+        else:
+            c.usable=[]
+    plateinfo.cassette_groups['Setup 3']=[ok]
+    #Setup 5
+    ok=ok5
+    for c in plateinfo.cassettes_for_setup('Setup 5').values():
+        if c.name in ok:
+            if 'l' in c.name:
+                c.usable=range(1,9)
+            else:
+                c.usable=range(9,17)
+        else:
+            c.usable=[]
+    plateinfo.cassette_groups['Setup 5']=[ok]
+
 
 def _postProcessNideverCassettes(plateinfo):
     #Setups 1, 2, 3, 4
