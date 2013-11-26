@@ -48,8 +48,8 @@ class Hole(dict):
         priority=extra.pop('priority',0)
         
         self['USER_ASSIGNED']= fiber!=''
-        self['RA']=ra
-        self['DEC']=de
+        self['RA']=ra #('0','0','0.0')
+        self['DEC']=de #('0','0','0.0')
         self['ID']=id
         self['COLOR']=color
         self['MAGNITUDE']=mag
@@ -230,11 +230,21 @@ class Hole(dict):
     def isAssigned(self):
         return self['FIBER']!=''
 
-    def ra_string(self):
-        return '{} {} {}'.format(*self['RA'])
+    def ra_string(self,decimal=False):
+        if decimal:
+            return '{:.6f}'.format(float(self['RA'][0])*15+
+                                   float(self['RA'][1])/60+
+                                   float(self['RA'][2])/3600.0)
+        else:
+            return '{} {} {}'.format(*self['RA'])
 
-    def de_string(self):
-        return '{} {} {}'.format(*self['DEC'])
+    def de_string(self,decimal=False):
+        if decimal:
+            return '{:.6f}'.format(float(self['DEC'][0])+
+                                   float(self['DEC'][1])/60+
+                                   float(self['DEC'][2])/3600.0)
+        else:
+            return '{} {} {}'.format(*self['DEC'])
 
     def assigned_color(self):
         """ Return color of assigned cassette else None """
