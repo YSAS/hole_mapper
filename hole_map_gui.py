@@ -86,7 +86,8 @@ class HoleInfoDialog:
         
 
     def defocusCallback(self, event):
-        self.ok()
+        pass
+        #self.ok()
     
     def ok(self):
         self.save()
