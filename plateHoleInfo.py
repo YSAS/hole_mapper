@@ -4,6 +4,7 @@ import Cassette
 import Setup
 import os.path
 import math
+from m2fs.plate.plate import Plate as M2FSPlate
 
 SCALE=14.25
 SH_RADIUS=0.1875
@@ -295,8 +296,7 @@ class plateHoleInfo(object):
                             **addit)
             except ValueError:
                 return None
-        from m2fscontrolPlate import Plate
-        plate=Plate(file)
+        plate=M2FSPlate(file)
         #Add the SH to the global set
 
         self.sh_hole=plateDict_2_Hole(plate.shackhartman)
