@@ -12,7 +12,7 @@ OBJECT_TYPE='O'
 class Hole(dict):
     def __init__(self, x, y, z, r, ra=('0','0','0.0'), de=('0','0','0.0'),
                  type='', slit=180, ep=2000.0, mattfib='', idstr='',
-                 fiber='',channel='', cassette=None, fiberno=0, **extra):
+                 fiber='', cassette=None, fiberno=0, **extra):
         
         #cassette 0 not specified, 1-8
         #fiber num 0 not specified 1-16
@@ -29,14 +29,23 @@ class Hole(dict):
         
         assert slit in (180, 125, 95, 75, 58, 45)
 
+        #ID processing
         if type=='S':
             id='sky'+extra.pop('ID','')
         else:
             id=extra.pop('ID',':'.join(ra)+'_'+':'.join(de))
         
+        #oops
+        from __builtin__ import type as python_type
+        #ra & dec processing
+        if python_type(ra)==str:
+            ra=tuple([x for x in ra.split()])
+        if python_type(de)==str:
+            de=tuple([x for x in de.split()])
+
         color=extra.pop('COLOR',0.0)
         mag=extra.pop('MAGNITUDE',0.0)
-        priority=extra.pop('PRIORITY',0)
+        priority=extra.pop('priority',0)
         
         self['USER_ASSIGNED']= fiber!=''
         self['RA']=ra
@@ -44,14 +53,21 @@ class Hole(dict):
         self['ID']=id
         self['COLOR']=color
         self['MAGNITUDE']=mag
-        self['TYPE']=type
-        self['EPOCH']=ep
-        self['MATTFIB']=mattfib
-        self['SLIT']=slit
-        self['PRIORITY']=priority
-        self['FIBER']=fiber
+        self['TYPE']=str(type)
+        self['EPOCH']=float(ep)
+        self['MATTFIB']=str(mattfib)
+        self['SLIT']=int(slit)
+        self['PRIORITY']=int(priority)
+        self['FIBER']=str(fiber)
+        if fiber:
+            cassette,_,fiberno=fiber.partition('-')
+            fiberno=int(fiberno)
+            if fiberno >8:
+                cassette+='h'
+            else:
+                cassette+='l'
         self['ASSIGNMENT']={'CASSETTE':cassette, #cassette or list of viable cassettes e.g. R1, B8
-                            'FIBERNO':fiber}
+                            'FIBERNO':fiberno}
         self['CUSTOM']=extra #keys and values should be strings!
         for k,v in extra.iteritems():
             if k not in self:

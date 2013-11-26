@@ -355,7 +355,9 @@ class App(Tkinter.Tk):
         from tkFileDialog import askopenfilename
 
         dir=App.getPath(('hole_mapper','plates'))
-        file=askopenfilename(initialdir=dir, filetypes=[('asc files', '.asc')])
+        file=askopenfilename(initialdir=dir,
+                             filetypes=[('asc files', '.asc'),
+                             ('plate files', '.plate')])
         file=os.path.normpath(file)
         print file
         if file:
