@@ -115,6 +115,9 @@ class plateHoleInfo(object):
 
             if 'Calvet' in self.name:
                 _postProcessCalvetSetups(self)
+                
+            if 'Carnegie' in self.name:
+                _postProcessCarnegieSetups(self)
 
             #set of cassettes with same color & slit in future this
             # will come from plate file
@@ -583,6 +586,32 @@ def _postProcessCalvetSetups(plateinfo):
         sk.sort(key=lambda h: h['PRIORITY'])
         s['holes']=ob[0:no]+sk[0:ns]
 
+def _postProcessCarnegieSetups(plateinfo):
+    """
+    Drop excess targets
+    """
+    droptarg=[('06 49 4.92','-36 00 29.3'),
+              ('06 49 3.13','-35 59 42.2'),
+              ('06 49 6.67','-36 00 13.1'),
+              ('06 49 17.74','-35 57 5.2'),
+              ('06 49 11.16','-35 55 58.2'),
+              ('06 49 22.03','-36 02 0.6'),
+              ('06 49 3.09','-35 55 22.6'),
+              ('06 48 56.65','-35 57 50.3'),
+              ('06 49 3.09','-36 05 13.4'),
+              ('06 48 54.51','-36 05 13.4'),
+              ('06 48 46.44','-35 55 58.2'),
+              ('06 48 39.86','-35 57 5.2'),
+              ('06 48 34.08','-36 00 18.0'),
+              ('06 48 46.44','-36 04 37.8'),
+              ('06 48 35.57','-35 58 35.4')]
+              
+    def in_to_drop(hole):
+        return (' '.join(h['RA']),' '.join(h['DEC'])) in droptarg
+    s=plateinfo.setups['Setup 2']
+    s['holes']=[h for h in s['holes'] if not in_to_drop(h)]
+    import pdb;pdb.set_trace()
+
 def _postProcessIanCassettes(plateinfo):
     """
     Take the 2 setups for Nov13 Bailey plate and break them into the
@@ -590,9 +619,15 @@ def _postProcessIanCassettes(plateinfo):
     """
     for c in plateinfo.cassettes_for_setup('Setup 2').values():
         if 'l' in c.name:
-            c.usable=[1,8]
+            if 'R8' in c.name:
+                c.usable=[1]
+            else:
+                c.usable=[1,8]
         else:
-            c.usable=[9,15,16] #[1,2,8,9,15,16] or [1,8,15]
+            if 'R8' in c.name:
+                c.usable=[9,16]
+            else:
+                c.usable=[15]
 
 def _postProcessHJCassettes(plateinfo):
     for s in ['Setup 3','Setup 6']:
@@ -845,4 +880,3 @@ def parse_extra_data(name,setup, words):
         ret['MAGNITUDE']=nanfloat(l[2])
 
     return ret
-
