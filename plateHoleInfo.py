@@ -610,7 +610,6 @@ def _postProcessCarnegieSetups(plateinfo):
         return (' '.join(h['RA']),' '.join(h['DEC'])) in droptarg
     s=plateinfo.setups['Setup 2']
     s['holes']=[h for h in s['holes'] if not in_to_drop(h)]
-    import pdb;pdb.set_trace()
 
 def _postProcessIanCassettes(plateinfo):
     """
