@@ -379,10 +379,11 @@ class Plate(object):
             for h in unassigned_skys:
                 #Get cassettes with correct slit and free fibers
                 # n.b these are just cassette name strings
-                possible_cassettes=[c.name for c in setup['cassettes']
+                possible_cassettes=[c.name for c in cassettes
                                     if h.isAssignable(cassette=c) and
                                     c.n_avail() >0]
                 if len(possible_cassettes)<1:
+                    print 'Could not find a suitable cassette for {}'.format(h)
                     import pdb;pdb.set_trace()
                 #Set the cassetes that are usable for the hole
                 #  no_add is true so we keep the distribution of sky fibers
@@ -407,10 +408,11 @@ class Plate(object):
             for h in holes_to_assign:
                 #Get cassettes with correct slit and free fibers
                 # n.b these are just cassette name strings
-                possible_cassettes=[c.name for c in setup['cassettes']
+                possible_cassettes=[c.name for c in cassettes
                                     if h.isAssignable(cassette=c) and
                                     c.n_avail() >0]
                 if len(possible_cassettes)<1:
+                    print 'Could not find a suitable cassette for {}'.format(h)
                     import pdb;pdb.set_trace()
                 #Set the cassetes that are usable for the hole
                 #  no_add is true so we keep the distribution of sky fibers
