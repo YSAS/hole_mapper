@@ -132,7 +132,7 @@ class Cassette(object):
         self.used=0
         self._defaultslit=slit #This is for now, in the future we might just
         #set the slits for the holes and see what happens
-        self._slit=defaultdict(lambda:_defaultslit)
+        self._slit=defaultdict(lambda:self._defaultslit)
         self.holes=[]
     
     def slit(self,setup):
@@ -167,7 +167,7 @@ class Cassette(object):
         self.used=0
         self.holes=[]
         self.map={}
-        self._slit=defaultdict(lambda:_defaultslit)
+        self._slit=defaultdict(lambda:self._defaultslit)
     
     def slit_compatible(self, hole):
         """ true if the holes slit matches the slit for the holes setup"""
