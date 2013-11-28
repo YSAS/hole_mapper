@@ -152,14 +152,12 @@ class plateHoleInfo(object):
             if 'Kounkel_2' in self.name:
                 _postProcessKounkel2Cassettes(self)
         
-        
         else:
             self.name=os.path.basename(file)[0:-6]
             self.pfile_filename=file
             self._init_from_plate(file)
         
-        for s in self.setups:
-            self.setups[s]['cassettes']=self.cassettes[s]
+
 
     def _init_fromASC(self):
         #add shack hartman holes
@@ -388,7 +386,11 @@ class plateHoleInfo(object):
         self.plate=plate
 
     def cassettes_for_setup(self,setup_name):
-        return self.cassettes[setup_name]
+        import copy
+        ret=copy.deepcopy(self.cassettes[setup_name])
+        if not ret:
+            import ipd;ipd.set_trace()
+        return ret
     
     def cassette_groups_for_setup(self, setup_name):
         return self.cassette_groups[setup_name]
@@ -640,7 +642,7 @@ def _postProcessIanCassettes(plateinfo):
     Take the 2 setups for Nov13 Bailey plate and break them into the
     6 real setups
     """
-    for c in plateinfo.cassettes_for_setup('Setup 2').values():
+    for c in  plateinfo.cassettes['Setup 2'].values():
         if 'l' in c.name:
             if 'R8' in c.name:
                 c.usable=[1]
@@ -654,17 +656,17 @@ def _postProcessIanCassettes(plateinfo):
 
 def _postProcessHJCassettes(plateinfo):
     for s in ['Setup 3','Setup 6']:
-        for c in plateinfo.cassettes_for_setup(s).values():
+        for c in  plateinfo.cassettes[s].values():
             if 'l' in c.name:
                 c.usable=[2,4,6,8]
             else:
                 c.usable=[10,12,14,16]
-    for c in plateinfo.cassettes_for_setup('Setup 4').values():
+    for c in  plateinfo.cassettes['Setup 4'].values():
         if 'l' in c.name:
             c.usable=[2]
         else:
             c.usable=[16]
-    for c in plateinfo.cassettes_for_setup('Setup 1').values():
+    for c in  plateinfo.cassettes['Setup 1'].values():
         #have 8 want in fiber 8 of every other tetris
         if c.name[1] in ['1','3','5','7']:
             if 'l' in c.name:
@@ -674,7 +676,7 @@ def _postProcessHJCassettes(plateinfo):
         else:
             c.usable=[]
     for s in ['Setup 2','Setup 5']:
-        for c in plateinfo.cassettes_for_setup(s).values():
+        for c in  plateinfo.cassettes[s].values():
             if 'l' in c.name:
                 c.usable=range(1,8,2)
             else:
@@ -691,7 +693,7 @@ def _postProcessCalvetCassettes(plateinfo):
 def _postProcessVasilyCassettes(plateinfo):
     #Setups 1, 2, 3, 4
     ok=['B1','R1','B5','R5','B2','R2','B6','R6']
-    for c in plateinfo.cassettes_for_setup('Setup 1').values():
+    for c in  plateinfo.cassettes['Setup 1'].values():
         if c.name[0:2] in ok:
             if 'l' in c.name:
                 c.usable=range(1,9)
@@ -702,7 +704,7 @@ def _postProcessVasilyCassettes(plateinfo):
     plateinfo.cassette_groups['Setup 1']=[[i+k for i in ok for k in 'lh']]
     
     ok=['B3','R3','B7','R7','B4','R4','B8','R8']
-    for c in plateinfo.cassettes_for_setup('Setup 2').values():
+    for c in  plateinfo.cassettes['Setup 2'].values():
         if c.name[0:2] in ok:
             if 'l' in c.name:
                 c.usable=range(1,9)
@@ -723,7 +725,7 @@ def _postProcessKounkel2Cassettes(plateinfo):
     ok5+=filtered_right
     #Setups 3
     ok=ok3
-    for c in plateinfo.cassettes_for_setup('Setup 3').values():
+    for c in  plateinfo.cassettes['Setup 3'].values():
         if c.name in ok:
             if 'l' in c.name:
                 c.usable=range(1,9)
@@ -734,7 +736,7 @@ def _postProcessKounkel2Cassettes(plateinfo):
     plateinfo.cassette_groups['Setup 3']=[ok]
     #Setup 5
     ok=ok5
-    for c in plateinfo.cassettes_for_setup('Setup 5').values():
+    for c in  plateinfo.cassettes['Setup 5'].values():
         if c.name in ok:
             if 'l' in c.name:
                 c.usable=range(1,9)
@@ -748,7 +750,7 @@ def _postProcessKounkel2Cassettes(plateinfo):
 def _postProcessNideverCassettes(plateinfo):
     #Setups 1, 2, 3, 4
     ok=['B1','B5','B2','B6']
-    for c in plateinfo.cassettes_for_setup('Setup 1').values():
+    for c in  plateinfo.cassettes['Setup 1'].values():
         if c.name[0:2] in ok:
             if 'l' in c.name:
                 c.usable=range(1,9)
@@ -759,7 +761,7 @@ def _postProcessNideverCassettes(plateinfo):
     plateinfo.cassette_groups['Setup 1']=[[i+k for i in ok for k in 'lh']]
 
     ok=['R1','R5','R2','R6']
-    for c in plateinfo.cassettes_for_setup('Setup 2').values():
+    for c in  plateinfo.cassettes['Setup 2'].values():
         if c.name[0:2] in ok:
             if 'l' in c.name:
                 c.usable=range(1,9)
@@ -770,7 +772,7 @@ def _postProcessNideverCassettes(plateinfo):
     plateinfo.cassette_groups['Setup 2']=[[i+k for i in ok for k in 'lh']]
 
     ok=['B3','B7','B4','B8']
-    for c in plateinfo.cassettes_for_setup('Setup 3').values():
+    for c in  plateinfo.cassettes['Setup 3'].values():
         if c.name[0:2] in ok:
             if 'l' in c.name:
                 c.usable=range(1,9)
@@ -781,7 +783,7 @@ def _postProcessNideverCassettes(plateinfo):
     plateinfo.cassette_groups['Setup 3']=[[i+k for i in ok for k in 'lh']]
 
     ok=['R3','R7','R4','R8']
-    for c in plateinfo.cassettes_for_setup('Setup 4').values():
+    for c in  plateinfo.cassettes['Setup 4'].values():
         if c.name[0:2] in ok:
             if 'l' in c.name:
                 c.usable=range(1,9)
@@ -793,7 +795,7 @@ def _postProcessNideverCassettes(plateinfo):
 
     #Setups 5, 6, 7, 8
     ok=['B1','B5','B2','B6']
-    for c in plateinfo.cassettes_for_setup('Setup 5').values():
+    for c in  plateinfo.cassettes['Setup 5'].values():
         if c.name[0:2] in ok:
             if 'l' in c.name:
                 c.usable=range(1,9)
@@ -804,7 +806,7 @@ def _postProcessNideverCassettes(plateinfo):
     plateinfo.cassette_groups['Setup 5']=[[i+k for i in ok for k in 'lh']]
 
     ok=['R1','R5','R2','R6']
-    for c in plateinfo.cassettes_for_setup('Setup 6').values():
+    for c in  plateinfo.cassettes['Setup 6'].values():
         if c.name[0:2] in ok:
             if 'l' in c.name:
                 c.usable=range(1,9)
@@ -815,7 +817,7 @@ def _postProcessNideverCassettes(plateinfo):
     plateinfo.cassette_groups['Setup 6']=[[i+k for i in ok for k in 'lh']]
 
     ok=['B3','B7','B4','B8']
-    for c in plateinfo.cassettes_for_setup('Setup 7').values():
+    for c in  plateinfo.cassettes['Setup 7'].values():
         if c.name[0:2] in ok:
             if 'l' in c.name:
                 c.usable=range(1,9)
@@ -826,7 +828,7 @@ def _postProcessNideverCassettes(plateinfo):
     plateinfo.cassette_groups['Setup 7']=[[i+k for i in ok for k in 'lh']]
 
     ok=['R3','R7','R4','R8']
-    for c in plateinfo.cassettes_for_setup('Setup 8').values():
+    for c in  plateinfo.cassettes['Setup 8'].values():
         if c.name[0:2] in ok:
             if 'l' in c.name:
                 c.usable=range(1,9)
