@@ -213,8 +213,8 @@ class Plate(object):
         nb=0
         ns=0
         
-        #TODO fix total calculation
-        nt=len(self.holeSet)-len(self.getHolesNotInAnySetup())
+        nt=sum([len(self.setups[s]['holes']) for s in self.setups ])
+        
         for s in self.setups:
             nt-=len(self.setups[s]['unused_holes'])
 
@@ -349,8 +349,7 @@ class Plate(object):
 #        for h in self.holeSet:
 #            h.reset()
 
-        #Grab the cassettes and cassette groups
-        #cassettes=setup['cassetteConfig']
+        #Grab the cassettes
         cassettes=self.plateHoleInfo.cassettes_for_setup(setup_name)
         
         for c in cassettes.itervalues():
@@ -381,17 +380,16 @@ class Plate(object):
 
         setup['INFO']['ASSIGNEDWITH']=', '.join(awith)
         
-    
-        #TODO This cassette groups assignemnt probably needs a bit of work
-        # right now it doesn't distribute skys in the awith setup among their own
-        # cassette groups
-        cassette_groups=self.plateHoleInfo.cassette_groups_for_setup(setup['setup'])
         
-        #Distribute sky fibers evenly over groups of cassettes with
-        # same color & slit, don't bother factoring in preassigned skys for now
-        for i, h in enumerate(unassigned_skys):
-            group=cassette_groups[i % len(cassette_groups)]
-            h.assign_possible_cassette(group)
+        #Distribute sky fibers evenly over cassettes groups (e.g. color, slit)
+        setup_names=[setup_name]+['Setup '+s for s in awith]
+        for sname in setup_names:
+            cassette_groups=self.plateHoleInfo.cassette_groups_for_setup(sname)
+            skys=[h for h in self.setups[sname]['holes'] if
+                  h.isSky() and not h.isAssigned()]
+            for i, h in enumerate(skys):
+                group=cassette_groups[i % len(cassette_groups)]
+                h.assign_possible_cassette(group)
 
         #While there are holes w/o an assigned cassette (groups don't count)
         while len(unassigned_skys) > 0:
