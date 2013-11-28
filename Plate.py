@@ -362,6 +362,9 @@ class Plate(object):
 
         #Grab the cassettes and cassette groups
         cassettes=self.plateHoleInfo.cassettes_for_setup(setup['setup'])
+        #TODO This cassette groups assignemnt probably needs a bit of work
+        # right now it doesn't distribute skys in the awith setup among their own
+        # cassette groups
         cassette_groups=self.plateHoleInfo.cassette_groups_for_setup(setup['setup'])
         
         #Distribute sky fibers evenly over groups of cassettes with
@@ -376,8 +379,9 @@ class Plate(object):
             for h in unassigned_skys:
                 #Get cassettes with correct slit and free fibers
                 # n.b these are just cassette name strings
-                possible_cassettes=self.plateHoleInfo.available_cassettes(h,
-                                                    setup['setup'])
+                possible_cassettes=[c.name for c in setup['cassettes']
+                                    if h.isAssignable(cassette=c) and
+                                    c.n_avail() >0]
                 if len(possible_cassettes)<1:
                     import pdb;pdb.set_trace()
                 #Set the cassetes that are usable for the hole
@@ -403,8 +407,9 @@ class Plate(object):
             for h in holes_to_assign:
                 #Get cassettes with correct slit and free fibers
                 # n.b these are just cassette name strings
-                possible_cassettes=self.plateHoleInfo.available_cassettes(h,
-                                                    setup['setup'])
+                possible_cassettes=[c.name for c in setup['cassettes']
+                                    if h.isAssignable(cassette=c) and
+                                    c.n_avail() >0]
                 if len(possible_cassettes)<1:
                     import pdb;pdb.set_trace()
                 #Set the cassetes that are usable for the hole

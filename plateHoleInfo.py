@@ -152,6 +152,7 @@ class plateHoleInfo(object):
             if 'Kounkel_2' in self.name:
                 _postProcessKounkel2Cassettes(self)
         
+        
         else:
             self.name=os.path.basename(file)[0:-6]
             self.pfile_filename=file
@@ -389,16 +390,6 @@ class plateHoleInfo(object):
     
     def cassette_groups_for_setup(self, setup_name):
         return self.cassette_groups[setup_name]
-
-    def available_cassettes(self, hole, setup_name):
-        """
-        Return cassette(s) name's containing fibers which can be used for hole
-        """
-        #Filter cassettes based on slit width & fiber availability
-        available=filter(lambda x: x.slit==hole['SLIT'] and x.n_avail() > 0,
-                         self.cassettes[setup_name].values())
-        ret=[c.name for c in available]
-        return ret
 
     def write_platefile(self):
 
