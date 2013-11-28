@@ -1,5 +1,6 @@
 import numpy as np
 import operator
+from collections import defaultdict
 
 def rangify(data):
     from itertools import groupby
@@ -12,6 +13,13 @@ def rangify(data):
         else:
             str_list.append('%d' % ilist[0])
     return ', '.join(str_list)
+
+def fiber2cassettename(fib):
+    ret = fib[0:2]
+    if int(fib.split('-')[1])>8:
+        return ret+'h'
+    else:
+        return ret+'l'
 
 def left_only(cassettes):
     if not cassettes:
@@ -108,6 +116,7 @@ def _init_cassette_positions():
 
 cassette_positions=_init_cassette_positions()
 
+
 class Cassette(object):
     def __init__(self, name, slit, usable=None):
         assert 'h' in name or 'l' in name
@@ -180,9 +189,6 @@ class Cassette(object):
     def assign_fiber(self, hole):
         """
         Associate hole with the next available fiber. Sets assignment for hole.
-        
-        Set skip_lower to start assignment with 9
-        
         """
         #Get next available fiber
         #min of self.usable not in self.map
@@ -196,8 +202,7 @@ class Cassette(object):
         self.map[num]=hole
         
         #Tell the hole its fiber
-        hole.assign({'CASSETTE':self.name,
-                     'FIBERNO':num})
+        hole.assign({'CASSETTE':self.name, 'FIBERNO':num})
 
     def label(self):
         """Return a string label for the cassette e.g. R1 1-8 or B3 1,4,7"""
@@ -219,6 +224,9 @@ class Cassette(object):
         side=int(self.name[1]) % 2  != 0
         assert side == (self.pos[0] < 0)
         return side
+
+    def get_hole(self, fiber):
+        return self._map.get(int(fiber.split('-')[1]),None)
 
 def blue_cassette_names():
     return ['B'+str(i)+j for i in range(1,9) for j in 'hl']
