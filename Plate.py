@@ -343,25 +343,45 @@ class Plate(object):
         
 
         setup=self.setups[setup_name]
+        #import ipdb;ipdb.set_trace()
         setup['INFO']['ASSIGNEDWITH']=', '.join(awith)
 
-        for c in setup['cassettes']:
-            setup['cassettes'][c].reset()
-        for h in self.holeSet:
+#        for h in self.holeSet:
+#            h.reset()
+
+        #Grab the cassettes and cassette groups
+        #cassettes=setup['cassetteConfig']
+        cassettes=self.plateHoleInfo.cassettes_for_setup(setup_name)
+        
+        for c in cassettes.itervalues():
+            c.reset()
+
+
+        #Grab all the holes of the setups we should assign with
+        assignwithholes=[h for s in awith
+                           for h in self.setups['Setup '+s]['holes']]
+                           
+        #Reset all the assignments
+        for h in assignwithholes+setup['holes']:
             h.reset()
-
-
+        
         #Grab all skys and objects that don't have assignments
-        assignwithholes=[h for s in awith for h in self.setups['Setup '+s]['holes']]
-        setup['assignwithholes']=assignwithholes
         unassigned_skys=[h for h in setup['holes']+assignwithholes if
                          h.isSky() and not h.isAssigned()]
         unassigned_objs=[h for h in setup['holes']+assignwithholes if
                         h.isObject() and not h.isAssigned()]
                         
+        #Grab the holes with assignments and configure the cassettes
+        assigned=[h for h in setup['holes']+assignwithholes if h.isAssigned()]
+        for h in assigned:
+            print "some were assigned"
+            cassettes[Cassette.fiber2cassettename(h['FIBER'])].assign_hole(h)
+        
+        
 
-        #Grab the cassettes and cassette groups
-        cassettes=self.plateHoleInfo.cassettes_for_setup(setup['setup'])
+        setup['INFO']['ASSIGNEDWITH']=', '.join(awith)
+        
+    
         #TODO This cassette groups assignemnt probably needs a bit of work
         # right now it doesn't distribute skys in the awith setup among their own
         # cassette groups
@@ -379,7 +399,7 @@ class Plate(object):
             for h in unassigned_skys:
                 #Get cassettes with correct slit and free fibers
                 # n.b these are just cassette name strings
-                possible_cassettes=[c.name for c in cassettes
+                possible_cassettes=[c.name for c in cassettes.itervalues()
                                     if h.isAssignable(cassette=c) and
                                     c.n_avail() >0]
                 if len(possible_cassettes)<1:
@@ -408,7 +428,7 @@ class Plate(object):
             for h in holes_to_assign:
                 #Get cassettes with correct slit and free fibers
                 # n.b these are just cassette name strings
-                possible_cassettes=[c.name for c in cassettes
+                possible_cassettes=[c.name for c in cassettes.itervalues()
                                     if h.isAssignable(cassette=c) and
                                     c.n_avail() >0]
                 if len(possible_cassettes)<1:
@@ -448,6 +468,11 @@ class Plate(object):
             c.map_fibers(remap=True)
 
         setup['cassetteConfig']=cassettes
+        for s in self.setups:
+            if s.split()[1] in awith:
+                self.setups[s]['INFO']['ASSIGNEDWITH']=setup['INFO']['ASSIGNEDWITH']
+                self.setups[s]['cassetteConfig']=cassettes
+            
         
     def drawHole(self, hole, canvas, color=None, fcolor='White', radmult=1.0, drawimage=0):
        

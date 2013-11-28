@@ -151,7 +151,10 @@ class plateHoleInfo(object):
                 
             if 'Kounkel_2' in self.name:
                 _postProcessKounkel2Cassettes(self)
-        
+    
+    
+            for s in self.setups:
+                self.setups[s]['cassetteConfig']=self.cassettes_for_setup(s)
         else:
             self.name=os.path.basename(file)[0:-6]
             self.pfile_filename=file

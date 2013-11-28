@@ -179,9 +179,19 @@ class Cassette(object):
         if self.n_avail()==0:
             import pdb;pdb.set_trace()
             raise Exception('Cassette Full')
+
+        if not self.slit_compatible(hole):
+            raise ValueError('Hole not compatible with cassette')
+        if hole['FIBER']!='':
+            print "assigning hole with preset fiber"
+            if fiber2cassettename(hole['FIBER'])!=self.name:
+                raise ValueError('Hole not compatible with cassette')
+            self.map[int(hole['FIBER'].split('-')[1])]=hole
+            self._slit[hole['SETUP']]=hole['SLIT']
+        else:
+            hole.assign_cassette(self.name)
         self.consume()
         self.holes.append(hole)
-        hole.assign_cassette(self.name)
 
     def unassign_hole(self, hole):
         """
@@ -205,7 +215,9 @@ class Cassette(object):
         #min of self.usable not in self.map
         free=filter(lambda x: x not in self.map, self.usable)
         
-        assert len(free)>0
+        #assert len(free)>0
+        if len(free)==0:
+            import ipdb;ipdb.set_trace()
         
         num=min(free)
         
@@ -221,11 +233,15 @@ class Cassette(object):
 
     def map_fibers(self, remap=False):
         #assuming -x is to left
-        self.holes.sort(key=operator.attrgetter('x'), reverse=not self.onRight())
         if remap:
-            self.map={}
+            for k in self.map.keys():
+                if not self.map[k]['USER_ASSIGNED']:
+                    self.map.pop(k)
+        holes=[h for h in self.holes if h not in self.map.values()]
+        holes.sort(key=operator.attrgetter('x'), reverse=not self.onRight())
+
         #assign the next fiber
-        for h in self.holes:
+        for h in holes:
             self._assign_fiber(h)
 
     def onLeft(self):
