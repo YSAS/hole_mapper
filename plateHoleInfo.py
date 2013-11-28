@@ -250,6 +250,7 @@ class plateHoleInfo(object):
                      ra=tuple([x for x in rwords[1:4]]),
                      de=tuple([x for x in rwords[4:7]]),
                      ep=float(rwords[7]),
+                     setup=setup_name,
                      type=rtype,
                      mattfib=matt_fiber,
                      idstr=aline,
@@ -327,6 +328,7 @@ class plateHoleInfo(object):
             targets=[]
             other=[]
             for t in setup._target_list:
+                t['setup']=setup_name
                 hole=plateDict_2_Hole(t)
                 if not hole:
                     #fiber mightnot be plugged

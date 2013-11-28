@@ -59,6 +59,7 @@ class Hole(dict):
         self['SLIT']=int(slit)
         self['PRIORITY']=int(priority)
         self['FIBER']=str(fiber)
+        self['SETUP']=extra.pop('setup','')
         if fiber:
             cassette,_,fiberno=fiber.partition('-')
             fiberno=int(fiberno)
