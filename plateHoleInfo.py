@@ -439,47 +439,54 @@ class plateHoleInfo(object):
                     fp.write("{k}={space}{v}\n".format(k=k,v=str(v),
                         space=' '*(key_col_wid-len(k)-1)))
 
-                #Write out objects & sky
-                ob=[h for h in setup['holes'] ]#if h.isObject()]
+                ####Write out cassette config####
+                #Section heading
                 fp.write("[{}:Targets]\n".format(condensed_name))
-                base_col_header=['ra','dec','ep','x','y','z','r','type', 'priority',
-                            'slit', 'id']
+                base_col_header=['ra','dec','ep','x','y','z','r','type',
+                                 'priority', 'slit', 'id']
                 
+                #Determine what extra columns where are
                 extra_col_header=[]
-                for h in ob:
+                for h in setup['holes']:
                     extra_col_header.extend(h['CUSTOM'].keys())
                 extra_col_header=list(set(extra_col_header))
                 
+                #Write Header line
                 fp.write("H:'"+
                          "'\t'".join(base_col_header+extra_col_header)+
                          "'\n")
+                
+                #Define the format string
                 fmt_str=("{fiber} : '{"+
                         "}'\t'{".join(base_col_header+extra_col_header)+
                         "}'\n")
                         
+                #Write record for each fiber
                 for fiber in ORDERED_FIBER_NAMES:
-                    h=[h for h in setup['holes'] if h['FIBER']==fiber]
-                    assert len(h)<=1
-                    if h:
-                        h=h[0]
+                    #get cassette
+                    c=setup['cassetteConfig'][Cassette.fiber2cassettename(fiber)]
+
+                    #get the hole
+                    h=c.get_hole(fiber)
+                    
+                    #determine if in this setup
+                    if h in setup['holes']:
                         fmt_dict={'ra':h.ra_string(),
-                                'dec':h.de_string(),
-                                'ep':h['EPOCH'],
-                                'x':'%.4f'% (h.x*SCALE),
-                                'y':'%.4f'% (h.y*SCALE),
-                                'z':'%.4f'% (h.z*SCALE),
-                                'r':'%.4f'% (h.radius*SCALE),
-                                'type':h['TYPE'],
-                                'priority':h['PRIORITY'],
-                                'id':h['ID'],
-                                'fiber':fiber,
-                                'slit':h['SLIT']}
+                            'dec':h.de_string(),
+                            'ep':h['EPOCH'],
+                            'x':'%.4f'% (h.x*SCALE),
+                            'y':'%.4f'% (h.y*SCALE),
+                            'z':'%.4f'% (h.z*SCALE),
+                            'r':'%.4f'% (h.radius*SCALE),
+                            'type':h['TYPE'],
+                            'priority':h['PRIORITY'],
+                            'id':h['ID'],
+                            'fiber':fiber,
+                            'slit':h['SLIT']}
                         for k in extra_col_header:
                             fmt_dict[k]=h.get(k,'')
                         fp.write(fmt_str.format(**fmt_dict))
                     else:
-                        h=[h for h in setup['assignwithholes']
-                           if h['FIBER']==fiber]
                         if h:
                             id='unassigned'
                         else:
@@ -527,6 +534,8 @@ class plateHoleInfo(object):
                         fmt_dict[k]=h.get(k,'')
                     fp.write(fmt_str.format(**fmt_dict))
 
+                #Write out unassignable & undrillable target
+                #TODO in the future
 
     
 def _postProcessHJSetups(plateinfo):
