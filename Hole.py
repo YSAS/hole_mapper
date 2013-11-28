@@ -211,7 +211,7 @@ class Hole(dict):
             return self['ASSIGNMENT']['CASSETTE']
         
         usable=[(c,self.cassette_distances[c])
-                 for c in self['ASSIGNMENT']['CASSETTE']]
+                for c in self['ASSIGNMENT']['CASSETTE']]
         
         return min(usable, key=operator.itemgetter(1))[0]
     
@@ -228,7 +228,8 @@ class Hole(dict):
 
     def isAssignable(self, cassette=None):
         """
-        True iff hole can be (re)assigned, optionally to sppecified cassette
+        True iff hole can be (re)assigned, optionally to specified cassette
+        returns false if user assignemnt
         """
         ret = not self['USER_ASSIGNED']
         if cassette:
