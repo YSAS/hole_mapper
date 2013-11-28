@@ -470,7 +470,7 @@ class plateHoleInfo(object):
                     h=c.get_hole(fiber)
                     
                     #determine if in this setup
-                    if h in setup['holes']:
+                    if h and h in setup['holes']:
                         fmt_dict={'ra':h.ra_string(),
                             'dec':h.de_string(),
                             'ep':h['EPOCH'],
