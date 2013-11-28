@@ -94,15 +94,6 @@ class Hole(dict):
     def getInfo(self):
         return ("%.6f %.6f %.6f"%(self.x,self.y,self.radius),"RA DEC",self.idstr)
 
-    def maprecord(self):
-        return ''.join([self['FIBER'],'  ',self.idstr])
-
-    def holeCompareX(self,other):
-        return cmp(self.x,other.x)
-
-    def holeCompareY(self,other):
-        return cmp(self.y,other.y)
-
     def reset(self):
         self['ASSIGNMENT']=self['INIT_ASSIGNMENT'].copy()
         self['FIBER']=self['ASSIGNMENT'].pop('FIBER')
@@ -175,13 +166,6 @@ class Hole(dict):
             raise Exception('Fiber already assigned')
         if type(self['ASSIGNMENT']['CASSETTE'])==str:
             raise Exception('Cassette already assigned')
-#        if self.__hash__()==190951225552046123:
-#            if not hasattr(self, 'foobar'):
-#                self.foobar=[(cassettes,self['ASSIGNMENT']['CASSETTE'])]
-#            if self.foobar[-1]!=cassettes:
-#                self.foobar.append((cassettes,self['ASSIGNMENT']['CASSETTE']))
-#            if len(cassettes)==0:
-#                import pdb;pdb.set_trace()
         #If no possibles have ever been set, set and finish
         if self['ASSIGNMENT']['CASSETTE']==None:
             self['ASSIGNMENT']['CASSETTE']=cassettes
