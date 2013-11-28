@@ -59,6 +59,7 @@ class Hole(dict):
         self['SLIT']=int(slit)
         self['PRIORITY']=int(priority)
         self['FIBER']=str(fiber)
+        self['SETUP']=extra.pop('setup','')
         if fiber:
             cassette,_,fiberno=fiber.partition('-')
             fiberno=int(fiberno)
@@ -183,11 +184,25 @@ class Hole(dict):
     def assign_cassette(self, cassette):
         """
         Set the cassette (e.g. 'R3') which can be used for fiber selection
+        rases exception if user assignment and cassette doesn't match user
+        assignment
         """
-        if self['FIBER']!='':
-            raise Exception('Fiber already assigned')
         if type(cassette)!=str:
             raise TypeError('casssette must be a sting')
+    
+        if self['USER_ASSIGNED']:
+            if self['ASSIGNMENT']['CASSETTE'] in cassette.name:
+                assert ((self['ASSIGNMENT']['FIBERNO'] > 8 and
+                        'h' in cassette.name)     or
+                        (self['ASSIGNMENT']['FIBERNO'] < 9 and
+                          'l' in cassette.name))
+                return
+            else:
+                raise ValueError("Incompatible with user assignment")
+    
+        if self['FIBER']!='':
+            print "Reassigning hole"
+        
         self['ASSIGNMENT']['CASSETTE']=cassette
 
     def nearest_usable_cassette(self):
@@ -196,7 +211,7 @@ class Hole(dict):
             return self['ASSIGNMENT']['CASSETTE']
         
         usable=[(c,self.cassette_distances[c])
-                 for c in self['ASSIGNMENT']['CASSETTE']]
+                for c in self['ASSIGNMENT']['CASSETTE']]
         
         return min(usable, key=operator.itemgetter(1))[0]
     
@@ -213,14 +228,22 @@ class Hole(dict):
 
     def isAssignable(self, cassette=None):
         """
-        True iff hole can be (re)assigned, optionally to sppecified cassette
+        True iff hole can be (re)assigned, optionally to specified cassette
+        returns false if user assignemnt
         """
         ret = not self['USER_ASSIGNED']
-        if cassette:
-            if self['INIT_ASSIGNMENT']['ASSIGNMENT']['CASSETTE']:
-                ret&=(cassette.name in # e.g. R8l
-                      self['INIT_ASSIGNMENT']['ASSIGNMENT']['CASSETTE']) #might be R8
-            ret&=cassette.slit==self['SLIT']
+        if ret and cassette:
+            if self['INIT_ASSIGNMENT']['CASSETTE']:
+                #we are asking is R or R8 in R8l or B4h in B4l, etc.
+                # assignment can be more or less specific as desired
+                if type(self['INIT_ASSIGNMENT']['CASSETTE'])==str:
+                    ret&=(self['INIT_ASSIGNMENT']['CASSETTE'] in
+                          cassette.name)
+                else:
+                    x=filter(lambda x: x in cassette.name,
+                             self['INIT_ASSIGNMENT']['CASSETTE'])
+                    ret&=len(x)>0
+            ret&=cassette.slit_compatible(self)
         return ret
     
     def isAssigned(self):

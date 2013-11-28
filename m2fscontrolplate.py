@@ -52,7 +52,6 @@ class Setup(object):
     
     It has the attributes:
     name
-    TODO
     """
     def __init__(self, setupAttributes, targetDictList, guideDictList):
         """
