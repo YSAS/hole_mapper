@@ -229,7 +229,7 @@ class Cassette(object):
         return side
 
     def get_hole(self, fiber):
-        return self._map.get(int(fiber.split('-')[1]),None)
+        return self.map.get(int(fiber.split('-')[1]),None)
 
 def blue_cassette_names():
     return ['B'+str(i)+j for i in range(1,9) for j in 'hl']
