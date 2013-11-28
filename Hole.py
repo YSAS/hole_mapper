@@ -231,8 +231,11 @@ class Hole(dict):
         """
         True iff hole can be (re)assigned, optionally to sppecified cassette
         """
-        ret= not self['USER_ASSIGNED']
+        ret = not self['USER_ASSIGNED']
         if cassette:
+            if self['INIT_ASSIGNMENT']['ASSIGNMENT']['CASSETTE']:
+                ret&=(cassette.name in # e.g. R8l
+                      self['INIT_ASSIGNMENT']['ASSIGNMENT']['CASSETTE']) #might be R8
             ret&=cassette.slit==self['SLIT']
         return ret
     
