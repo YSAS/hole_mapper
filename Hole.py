@@ -184,11 +184,25 @@ class Hole(dict):
     def assign_cassette(self, cassette):
         """
         Set the cassette (e.g. 'R3') which can be used for fiber selection
+        rases exception if user assignment and cassette doesn't match user
+        assignment
         """
-        if self['FIBER']!='':
-            raise Exception('Fiber already assigned')
         if type(cassette)!=str:
             raise TypeError('casssette must be a sting')
+    
+        if self['USER_ASSIGNED']:
+            if self['ASSIGNMENT']['CASSETTE'] in cassette.name:
+                assert ((self['ASSIGNMENT']['FIBERNO'] > 8 and
+                        'h' in cassette.name)     or
+                        (self['ASSIGNMENT']['FIBERNO'] < 9 and
+                          'l' in cassette.name))
+                return
+            else:
+                raise ValueError("Incompatible with user assignment")
+    
+        if self['FIBER']!='':
+            print "Reassigning hole"
+        
         self['ASSIGNMENT']['CASSETTE']=cassette
 
     def nearest_usable_cassette(self):
