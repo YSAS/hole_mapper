@@ -197,7 +197,7 @@ class Cassette(object):
                 self.map.pop(k)
         hole.unassign()
 
-    def assign_fiber(self, hole):
+    def _assign_fiber(self, hole):
         """
         Associate hole with the next available fiber. Sets assignment for hole.
         """
@@ -226,7 +226,7 @@ class Cassette(object):
             self.map={}
         #assign the next fiber
         for h in self.holes:
-            self.assign_fiber(h)
+            self._assign_fiber(h)
 
     def onLeft(self):
         return not self.onRight()
