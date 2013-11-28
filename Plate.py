@@ -241,27 +241,6 @@ class Plate(object):
             if flag:
                 otherholes.append(h)
         return otherholes
-    
-    def initializeSetup(self, setupName):
-        """Initializes a setup dictionary with name 
-           setupName"""
-        #if setupName is not of the form "Setup #" raise an exception
-        
-        setup={'plate':self.plate_name, 
-               'setup':setupName,
-               'unused_holes':[],
-               'channels':{},
-               'groups':[]}
-        return setup
-    
-    @staticmethod
-    def initializeGroup( fiberBundle, holes, region, side, channel):
-        return {'fiber_group':fiberBundle, 
-                'holes':holes,
-                'region':region,
-                'side':side, 
-                'path':[],
-                'channel':channel}
 
     def load(self,file):
         ''' Routine to load holes from a file 
@@ -284,15 +263,25 @@ class Plate(object):
         self.setups={}
         self.holeSet=set()
 
-    def regionify(self, active_setup='Setup 1'):
-        if active_setup in self.setups:
-            self.assignFibers(self.setups[active_setup])
+    def regionify(self, setup_number='1', awith=[]):
+        if 'Setup ' +setup_number in self.setups:
+            if setup_number in awith:
+                awith.remove(setup_number)
+            self.assignFibers('Setup ' +setup_number, awith)
 
     def toggleCoordShift(self):
         self.doCoordShift = not self.doCoordShift
         return self.doCoordShift
 
-    def assignFibers(self, setup):
+    def isValidAssignwith(self, aw):
+        """list of string numbers TODO verify all the various constraints"""
+        setups=['Setup '+ s for s in aw]
+        for s in setups:
+            if s not in self.setups:
+                return False
+        return True
+
+    def assignFibers(self, setup_name, awith):
         """
         load holes from file, by default assume all are on same slit and no pattern
         
@@ -352,13 +341,25 @@ class Plate(object):
             assign fiber numbers with x coordinate of holes
         """
         
+
+        setup=self.setups[setup_name]
+        setup['INFO']['ASSIGNEDWITH']=', '.join(awith)
+
+        for c in setup['cassettes']:
+            setup['cassettes'][c].reset()
+        for h in self.holeSet:
+            h.reset()
+
+
         #Grab all skys and objects that don't have assignments
-        unassigned_skys=[h for h in setup['holes'] if
+        assignwithholes=[h for s in awith for h in self.setups['Setup '+s]['holes']]
+        setup['assignwithholes']=assignwithholes
+        unassigned_skys=[h for h in setup['holes']+assignwithholes if
                          h.isSky() and not h.isAssigned()]
-        unassigned_objs=[h for h in setup['holes'] if
+        unassigned_objs=[h for h in setup['holes']+assignwithholes if
                         h.isObject() and not h.isAssigned()]
                         
-        
+
         #Grab the cassettes and cassette groups
         cassettes=self.plateHoleInfo.cassettes_for_setup(setup['setup'])
         cassette_groups=self.plateHoleInfo.cassette_groups_for_setup(setup['setup'])
@@ -456,7 +457,8 @@ class Plate(object):
                 print tmp
                 for k,v in hole.items():
                     print k,v
-                import pdb;pdb.set_trace()
+                #import pdb;pdb.set_trace() TODO prevent drawing dupes more than
+                #once
                 print "drawing dupe in Dark Green @ (%f,%f) ID:%i"%tuple(tmp)
                 fcolor='DarkGreen'
             canvas.drawCircle( pos, hole.radius*radmult, 
@@ -814,5 +816,5 @@ class Plate(object):
     def isValidSetup(self,s):
         ret=True
         if self.setups:
-            ret=s in self.setups
+            ret=('Setup '+s) in self.setups
         return ret

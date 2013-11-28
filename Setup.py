@@ -11,17 +11,10 @@ def new_setup(platename='',setup_name='',):
         'setup':setup_name,
         'unused_holes':[], #bit of a misnomer, mechanical & guide would be more apt
         'holes':[],
-        'channels':{'armR':[],'armB':[]}, #lists of holes
-        'groups':[] # list of fiber_groups, see new_fiber_group()
+        'assignwithholes':[], #list of holes not in setup but to be assigned
+        'cassettes':{} #dict of cassettes
         }
-#def new_fiber_group(fiberBundle='', region=(0,0,0,0), channel='', side=''):
-#    return {
-#        'fiber_group':fiberBundle, # e.g. 'B-02-09' or 'B-02-01'
-#        'holes':[], #list of holes
-#        'region':region, #bounding box, (x0, y0,x1,y1)
-#        'side':side, #'left' | 'right'
-#        'path':[], #list of 1 or 2 element lists of (x,y) tuples
-#        'channel':channel} # 'armB' | 'armR'
+
 
 class Setup(object):
     '''

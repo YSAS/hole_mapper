@@ -68,6 +68,10 @@ class Hole(dict):
                 cassette+='l'
         self['ASSIGNMENT']={'CASSETTE':cassette, #cassette or list of viable cassettes e.g. R1, B8
                             'FIBERNO':fiberno}
+        
+        self['INIT_ASSIGNMENT']=self['ASSIGNMENT'].copy()
+        self['INIT_ASSIGNMENT']['FIBER']=self['FIBER']
+        
         self['CUSTOM']=extra #keys and values should be strings!
         for k,v in extra.iteritems():
             if k not in self:
@@ -98,6 +102,10 @@ class Hole(dict):
 
     def holeCompareY(self,other):
         return cmp(self.y,other.y)
+
+    def reset(self):
+        self['ASSIGNMENT']=self['INIT_ASSIGNMENT'].copy()
+        self['FIBER']=self['ASSIGNMENT'].pop('FIBER')
 
     def inRegion(self,(x0,y0,x1,y1)):
         ret=False
@@ -140,10 +148,11 @@ class Hole(dict):
 
     def unassign(self):
         """assignemnt={'CASSETTE':'','FIBERNO':0}"""
-        if self['USER_ASSIGNED']==True:
+        if self['USER_ASSIGNED']:
             raise Exception('User assignments are irrevocable')
         self['FIBER']=''
-        self['ASSIGNMENT']={'CASSETTE':None,'FIBERNO':0}
+        self['ASSIGNMENT']=self['INIT_ASSIGNMENT'].copy()
+        self['ASSIGNMENT'].pop('FIBER')
         
     def assigned_cassette(self):
         """Return name of assigned cassette or ''"""
@@ -222,7 +231,7 @@ class Hole(dict):
         """
         True iff hole can be (re)assigned, optionally to sppecified cassette
         """
-        ret=self['USER_ASSIGNED']==False
+        ret= not self['USER_ASSIGNED']
         if cassette:
             ret&=cassette.slit==self['SLIT']
         return ret

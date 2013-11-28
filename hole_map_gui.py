@@ -173,9 +173,25 @@ class App(Tkinter.Tk):
         Tkinter.Label(lframe, text='Setup #:').grid(row=0,column=0)
         entry=Tkinter.Entry(lframe, validate='focusout', width=2, 
                       invcmd=lambda:tkMessageBox.showerror('Bad Setup','Not a valid setup.'),
-                      vcmd=lambda:self.plate.isValidSetup(self.getActiveSetup()), 
+                      vcmd=lambda:self.plate.isValidSetup(self.setup_str.get()),
                       textvariable=self.setup_str)
         entry.grid(row=0,column=1)
+        
+        #Assignwith input
+        self.assignwith_str=Tkinter.StringVar(value='')
+        
+        lframe=Tkinter.Frame(frame)
+        lframe.pack()
+        
+        Tkinter.Label(lframe, text='Setup #s:').grid(row=0,column=0)
+        entry=Tkinter.Entry(lframe, validate='focusout', width=2,
+                            invcmd=lambda:tkMessageBox.showerror(
+                                        'Much Bad.','No regionwith. Mix Improper.'),
+                            vcmd=lambda:self.plate.isValidAssignwith(
+                                        self.get_assign_with_list()),
+                            textvariable=self.assignwith_str)
+        entry.grid(row=0,column=1)
+        
         #entry.bind("<Return>",self.show)
    
         #Coordinate shift input
@@ -234,7 +250,13 @@ class App(Tkinter.Tk):
         Tkinter.Label(frame2, textvariable=self.file_str).pack(anchor='w')
         
         self.testinit()
-
+    
+    def get_assign_with_list(self):
+        if self.assignwith_str.get():
+            return self.assignwith_str.get().replace(' ','').split(',')
+        else:
+            return []
+    
     def toggleCoord(self):
         self.plate.toggleCoordShift()
         if self.plate.doCoordShift:
@@ -336,7 +358,8 @@ class App(Tkinter.Tk):
 
 
     def makeRegions(self):
-        self.plate.regionify(active_setup=self.getActiveSetup())
+        self.plate.regionify(setup_number=self.setup_str.get(),
+                             awith=self.get_assign_with_list())
         self.show()
 
     def genPlate(self):

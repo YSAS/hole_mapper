@@ -116,9 +116,12 @@ class plateHoleInfo(object):
 
             if 'Calvet' in self.name:
                 _postProcessCalvetSetups(self)
-                
+ 
             if 'Carnegie' in self.name:
                 _postProcessCarnegieSetups(self)
+                
+            if 'Kounkel_2' in self.name:
+                _postProcessKounkel2Setups(self)
 
             #set of cassettes with same color & slit in future this
             # will come from plate file
@@ -154,7 +157,8 @@ class plateHoleInfo(object):
             self.pfile_filename=file
             self._init_from_plate(file)
         
-
+        for s in self.setups:
+            self.setups[s]['cassettes']=self.cassettes[s]
 
     def _init_fromASC(self):
         #add shack hartman holes
@@ -439,7 +443,7 @@ class plateHoleInfo(object):
                 for k, v in setup['INFO'].iteritems():
                     if k=='NAME':
                         continue
-                    fp.write("{k}={space}{v}\n".format(k=k,v=v,
+                    fp.write("{k}={space}{v}\n".format(k=k,v=str(v),
                         space=' '*(key_col_wid-len(k)-1)))
 
                 #Write out objects & sky
@@ -481,9 +485,19 @@ class plateHoleInfo(object):
                             fmt_dict[k]=h.get(k,'')
                         fp.write(fmt_str.format(**fmt_dict))
                     else:
+                        h=[h for h in setup['assignwithholes']
+                           if h['FIBER']==fiber]
+                        if h:
+                            id='unassigned'
+                        else:
+                            id='inactive'
+                    
+                        #TODO add dead fiber support
+                    
                         fmt_dict={'ra':'', 'dec':'', 'ep':'', 'x':'',
                             'y':'','z':'', 'r':'', 'type':'',
-                            'priority':'', 'id':'','fiber':fiber,'slit':''}
+                            'priority':'', 'id':id,'fiber':fiber,
+                            'slit':''} #TODO report slit from cassette
                         for k in extra_col_header:
                             fmt_dict[k]=''
                         fp.write(fmt_str.format(**fmt_dict))
@@ -611,6 +625,13 @@ def _postProcessCarnegieSetups(plateinfo):
         return (' '.join(h['RA']),' '.join(h['DEC'])) in droptarg
     s=plateinfo.setups['Setup 2']
     s['holes']=[h for h in s['holes'] if not in_to_drop(h)]
+
+def _postProcessKounkel2Setups(plateinfo):
+    """
+    Drop excess targets
+    """
+    plateinfo.setups['Setup 1']['assignwithholes']=plateinfo.setups['Setup 4']['holes']
+    plateinfo.setups['Setup 4']['assignwithholes']=plateinfo.setups['Setup 1']['holes']
 
 def _postProcessIanCassettes(plateinfo):
     """

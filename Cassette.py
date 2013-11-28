@@ -152,6 +152,7 @@ class Cassette(object):
     def reset(self):
         self.used=0
         self.holes=[]
+        self.map={}
     
     def assign_hole(self, hole):
         """Add the hole to the cassette and assign the cassette to the hole"""
