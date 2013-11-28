@@ -232,11 +232,18 @@ class Hole(dict):
         returns false if user assignemnt
         """
         ret = not self['USER_ASSIGNED']
-        if cassette:
-            if self['INIT_ASSIGNMENT']['ASSIGNMENT']['CASSETTE']:
-                ret&=(cassette.name in # e.g. R8l
-                      self['INIT_ASSIGNMENT']['ASSIGNMENT']['CASSETTE']) #might be R8
-            ret&=cassette.slit==self['SLIT']
+        if ret and cassette:
+            if self['INIT_ASSIGNMENT']['CASSETTE']:
+                #we are asking is R or R8 in R8l or B4h in B4l, etc.
+                # assignment can be more or less specific as desired
+                if type(self['INIT_ASSIGNMENT']['CASSETTE'])==str:
+                    ret&=(self['INIT_ASSIGNMENT']['CASSETTE'] in
+                          cassette.name)
+                else:
+                    x=filter(lambda x: x in cassette.name,
+                             self['INIT_ASSIGNMENT']['CASSETTE'])
+                    ret&=len(x)>0
+            ret&=cassette.slit(self['SETUP'])==self['SLIT']
         return ret
     
     def isAssigned(self):

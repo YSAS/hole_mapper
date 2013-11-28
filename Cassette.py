@@ -130,8 +130,11 @@ class Cassette(object):
         self.map={} #fiber # is key, hole is value
         self.pos=cassette_positions[name]
         self.used=0
-        self.slit=slit
+        self._slit=defaultdict(lambda:180)
         self.holes=[]
+    
+    def slit(self,setup):
+        return self._slit[setup]
     
     def color(self):
         if self.name[0]=='R':
