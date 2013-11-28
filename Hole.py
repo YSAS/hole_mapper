@@ -243,7 +243,7 @@ class Hole(dict):
                     x=filter(lambda x: x in cassette.name,
                              self['INIT_ASSIGNMENT']['CASSETTE'])
                     ret&=len(x)>0
-            ret&=cassette.slit(self['SETUP'])==self['SLIT']
+            ret&=cassette.slit_compatible(self)
         return ret
     
     def isAssigned(self):
