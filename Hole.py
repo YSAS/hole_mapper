@@ -255,7 +255,7 @@ class Hole(dict):
                                    float(self['RA'][1])/60+
                                    float(self['RA'][2])/3600.0)
         else:
-            return '{} {} {}'.format(*self['RA'])
+            return '{}:{}:{}'.format(*self['RA'])
 
     def de_string(self,decimal=False):
         if decimal:
@@ -263,7 +263,7 @@ class Hole(dict):
                                    float(self['DEC'][1])/60+
                                    float(self['DEC'][2])/3600.0)
         else:
-            return '{} {} {}'.format(*self['DEC'])
+            return '{}:{}:{}'.format(*self['DEC'])
 
     def assigned_color(self):
         """ Return color of assigned cassette else None """
