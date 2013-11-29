@@ -561,7 +561,7 @@ class Plate(object):
             for h in self.holeSet:
                 self.drawHole(h, canvas)
 
-    def _draw_with_assignements(self, setup, channel, canvas,
+    def _draw_with_assignements(self, setup, channel, canvas, radmult=1.0,
                                 lblcolor='black', drawimage=False):
         """Does not draw holes for color if not selected"""
         if channel in ['armB', 'BLUE', 'blue']:
@@ -584,7 +584,8 @@ class Plate(object):
                 continue
             if drawred and cassette.color()=='red':
                 #Draw the cassette
-                self.drawCassette(cassette, canvas, drawimage=drawimage)
+                self.drawCassette(cassette, canvas, radmult=radmult,
+                                  drawimage=drawimage)
                 #Grab the first hole position
                 start_pos=cassette.first_hole().position()
                 #Grab the label text
@@ -593,7 +594,8 @@ class Plate(object):
                 labeldata.append(('red', start_pos, label, cassette.onRight()))
             if drawblue and cassette.color()=='blue':
                 #Draw the cassette
-                self.drawCassette(cassette, canvas, drawimage=drawimage)
+                self.drawCassette(cassette, canvas, radmult=radmult,
+                                  drawimage=drawimage)
                 #Grab the first hole position
                 start_pos=cassette.first_hole().position()
                 #Grab the label text
@@ -689,7 +691,7 @@ class Plate(object):
                     self.drawHole(h, canvas, color=nonecolor,
                                   radmult=radmult)
 
-    def drawImage(self, canvas, active_setup=None, channel='all',radmult=1.25):
+    def drawImage(self, canvas, active_setup=None, channel='all',radmult=.75):
         if active_setup and active_setup in self.setups:
             #the active setup
             setup=self.setups[active_setup]
@@ -702,7 +704,7 @@ class Plate(object):
 
             if 'cassetteConfig' in setup:
                 self._draw_with_assignements(setup, channel, canvas,
-                                             drawimage=True,
+                                             drawimage=True, radmult=radmult,
                                              lblcolor='white')
             else:
                 self._draw_without_assignements(setup, channel, canvas,
@@ -764,7 +766,8 @@ class Plate(object):
 
         #Draw the holes in the cassette
         for h in holes:
-            self.drawHole(h, canvas, color=color, fcolor=color,radmult=radmult,drawimage=drawimage)
+            self.drawHole(h, canvas, color=color, fcolor=color,
+                          radmult=radmult,drawimage=drawimage)
 
         if cassette.used==1:
             return
