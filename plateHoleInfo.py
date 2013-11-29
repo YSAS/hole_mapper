@@ -4,7 +4,7 @@ import Cassette
 import Setup
 import os.path
 import math
-from m2fscontrolplate import Plate
+from m2fs.plate.plate import PlateConfigParser
 
 SCALE=14.25
 SH_RADIUS=0.1875
@@ -307,6 +307,8 @@ class plateHoleInfo(object):
             except ValueError:
                 return None
 
+
+
         plate=Plate(file)
         #Add the SH to the global set
 
@@ -399,152 +401,91 @@ class plateHoleInfo(object):
         return self.cassette_groups[setup_name]
 
     def write_platefile(self):
+        
+        
+        plate_holes=[]
+        for h in self.mechanical_holes+[self.sh_hole,self.standard['hole']]:
+            rec={}
+            rec['x']='{:.4f}'.format(h.x*SCALE)
+            rec['y']='{:.4f}'.format(h.y*SCALE)
+            rec['z']='{:.4f}'.format(h.z*SCALE)
+            rec['r']='{:.4f}'.format(h.radius*SCALE)
+            rec['type']=h['TYPE']
+            rec['id']=h['ID']
+            rec.update({str.lower(k):str(v) for k,v in h['CUSTOM'].items()})
+            plate_holes.append(rec)
 
-        #get list of crap for the plate
-        with open(self.pfile_filename,'w') as fp:
-            fp.write("[Plate]\n")
-            fp.write("formatversion= 0.2\n")
-            fp.write("NAME= {}\n".format(self.name))
-            fp.write("STD_OFFSET= {}\n".format(self.standard['offset']))
+        pfile_data={'plate':{'name':self.name,
+                            'offset':str(self.standard['offset'])},
+                    'plateholes':plate_holes}
+        for s in self.setups:
+
+            setup=self.setups[s]
+            #Grab targets
+            used_holes=[]
+            for fiber in ORDERED_FIBER_NAMES:
+                
+                rec={}
+                rec['fiber']=fiber
             
-            
-            #Write out mechanical holes
-            fp.write("[PlateHoles]\n")
-            plate_holes=(self.mechanical_holes+
-                        [self.sh_hole,self.standard['hole']])
-            base_col_header=['x','y','z','r','type']
-            fp.write("H:'" + "'\t'".join(base_col_header) + "'\n")
-            fmt_str="H{n:<3}:'{" + "}'\t'{".join(base_col_header) + "}'\n"
-            for i,h in enumerate(plate_holes):
-                fmt_dict={'n':i,
-                          'x':'%.4f'% (h.x*SCALE),
-                          'y':'%.4f'% (h.y*SCALE),
-                          'z':'%.4f'% (h.z*SCALE),
-                          'r':'%.4f'% (h.radius*SCALE),
-                          'type':h['TYPE']}
-                fp.write(fmt_str.format(**fmt_dict))
-    
-            #Write out the setups
-            s_sorted=sorted(self.setups.keys(),key=lambda s: int(s.split()[1]))
-            for s in s_sorted:
-                condensed_name=''.join(s.split())
-                setup=self.setups[s]
-                #Write out setup description section
-                fp.write("[{}]\n".format(condensed_name))
-                
-                #Determine whitespace for setup keys & write out
-                key_col_wid=max([len(k) for k in setup['INFO'].iterkeys()])+6
-                k='NAME'
-                v=setup['INFO']['NAME']
-                fp.write("{k}={space}{v}\n".format(k=k,v=v,
-                    space=' '*(key_col_wid-len(k)-1)))
-                for k, v in setup['INFO'].iteritems():
-                    if k=='NAME':
-                        continue
-                    fp.write("{k}={space}{v}\n".format(k=k,v=str(v),
-                        space=' '*(key_col_wid-len(k)-1)))
+                #get cassette
+                c=setup['cassetteConfig'][Cassette.fiber2cassettename(fiber)]
 
-                ####Write out cassette config####
-                #Section heading
-                fp.write("[{}:Targets]\n".format(condensed_name))
-                base_col_header=['ra','dec','ep','x','y','z','r','type',
-                                 'priority', 'slit', 'id']
+                #get the hole
+                h=c.get_hole(fiber)
                 
-                #Determine what extra columns where are
-                extra_col_header=[]
-                for h in setup['holes']:
-                    extra_col_header.extend(h['CUSTOM'].keys())
-                extra_col_header=list(set(extra_col_header))
-                
-                #Write Header line
-                fp.write("H:'"+
-                         "'\t'".join(base_col_header+extra_col_header)+
-                         "'\n")
-                
-                #Define the format string
-                fmt_str=("{fiber} : '{"+
-                        "}'\t'{".join(base_col_header+extra_col_header)+
-                        "}'\n")
-                        
-                #Write record for each fiber
-                for fiber in ORDERED_FIBER_NAMES:
-                    #get cassette
-                    c=setup['cassetteConfig'][Cassette.fiber2cassettename(fiber)]
-
-                    #get the hole
-                    h=c.get_hole(fiber)
-                    
-                    #determine if in this setup
-                    if h and h in setup['holes']:
-                        fmt_dict={'ra':h.ra_string(),
-                            'dec':h.de_string(),
-                            'ep':h['EPOCH'],
-                            'x':'%.4f'% (h.x*SCALE),
-                            'y':'%.4f'% (h.y*SCALE),
-                            'z':'%.4f'% (h.z*SCALE),
-                            'r':'%.4f'% (h.radius*SCALE),
-                            'type':h['TYPE'],
-                            'priority':h['PRIORITY'],
-                            'id':h['ID'],
-                            'fiber':fiber,
-                            'slit':h['SLIT']}
-                        for k in extra_col_header:
-                            fmt_dict[k]=h.get(k,'')
-                        fp.write(fmt_str.format(**fmt_dict))
+                #determine if in this setup
+                if h and h in setup['holes']:
+                    rec['ra']=h.ra_string()
+                    rec['de']=h.de_string()
+                    rec['ep']=str(h['EPOCH'])
+                    rec['x']='{:.4f}'.format(h.x*SCALE)
+                    rec['y']='{:.4f}'.format(h.y*SCALE)
+                    rec['z']='{:.4f}'.format(h.z*SCALE)
+                    rec['r']='{:.4f}'.format(h.radius*SCALE)
+                    rec['type']=h['TYPE']
+                    rec['priority']=str(h['PRIORITY'])
+                    rec['id']=h['ID']
+                    rec['slit']=str(h['SLIT'])
+                    rec.update({str.lower(k):str(v) for k,v in h['CUSTOM'].items()})
+                else:
+                    if h:
+                        rec['id']='unassigned'
+                        rec['type']='U'
                     else:
-                        if h:
-                            id='unassigned'
-                        else:
-                            id='inactive'
-                    
-                        #TODO add dead fiber support
-                    
-                        fmt_dict={'ra':'', 'dec':'', 'ep':'', 'x':'',
-                            'y':'','z':'', 'r':'', 'type':'',
-                            'priority':'', 'id':id,'fiber':fiber,
-                            'slit':''} #TODO report slit from cassette
-                        for k in extra_col_header:
-                            fmt_dict[k]=''
-                        fp.write(fmt_str.format(**fmt_dict))
-    
-                #Write out guide & acquisition
-                ga=[h for h in setup['unused_holes'] if h['TYPE'] in ['G','A'] ]
-                fp.write("[{}:Guide]\n".format(condensed_name))
-                
-                base_col_header=['ra','dec','ep','x','y','z','r','type']
-                
-                extra_col_header=[]
+                        rec['id']='inactive'
+                        rec['type']='I'
+                used_holes.append(rec)
+
+                #Grab guides
+                guide_holes=[]
+                ga=(h for h in setup['unused_holes'] if h['TYPE'] in ['G','A'])
                 for h in ga:
-                    extra_col_header.extend(h['CUSTOM'].keys())
-                extra_col_header=list(set(extra_col_header))
+                    rec={}
+                    rec['ra']=h.ra_string()
+                    rec['de']=h.de_string()
+                    rec['ep']=str(h['EPOCH'])
+                    rec['x']='{:.4f}'.format(h.x*SCALE)
+                    rec['y']='{:.4f}'.format(h.y*SCALE)
+                    rec['z']='{:.4f}'.format(h.z*SCALE)
+                    rec['r']='{:.4f}'.format(h.radius*SCALE)
+                    rec['type']=h['TYPE']
+                    rec.update({str.lower(k):str(v) for k,v in h['CUSTOM'].items()})
+                    guide_holes.append(rec)
                 
-                fp.write("H:'"+
-                         "'\t'".join(base_col_header+extra_col_header)+
-                         "'\n")
-                fmt_str=("G{n:<3}:'{"+
-                        "}'\t'{".join(base_col_header+extra_col_header)+
-                        "}'\n")
-                
-                for i,h in enumerate(ga):
-                    fmt_dict={'n':i,
-                        'ra':h.ra_string(),
-                        'dec':h.de_string(),
-                        'ep':h['EPOCH'],
-                        'x':'%.4f'% (h.x*SCALE),
-                        'y':'%.4f'% (h.y*SCALE),
-                        'z':'%.4f'% (h.z*SCALE),
-                        'r':'%.4f'% (h.radius*SCALE),
-                        'type':h['TYPE']}
-                    for k in extra_col_header:
-                        fmt_dict[k]=h.get(k,'')
-                    fp.write(fmt_str.format(**fmt_dict))
-
                 #Write out unassignable & undrillable target
-                #TODO in the future
+                
 
-    
+                pfile_data[s]={ 'info':setup['INFO'].copy(),
+                                'Targets':used_holes,
+                                'Guide':guide_holes,
+                                'Unused':[]} #TODO in the future
+
+        pfile=PlateConfigParser( self.pfile_filename,sections=pfile_data)
+        pfile.write()
+
 def _postProcessHJSetups(plateinfo):
-    """ 
+    """
     Take the 2 setups for Nov13 Bailey plate and break them into the
     6 real setups
     """
@@ -637,8 +578,9 @@ def _postProcessKounkel2Setups(plateinfo):
     """
     Drop excess targets
     """
-    plateinfo.setups['Setup 1']['assignwithholes']=plateinfo.setups['Setup 4']['holes']
-    plateinfo.setups['Setup 4']['assignwithholes']=plateinfo.setups['Setup 1']['holes']
+    h=plateinfo.setups['Setup 2']['holes']
+    h.sort(key=lambda h: h['PRIORITY'],reverse=True)
+    plateinfo.setups['Setup 2']['holes']=h[0:-3]
 
 def _postProcessIanCassettes(plateinfo):
     """
@@ -884,6 +826,9 @@ def parse_extra_data(name,setup, words):
         ret['ID']=id
         ret['V?']=mag
         ret['MAGNITUDE']=nanfloat(mag)
+    #Kounkel 2
+    if name=='Kounkel_2_Sum':
+        ret['V?']=words[0]
     #Jeb
     if name=='HotJupiters_1_Sum':
         l=words[0].split('_')
