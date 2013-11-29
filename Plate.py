@@ -8,6 +8,7 @@ import ImageCanvas
 from plateHoleInfo import plateHoleInfo
 import operator
 import Cassette
+import os.path
 
 def distribute(x, min_x, max_x, min_sep):
     """
@@ -249,6 +250,8 @@ class Plate(object):
         separated into groups specifying the setup number.
         valid lines are of format x y z diam type arbit_fiber channel'''
 
+        if not os.path.isfile(file):
+            return
         self.clear()
         
         self.plateHoleInfo=plateHoleInfo(file)
