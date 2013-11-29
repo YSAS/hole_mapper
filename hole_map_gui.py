@@ -275,7 +275,7 @@ class App(Tkinter.Tk):
         self.proj_win.bind("<Button-1>",self.startMove)
         self.proj_win.bind("<ButtonRelease-1>",self.stopMove)
         self.proj_win.bind("<B1-Motion>", self.Move)
-        print '.'+self.proj_win.winfo_screen()+'.'
+        #print '.'+self.proj_win.winfo_screen()+'.'
         
         self.proj_can=BetterCanvas.BetterCanvas(self.proj_win, 768,768, 1.00, 1.00, bg='Black')
         self.proj_can.place(x=-3,y=-3)
@@ -293,14 +293,14 @@ class App(Tkinter.Tk):
             
 
     def startMove(self,event):
-        print '.'+self.proj_win.winfo_screen()+'.'
+        #print '.'+self.proj_win.winfo_screen()+'.'
         self.moving={'stat':True,'xs':event.x_root,'ys':event.y_root,
                      'xi':self.proj_win.winfo_rootx(),
                      'yi':self.proj_win.winfo_rooty()}
         
     
     def stopMove(self,event):
-        print '.'+self.proj_win.winfo_screen()+'.'
+        #print '.'+self.proj_win.winfo_screen()+'.'
         self.moving['stat']=False    
     
     def canvasclick(self, event):
