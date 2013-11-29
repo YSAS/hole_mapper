@@ -485,14 +485,14 @@ class Plate(object):
                 canvas.drawCircle( pos, hole.radius*radmult, outline=color, fill=fcolor)
         else:
             if canvas.find_withtag(hashtag):
-                tmp=list(pos)
-                tmp.append(hole.hash)
-                print tmp
-                for k,v in hole.items():
-                    print k,v
-                #import pdb;pdb.set_trace() TODO prevent drawing dupes more than
-                #once
-                print "drawing dupe in Dark Green @ (%f,%f) ID:%i"%tuple(tmp)
+#                tmp=list(pos)
+#                tmp.append(hole.hash)
+#                print tmp
+#                for k,v in hole.items():
+#                    print k,v
+#                #import pdb;pdb.set_trace() TODO prevent drawing dupes more than
+#                #once
+#                print "drawing dupe in Dark Green @ (%f,%f) ID:%i"%tuple(tmp)
                 fcolor='DarkGreen'
             canvas.drawCircle( pos, hole.radius*radmult, 
                                outline=color, fill=fcolor, tags=('hole',hashtag),
