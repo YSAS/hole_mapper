@@ -140,8 +140,8 @@ class plateHoleInfo(object):
             if 'HotJupiters_1' in self.name:
                 _postProcessHJCassettes(self)
 
-            if 'Calvet' in self.name:
-                _postProcessCalvetCassettes(self)
+#            if 'Calvet' in self.name:
+#                _postProcessCalvetCassettes(self)
 
             if 'Outer_LMC_1' in self.name:
                 _postProcessNideverCassettes(self)
