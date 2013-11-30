@@ -580,7 +580,7 @@ def _postProcessKounkel2Setups(plateinfo):
     """
     h=plateinfo.setups['Setup 2']['holes']
     h.sort(key=lambda h: h['PRIORITY'],reverse=True)
-    plateinfo.setups['Setup 2']['holes']=h[0:-3]
+    plateinfo.setups['Setup 2']['holes']=h[0:128]
 
 def _postProcessIanCassettes(plateinfo):
     """
@@ -690,6 +690,28 @@ def _postProcessKounkel2Cassettes(plateinfo):
         else:
             c.usable=[]
     plateinfo.cassette_groups['Setup 5']=[ok]
+    #Setup 1
+    ok=['R'+str(i)+lh for i in range(1,9) for lh in 'lh']
+    for c in  plateinfo.cassettes['Setup 1'].values():
+        if c.name in ok:
+            if 'l' in c.name:
+                c.usable=range(1,9)
+            else:
+                c.usable=range(9,17)
+        else:
+            c.usable=[]
+    plateinfo.cassette_groups['Setup 1']=[ok]
+    #Setup 1
+    ok=['B'+str(i)+lh for i in range(1,9) for lh in 'lh']
+    for c in  plateinfo.cassettes['Setup 2'].values():
+        if c.name in ok:
+            if 'l' in c.name:
+                c.usable=range(1,9)
+            else:
+                c.usable=range(9,17)
+        else:
+            c.usable=[]
+    plateinfo.cassette_groups['Setup 2']=[ok]
 
 
 def _postProcessNideverCassettes(plateinfo):
