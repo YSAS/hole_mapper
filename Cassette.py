@@ -1,18 +1,52 @@
 import numpy as np
 import operator
 from collections import defaultdict
+from misc import *
 
-def rangify(data):
-    from itertools import groupby
-    from operator import itemgetter
-    str_list = []
-    for k, g in groupby(enumerate(data), lambda (i,x):i-x):
-        ilist = map(itemgetter(1), g)
-        if len(ilist) > 1:
-            str_list.append('%d-%d' % (ilist[0], ilist[-1]))
+
+def usable_parser(cname, usable_config):
+    """ usable_config == "A|B|R[-, # range[:-, # range]]" """
+    if type(usable_config)==dict:
+        raise Exception("Detailed config not supported")
+    else:
+        cfg_str=usable_config.lower()
+        color=cfg_str[0]
+        try:
+            cas_num=hyphen_range(cfg_str[1:].split(':')[0])
+        except IndexError:
+            cas_num=range(1,9)
+        try:
+            fib_num=cas_num=hyphen_range(cfg_str[1:].split(':')[1])
+        except IndexError:
+            fib_num=range(1,17)
+        
+        if ((color=='a' or color==cname[0].lower())
+            and (int(cname[1]) in cas_num)):
+            return fib_num
         else:
-            str_list.append('%d' % ilist[0])
-    return ', '.join(str_list)
+            return []
+
+def new_cassette_dict(setup_configs):
+    """
+    setup_configs=={sname: {'usable':usable_parser range, 'slit': slitwid} }
+    """
+    cassettes={}
+    
+    #Extract each setup's slit configuration
+    slitwid_dict={sname:conf['slit'] for sname,conf in setup_configs.items()}
+    
+    #Generator for all the cassette names
+    cname_gen=(side+str(i)+j for side in 'RB' for i in range(1,9) for j in 'hl')
+    for cname in cname_gen:
+        
+        #Determine what is usable for each setup
+        usable={sname: usable_parser(cname, config['usable'])
+            for sname, config in setup_configs.items()}
+        
+        cassettes[cname]=Cassette(cname, slitwid_dict.copy(), usable=usable)
+    
+    return cassettes
+
 
 def fiber2cassettename(fib):
     ret = fib[0:2]
@@ -46,6 +80,18 @@ def right_only(cassettes):
             #assume list of cassette names
             _cass=new_cassette_dict()
             return [c for c in cassettes if _cass[c].onRight()]
+
+
+def blue_cassette_names():
+    return ['B'+str(i)+j for i in range(1,9) for j in 'hl']
+
+def red_cassette_names():
+    return ['R'+str(i)+j for i in range(1,9) for j in 'hl']
+
+def new_cassette_dict(slitwid=180, usable=None):
+    return {side+str(i)+j: Cassette(side+str(i)+j, slitwid, usable=usable)
+            for side in 'RB' for i in range(1,9) for j in 'hl'}
+
 
 #in res and asc -x is on right looking at plate
 def _init_cassette_positions():
@@ -117,23 +163,68 @@ def _init_cassette_positions():
 cassette_positions=_init_cassette_positions()
 
 
+def new_cassette_dict(setup_configs):
+    """
+    setup_configs=={sname: {'usable':usable_parser range, 'slit': slitwid} }
+    """
+    cassettes={}
+    
+    #Extract each setup's slit configuration
+    slitwid_dict={sname:conf['slit'] for sname,conf in setup_configs.items()}
+    
+    #Generator for all the cassette names
+    cname_gen=(side+str(i)+j for side in 'RB' for i in range(1,9) for j in 'hl')
+    for cname in cname_gen:
+        
+        #Determine what is usable for each setup
+        usable={sname: usable_parser(cname, config['usable'])
+            for sname, config in setup_configs.items()}
+        
+        cassettes[cname]=Cassette(cname, slitwid_dict.copy(), usable=usable)
+    
+    return cassettes
+
+def range_corrector(cname, range_specifier):
+    if 'h' in name:
+        return list(set(usable).difference(range(1,9)))
+    else:
+        return list(set(usable).difference(range(9,17)))
+
 class Cassette(object):
-    def __init__(self, name, slit, usable=None):
+    def __init__(self, name, slit, usable):
         assert 'h' in name or 'l' in name
-        if usable == None and 'h' in name:
-            self.usable=range(9,17)
-        elif usable == None and 'l' in name:
-            self.usable=range(1,9)
+        
+        #Specified for all setups
+        if type(usable)==dict:
+            self.usable={sname:range_corrector(name, ok)
+                         for sname, ok in usable.items()}
+        #Specified defaults only
         else:
-            self.usable=usable
+            usable=range_corrector(name, usable)
+            self.usable=defaultdict(lambda:list(usable))
+
         self.name=name
-        self.map={} #fiber # is key, hole is value
+        self.holes=[]
         self.pos=cassette_positions[name]
         self.used=0
-        self._defaultslit=slit #This is for now, in the future we might just
-        #set the slits for the holes and see what happens
-        self._slit=defaultdict(lambda:self._defaultslit)
-        self.holes=[]
+        self.map={} #fiber # is key, hole is value
+
+
+        if type(slit)==dict:
+            self._slit=slit.copy()
+        else:
+            self._defaultslit=slit
+            self._slit=defaultdict(lambda:self._defaultslit)
+
+
+
+    def __setattr__(self, name, value):
+        if 'usable' in name:
+            print str(name), str(value)
+            self.__dict__[name]=value
+        else:
+            pass
+            super(Cassette, self).__setattr__(name, value)
     
     def slit(self,setup):
         return self._slit[setup]
@@ -156,12 +247,20 @@ class Cassette(object):
         """
         return [self.map[fiber] for fiber in sorted(self.map.keys())]
 
-    def n_avail(self):
-        return len(self.usable)-self.used
+    def n_avail(self, *args):
+        if args:
+            hole=args[0]
+            usable=self.usable[hole['SETUP']]
+        else:
+            usable=self.usable_across_all_setups_involved()
+        return len([x for x in usable if x not in self.map])
+    
+    def usable_across_all_setups_involved(self):
+        return list(set([f for usable in self.usable.values() for f in usable]))
     
     def consume(self):
         self.used+=1
-        assert self.used <= len(self.usable)
+        assert self.used <= len(self.usable_across_all_setups_involved())
     
     def reset(self):
         self.used=0
@@ -176,7 +275,7 @@ class Cassette(object):
     
     def assign_hole(self, hole):
         """Add the hole to the cassette and assign the cassette to the hole"""
-        if self.n_avail()==0:
+        if self.n_avail(h)==0:  #must edit?
             import pdb;pdb.set_trace()
             raise Exception('Cassette Full')
 
@@ -213,7 +312,7 @@ class Cassette(object):
         """
         #Get next available fiber
         #min of self.usable not in self.map
-        free=filter(lambda x: x not in self.map, self.usable)
+        free=filter(lambda x: x not in self.map, self.usable[hole['SETUP']])
         
         #assert len(free)>0
         if len(free)==0:
@@ -255,12 +354,3 @@ class Cassette(object):
     def get_hole(self, fiber):
         return self.map.get(int(fiber.split('-')[1]),None)
 
-def blue_cassette_names():
-    return ['B'+str(i)+j for i in range(1,9) for j in 'hl']
-
-def red_cassette_names():
-    return ['R'+str(i)+j for i in range(1,9) for j in 'hl']
-
-def new_cassette_dict(slitwid=180):
-    return {side+str(i)+j: Cassette(side+str(i)+j, slitwid)
-    for side in 'RB' for i in range(1,9) for j in 'hl'}

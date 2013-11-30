@@ -9,55 +9,46 @@ from plateHoleInfo import plateHoleInfo
 import operator
 import Cassette
 import os.path
-
-def distribute(x, min_x, max_x, min_sep):
-    """
-    Adjust x such that all x are min_space apart,
-    near original positions, and within min_x & max_x
-    """
-    import numpy as np
-    return np.linspace(min_x, max_x, len(x))
-
+from misc import *
 
 def condense_cassette_assignemnts(cassette_dict):
     #Grab cassettes with available fibers
     non_full=[c for c in cassette_dict.itervalues()
               if c.n_avail()>0 and c.used>0]
-              
+    
+    #Make Copy
     to_check=list(non_full)
+    
+    #Sort by number available
     to_check.sort(key= lambda x: x.n_avail())
     
     while to_check:
         
         trial=to_check.pop()
         
-    
         #Try to reassign all holes to non full cassettes
         holes=list(trial.holes)
         for h in holes:
             #If hole can't be assigned then screw it
             if not h.isAssignable():
                 break
-            #Try assigning the hole to another tetris
-            recomp_non_full=False
+            #Try assigning the hole to other cassettes
             for c in non_full:
-                if h.isAssignable(cassette=c):
+                if h.isAssignable(cassette=c) and c.n_avail(h)>0:
                     trial.unassign_hole(h)
                     c.assign_hole(h)
-                    recomp_non_full=True
+
+                    #Redetermine what is full
+                    recomp_non_full=False
+                    non_full=[c for c in non_full if c.n_avail()>0]
                     break
-            if recomp_non_full:
-                #Redetermine what is full
-                recomp_non_full=False
-                non_full=[c for c in non_full if c.n_avail()>0]
-    
+
         #If we were emptied the cassette then don't add anything to it
         if trial.used == 0:
             try:
                 non_full.remove(trial)
             except ValueError,e:
                 #it is possible that trial filled up, was dropped from non_full
-                # or something like that
                 pass
     
         #Update sort of to check
@@ -402,7 +393,7 @@ class Plate(object):
                 # n.b these are just cassette name strings
                 possible_cassettes=[c.name for c in cassettes.itervalues()
                                     if h.isAssignable(cassette=c) and
-                                    c.n_avail() >0]
+                                    c.n_avail(h)>0]
                 if len(possible_cassettes)<1:
                     print 'Could not find a suitable cassette for {}'.format(h)
                     import pdb;pdb.set_trace()
@@ -431,7 +422,7 @@ class Plate(object):
                 # n.b these are just cassette name strings
                 possible_cassettes=[c.name for c in cassettes.itervalues()
                                     if h.isAssignable(cassette=c) and
-                                    c.n_avail() >0]
+                                    c.n_avail(h) >0]
                 if len(possible_cassettes)<1:
                     print 'Could not find a suitable cassette for {}'.format(h)
                     import pdb;pdb.set_trace()
@@ -561,7 +552,7 @@ class Plate(object):
             for h in self.holeSet:
                 self.drawHole(h, canvas)
 
-    def _draw_with_assignements(self, setup, channel, canvas, radmult=1.0,
+    def _draw_with_assignements(self, setup, channel, canvas, radmult=0.75,
                                 lblcolor='black', drawimage=False):
         """Does not draw holes for color if not selected"""
         if channel in ['armB', 'BLUE', 'blue']:
@@ -691,7 +682,7 @@ class Plate(object):
                     self.drawHole(h, canvas, color=nonecolor,
                                   radmult=radmult)
 
-    def drawImage(self, canvas, active_setup=None, channel='all',radmult=.75):
+    def drawImage(self, canvas, active_setup=None, channel='all',radmult=1.25):
         if active_setup and active_setup in self.setups:
             #the active setup
             setup=self.setups[active_setup]
@@ -741,7 +732,7 @@ class Plate(object):
                 pos=self.plateCoordShift(h.position())    
                 canvas.drawSquare(pos,h.radius/3,fill='White',outline='White')
     
-    def drawCassette(self, cassette, canvas, radmult=1.0, drawimage=False):
+    def drawCassette(self, cassette, canvas, radmult=.75, drawimage=False):
         color=cassette.color()
         
         if cassette.used==0:

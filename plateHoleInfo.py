@@ -4,7 +4,9 @@ import Cassette
 import Setup
 import os.path
 import math
+import copy
 from m2fs.plate.plate import PlateConfigParser
+from misc import *
 
 SCALE=14.25
 SH_RADIUS=0.1875
@@ -14,16 +16,7 @@ ORDERED_FIBER_NAMES=['{}{}-{:02}'.format(color,cnum,fnum)
                      for fnum in range(1,17)]
 
 
-class platefile(object):
-    def __init__(self, filename):
-        self.filename=filename
 
-def nanfloat(s):
-    """Convert string to float or nan if can't"""
-    try:
-        return float(s)
-    except Exception:
-        return float('nan')
 
 def std_offset(c1,c2):
     """c1 sh, c2 std"""
@@ -96,7 +89,6 @@ class plateHoleInfo(object):
     def __init__(self,file):
         
         self.setups={}
-        self.cassettes={}
         self.cassette_groups={}
         self.holeSet=set()
         self.sh_hole=None#'hole'
@@ -129,7 +121,7 @@ class plateHoleInfo(object):
             #fiber logical cassette and a low-numbered liber logical cassette
             #for a given cassette h & l had better be created with the same slit
             # assignemnts!
-            self.cassettes={s:Cassette.new_cassette_dict() for s in self.setups}
+
             self.cassette_groups={s:[Cassette.blue_cassette_names(),
                                      Cassette.red_cassette_names()]
                                   for s in self.setups}
@@ -143,9 +135,6 @@ class plateHoleInfo(object):
 #            if 'Calvet' in self.name:
 #                _postProcessCalvetCassettes(self)
 
-            if 'Outer_LMC_1' in self.name:
-                _postProcessNideverCassettes(self)
-    
             if 'Vasily' in self.name:
                 _postProcessVasilyCassettes(self)
                 
@@ -375,27 +364,23 @@ class plateHoleInfo(object):
                 self.setups[setup_name]['holes']=targets
                 self.setups[setup_name]['INFO']=setup.attrib.copy()
 
-                self.cassettes[setup_name]=Cassette.new_cassette_dict()
+                cassette_dict=Cassette.new_cassette_dict()
                 for h in targets:
                     if h['FIBER']:
                         cname=h['ASSIGNMENT']['CASSETTE']
                         fnum=h['ASSIGNMENT']['FIBERNO']
-                        self.cassettes[setup_name][cname].map[fnum]=h
-                        self.cassettes[setup_name][cname].holes.append(h)
-                        self.cassettes[setup_name][cname].used+=1
+                        cassette_dict[cname].map[fnum]=h
+                        cassette_dict[cname].holes.append(h)
+                        cassette_dict[cname].used+=1
                 
-                self.setups[setup_name]['cassetteConfig']=self.cassettes[setup_name]
+                self.setups[setup_name]['cassetteConfig']=self.cassettes[setup_name].copy()
                 self.cassette_groups[setup_name]=[Cassette.blue_cassette_names(),
                                                   Cassette.red_cassette_names()]
 
         self.plate=plate
 
     def cassettes_for_setup(self,setup_name):
-        import copy
-        ret=copy.deepcopy(self.cassettes[setup_name])
-        if not ret:
-            import ipd;ipd.set_trace()
-        return ret
+        return copy.deepcopy(self.cassette_config)
     
     def cassette_groups_for_setup(self, setup_name):
         return self.cassette_groups[setup_name]
@@ -580,7 +565,7 @@ def _postProcessKounkel2Setups(plateinfo):
     """
     h=plateinfo.setups['Setup 2']['holes']
     h.sort(key=lambda h: h['PRIORITY'],reverse=True)
-    plateinfo.setups['Setup 2']['holes']=h[0:-3]
+    plateinfo.setups['Setup 2']['holes']=h[0:128]
 
 def _postProcessIanCassettes(plateinfo):
     """
@@ -590,50 +575,50 @@ def _postProcessIanCassettes(plateinfo):
     for c in  plateinfo.cassettes['Setup 2'].values():
         if 'l' in c.name:
             if 'R8' in c.name:
-                c.usable=[1]
+                c.usable['Setup 2']=[1]
             else:
-                c.usable=[1,8]
+                c.usable['Setup 2']=[1,8]
         else:
             if 'R8' in c.name:
-                c.usable=[9,16]
+                c.usable['Setup 2']=[9,16]
             else:
-                c.usable=[15]
+                c.usable['Setup 2']=[15]
 
 def _postProcessHJCassettes(plateinfo):
     for s in ['Setup 3','Setup 6']:
         for c in  plateinfo.cassettes[s].values():
             if 'l' in c.name:
-                c.usable=[2,4,6,8]
+                c.usable[s]=[2,4,6,8]
             else:
-                c.usable=[10,12,14,16]
+                c.usable[s]=[10,12,14,16]
     for c in  plateinfo.cassettes['Setup 4'].values():
         if 'l' in c.name:
-            c.usable=[2]
+            c.usable['Setup 4']=[2]
         else:
-            c.usable=[16]
+            c.usable['Setup 4']=[16]
     for c in  plateinfo.cassettes['Setup 1'].values():
         #have 8 want in fiber 8 of every other tetris
         if c.name[1] in ['1','3','5','7']:
             if 'l' in c.name:
-                c.usable=[8]
+                c.usable['Setup 1']=[8]
             else:
-                c.usable=[]
+                c.usable['Setup 1']=[]
         else:
             c.usable=[]
     for s in ['Setup 2','Setup 5']:
         for c in  plateinfo.cassettes[s].values():
             if 'l' in c.name:
-                c.usable=range(1,8,2)
+                c.usable[s]=range(1,8,2)
             else:
-                c.usable=range(9,16,2)
+                c.usable[s]=range(9,16,2)
 
 def _postProcessCalvetCassettes(plateinfo):
-    for c_set in plateinfo.cassettes.values():
+    for s, c_set in plateinfo.cassettes.items():
         for c in c_set.values():
             if 'l' in c.name:
-                c.usable=[2,4,6,8]
+                c.usable[s]=[2,4,6,8]
             else:
-                c.usable=[10,12,14,16]
+                c.usable[s]=[10,12,14,16]
 
 def _postProcessVasilyCassettes(plateinfo):
     #Setups 1, 2, 3, 4
@@ -641,147 +626,64 @@ def _postProcessVasilyCassettes(plateinfo):
     for c in  plateinfo.cassettes['Setup 1'].values():
         if c.name[0:2] in ok:
             if 'l' in c.name:
-                c.usable=range(1,9)
+                c.usable['Setup 1']=range(1,9)
             else:
-                c.usable=range(9,17)
+                c.usable['Setup 1']=range(9,17)
         else:
-            c.usable=[]
+            c.usable['Setup 1']=[]
     plateinfo.cassette_groups['Setup 1']=[[i+k for i in ok for k in 'lh']]
     
     ok=['B3','R3','B7','R7','B4','R4','B8','R8']
     for c in  plateinfo.cassettes['Setup 2'].values():
         if c.name[0:2] in ok:
             if 'l' in c.name:
-                c.usable=range(1,9)
+                c.usable['Setup 2']=range(1,9)
             else:
-                c.usable=range(9,17)
+                c.usable['Setup 2']=range(9,17)
         else:
-            c.usable=[]
+            c.usable['Setup 2']=[]
     plateinfo.cassette_groups['Setup 2']=[[i+k for i in ok for k in 'lh']]
+
+
+
+s3c=new_cassette_dict(usable=range(1,17))
+for k, v in (x for x in s3c.items() if 'B' not in x[0]):
+    v.usable.default_factory=list
+plateinfo.cassettes['Setup 3']=s3c
+
+'Setup 2':'R'
+'Setup 6':'B'
+
+'R|B|A[#[#,#,...]'
+
+
 
 def _postProcessKounkel2Cassettes(plateinfo):
-    cnames=Cassette.new_cassette_dict().keys()
 
-    ok3=['B1h','R3h','B5h','R7h']
-    ok5=['R2l','R6h','R6l']
-    filtered_left=[c for c in Cassette.left_only(cnames) if c not in ok5]
-    filtered_right=[c for c in Cassette.right_only(cnames) if c not in ok3]
-    ok3+=filtered_left
-    ok5+=filtered_right
-    #Setups 3
-    ok=ok3
-    for c in  plateinfo.cassettes['Setup 3'].values():
-        if c.name in ok:
-            if 'l' in c.name:
-                c.usable=range(1,9)
-            else:
-                c.usable=range(9,17)
-        else:
-            c.usable=[]
-    plateinfo.cassette_groups['Setup 3']=[ok]
-    #Setup 5
-    ok=ok5
-    for c in  plateinfo.cassettes['Setup 5'].values():
-        if c.name in ok:
-            if 'l' in c.name:
-                c.usable=range(1,9)
-            else:
-                c.usable=range(9,17)
-        else:
-            c.usable=[]
-    plateinfo.cassette_groups['Setup 5']=[ok]
+    cassette_setup_conf={}
+    cassette_setup_conf['Setup 1']={'usable':'A','slit':180}
+    cassette_setup_conf['Setup 2']={'usable':'R','slit':180}
+    cassette_setup_conf['Setup 3']={'usable':'A','slit':180}
+    cassette_setup_conf['Setup 4']={'usable':'A','slit':180}
+    cassette_setup_conf['Setup 5']={'usable':'A','slit':180}
+    cassette_setup_conf['Setup 6']={'usable':'B','slit':180}
 
+    self.cassette_config=Cassette.new_cassette_dict(cassette_setup_conf)
+    #Setup 1&2
+    #Setups 1
 
-def _postProcessNideverCassettes(plateinfo):
-    #Setups 1, 2, 3, 4
-    ok=['B1','B5','B2','B6']
-    for c in  plateinfo.cassettes['Setup 1'].values():
-        if c.name[0:2] in ok:
-            if 'l' in c.name:
-                c.usable=range(1,9)
-            else:
-                c.usable=range(9,17)
-        else:
-            c.usable=[]
-    plateinfo.cassette_groups['Setup 1']=[[i+k for i in ok for k in 'lh']]
-
-    ok=['R1','R5','R2','R6']
+    #Setup 2
+    ok=['R{}{}'.format(n,hl) for n in range(1,9) for hl in 'hl']
     for c in  plateinfo.cassettes['Setup 2'].values():
-        if c.name[0:2] in ok:
+        if c.name in ok:
             if 'l' in c.name:
                 c.usable=range(1,9)
             else:
                 c.usable=range(9,17)
         else:
             c.usable=[]
-    plateinfo.cassette_groups['Setup 2']=[[i+k for i in ok for k in 'lh']]
+    plateinfo.cassette_groups['Setup 2']=[ok]
 
-    ok=['B3','B7','B4','B8']
-    for c in  plateinfo.cassettes['Setup 3'].values():
-        if c.name[0:2] in ok:
-            if 'l' in c.name:
-                c.usable=range(1,9)
-            else:
-                c.usable=range(9,17)
-        else:
-            c.usable=[]
-    plateinfo.cassette_groups['Setup 3']=[[i+k for i in ok for k in 'lh']]
-
-    ok=['R3','R7','R4','R8']
-    for c in  plateinfo.cassettes['Setup 4'].values():
-        if c.name[0:2] in ok:
-            if 'l' in c.name:
-                c.usable=range(1,9)
-            else:
-                c.usable=range(9,17)
-        else:
-            c.usable=[]
-    plateinfo.cassette_groups['Setup 4']=[[i+k for i in ok for k in 'lh']]
-
-    #Setups 5, 6, 7, 8
-    ok=['B1','B5','B2','B6']
-    for c in  plateinfo.cassettes['Setup 5'].values():
-        if c.name[0:2] in ok:
-            if 'l' in c.name:
-                c.usable=range(1,9)
-            else:
-                c.usable=range(9,17)
-        else:
-            c.usable=[]
-    plateinfo.cassette_groups['Setup 5']=[[i+k for i in ok for k in 'lh']]
-
-    ok=['R1','R5','R2','R6']
-    for c in  plateinfo.cassettes['Setup 6'].values():
-        if c.name[0:2] in ok:
-            if 'l' in c.name:
-                c.usable=range(1,9)
-            else:
-                c.usable=range(9,17)
-        else:
-            c.usable=[]
-    plateinfo.cassette_groups['Setup 6']=[[i+k for i in ok for k in 'lh']]
-
-    ok=['B3','B7','B4','B8']
-    for c in  plateinfo.cassettes['Setup 7'].values():
-        if c.name[0:2] in ok:
-            if 'l' in c.name:
-                c.usable=range(1,9)
-            else:
-                c.usable=range(9,17)
-        else:
-            c.usable=[]
-    plateinfo.cassette_groups['Setup 7']=[[i+k for i in ok for k in 'lh']]
-
-    ok=['R3','R7','R4','R8']
-    for c in  plateinfo.cassettes['Setup 8'].values():
-        if c.name[0:2] in ok:
-            if 'l' in c.name:
-                c.usable=range(1,9)
-            else:
-                c.usable=range(9,17)
-        else:
-            c.usable=[]
-    plateinfo.cassette_groups['Setup 8']=[[i+k for i in ok for k in 'lh']]
 
 def parse_extra_data(name,setup, words):
     ret={}
