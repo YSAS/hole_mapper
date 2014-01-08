@@ -1,0 +1,35 @@
+!    -*- f90 -*-
+! Note: the context of this file is case sensitive.
+
+python module m2fsholesxy ! in 
+    interface  ! in :m2fsholesxy
+        subroutine m2fsholesxy(ut,utdate,lat,long_bn,height,rafield,decfield,epochfield,fieldrot,nstar,rastars,decstars,epochstars,type_bn,xm,ym,zm,sizem,sidtime,hangle,azimuth,elevation,airmass) ! in :m2fsholesxy:m2fsholesxy.f90
+            real*8 intent(in) :: ut
+            integer dimension(3),intent(in) :: utdate
+            real*8 intent(in) :: lat
+            real*8 intent(in) :: long_bn
+            real*8 intent(in) :: height
+            real*8 intent(in) :: rafield
+            real*8 intent(in) :: decfield
+            real*8 intent(in) :: epochfield
+            real*8 intent(in) :: fieldrot
+            integer, optional,intent(in,hide),check(len(rastars)=nstar),depend(rastars) :: nstar=len(rastars)
+            real*8 dimension(nstar),intent(in) :: rastars
+            real*8 dimension(nstar),intent(in),depend(nstar) :: decstars
+            real*8 dimension(nstar),intent(in),depend(nstar) :: epochstars
+            character dimension(nstar,1),intent(in,out,c),depend(nstar) :: type_bn
+            real*8 dimension(nstar),intent(out),depend(nstar) :: xm
+            real*8 dimension(nstar),intent(out),depend(nstar) :: ym
+            real*8 dimension(nstar),intent(out),depend(nstar) :: zm
+            real*8 dimension(nstar),intent(out),depend(nstar) :: sizem
+            real*8 intent(out) :: sidtime
+            real*8 intent(out) :: hangle
+            real*8 intent(out) :: azimuth
+            real*8 intent(out) :: elevation
+            real*8 intent(out) :: airmass
+        end subroutine m2fsholesxy
+    end interface 
+end python module m2fsholesxy
+
+! This file was auto-generated with f2py (version:2).
+! See http://cens.ioc.ee/projects/f2py2e/
