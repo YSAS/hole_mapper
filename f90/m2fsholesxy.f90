@@ -30,32 +30,33 @@
 !
       subroutine m2fsholesxy(ut, utdate, lat, long, height, &
         rafield,decfield,epochfield,fieldrot, nstar, rastars, decstars, &
-        epochstars, type, xm, ym, zm, sizem, sidtime, hangle, azimuth, &
-        elevation, airmass)
+        epochstars, type, xm, ym, zm, sizem, type_out, sidtime, hangle, azimuth, &
+        elevation, airmass, nmax, nout)
 !
       implicit real*8 (a-h,o-z)
       integer i
       integer tconfig
-      integer nmax,nstar
+      integer nmax,nstar,nout
       integer utdate(3)
 !
       parameter(tconfig=3)
-!      parameter(nmax=1000)
       parameter(rmax = 12.750)    ! in inches.
       real*8 rafield,decfield,epochfield,fieldrot
       real*8 raplugfield,decplugfield,fpochfield
       real*8 ut,long,lat,height
       real*8 airmass,elevation,azimuth,hangle,sidtime
       real*8 rastars(nstar),decstars(nstar),epochstars(nstar)
-
-      real*8 raplugstars(nstar),decplugstars(nstar),fpochstars(nstar)
-      real*8 xi(nstar),eta(nstar)
-      real*8 x(nstar),y(nstar)
-      real*8 xm(nstar),ym(nstar),zm(nstar),sizem(nstar)
-!
-      character*7 id(nstar)
       character*1 type(nstar)
+
+      real*8 raplugstars(nmax),decplugstars(nmax),fpochstars(nmax)
+      real*8 xi(nmax),eta(nmax)
+      real*8 x(nmax),y(nmax)
+      real*8 xm(nmax),ym(nmax),zm(nmax),sizem(nmax)
+!
+      character*1 type_out(nmax)
+
 !f2py intent(hide) nstar
+!f2py intent(hide) nmax
 !f2py intent(in) ut
 !f2py intent(in) utdate
 !f2py intent(in) long
@@ -69,20 +70,25 @@
 !f2py intent(in) decstars
 !f2py intent(in) epochstars
 !f2py intent(in) tconfig
-!f2py intent(hide) nstar
-!
-!f2py intent(in,out)
+!f2py intent(in) type
 !
 !f2py intent(out) xm
 !f2py intent(out) ym
 !f2py intent(out) zm
 !f2py intent(out) sizem
 !f2py intent(out) sidtime
+!f2py intent(out) type_out
 !f2py intent(out) hangle
 !f2py intent(out) azimuth
 !f2py intent(out) elevation
 !f2py intent(out) airmass
+!f2py intent(out) nout
 !
+        print *,''
+        do i=1,nstar
+            type_out(i)=type(i)
+        end do
+
         call fruitfield(long,lat,height,epochfield,rafield,decfield, &
            utdate,ut,fpochfield,raplugfield,decplugfield)
 
@@ -98,11 +104,12 @@
 !
 !adds 3 + 4 + 1 (not yet) + 3*nG
 
-!        call guiderefholes(id,xm,ym,zm,sizem,type,stari,nmax,fieldrot,rmax)
-!        call fiducialholes(id,xm,ym,zm,sizem,type,stari,nmax)
-!        call thumbscrewholes(id,xm,ym,zm,sizem,type,stari,nmax)
+        call guiderefholes(id,xm,ym,zm,sizem,type_out,nstar,nmax,fieldrot,rmax)
+        call fiducialholes(id,xm,ym,zm,sizem,type_out,nstar,nmax)
+        call thumbscrewholes(id,xm,ym,zm,sizem,type_out,nstar,nmax)
         call getfieldinfo(utdate,ut,raplugfield,decplugfield,lat,long, &
           sidtime,hangle,azimuth,elevation,airmass)
+        nout=nstar
 !
       end
 !
