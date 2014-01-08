@@ -2,7 +2,7 @@
 from collections import defaultdict
 import argparse
 import os
-
+from jbastro.astroLib import sexconvert
 def _parse_cl():
     parser = argparse.ArgumentParser(description='Help undefined',
                                      add_help=True)
@@ -62,8 +62,8 @@ def _parse_record_row(rec, keys):
             assert k in rdict
     
     #Enforce cannonical RA & DEC format
-    rdict['ra'] = _sexiegesmal_fmt(rdict['ra'],ra=True)
-    rdict['dec'] = _sexiegesmal_fmt(rdict['dec'])
+    rdict['ra'] = sexconvert(rdict['ra'],ra=True)
+    rdict['dec'] = sexconvert(rdict['dec'])
     
     #Set a priority if one isn't set
     if 'priority' not in rdict:
@@ -81,23 +81,6 @@ def _parse_record_row(rec, keys):
         rdict['type']='T'
     
     return rdict
-
-def _sexiegesmal_fmt(n, ra=False):
-    """n into dd:mm:ss.ss or hh:mm:ss.ss if ra=True"""
-    if type(n)==str and ':' in n:
-        return n
-    else:
-        n=float(n)
-        if ra:
-            sec=3600*n/15.0
-            hord=int(sec)/3600
-            m=int(sec % 3600)/60
-            secs=(sec % 3600) % 60
-        else:
-            hord=int(n)
-            m=int((n-hord)*60)
-            secs=(n-hord-m*60)*60
-        return '{}:{}:{:.2f}'.format(hord,m,secs)
 
 def _get_default_id(rdict):
     """ typecodeRA_DEC """

@@ -6,6 +6,7 @@ Created on Dec 12, 2009
 import math
 import Cassette
 import operator
+from jbastr.astrolib import sexconvert
 SKY_TYPE='S'
 OBJECT_TYPE='O'
 
@@ -251,19 +252,15 @@ class Hole(dict):
 
     def ra_string(self,decimal=False):
         if decimal:
-            return '{:.6f}'.format(float(self['RA'][0])*15+
-                                   float(self['RA'][1])/60+
-                                   float(self['RA'][2])/3600.0)
+            return '{:.6f}'.format(sexconvert(self['RA'],dtype=float,ra=True))
         else:
-            return '{}:{}:{}'.format(*self['RA'])
+            return sexconvert(self['RA'],ra=True)
 
     def de_string(self,decimal=False):
         if decimal:
-            return '{:.6f}'.format(float(self['DEC'][0])+
-                                   float(self['DEC'][1])/60+
-                                   float(self['DEC'][2])/3600.0)
+            return '{:.6f}'.format(sexconvert(self['DEC'],dtype=float))
         else:
-            return '{}:{}:{}'.format(*self['DEC'])
+            return sexconvert(self['DEC'])
 
     def assigned_color(self):
         """ Return color of assigned cassette else None """
