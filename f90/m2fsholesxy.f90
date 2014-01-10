@@ -104,9 +104,9 @@
 !
 !adds 3 + 4 + 1 (not yet) + 3*nG
 
-        call guiderefholes(id,xm,ym,zm,sizem,type_out,nstar,nmax,fieldrot,rmax)
-        call fiducialholes(id,xm,ym,zm,sizem,type_out,nstar,nmax)
-        call thumbscrewholes(id,xm,ym,zm,sizem,type_out,nstar,nmax)
+        call guiderefholes(xm,ym,zm,sizem,type_out,nstar,nmax,fieldrot,rmax)
+        call fiducialholes(xm,ym,zm,sizem,type_out,nstar,nmax)
+        call thumbscrewholes(xm,ym,zm,sizem,type_out,nstar,nmax)
         call getfieldinfo(utdate,ut,raplugfield,decplugfield,lat,long, &
           sidtime,hangle,azimuth,elevation,airmass)
           
@@ -402,22 +402,21 @@
 !
 !!!!!!!!!!!!
 !
-      subroutine guiderefholes(id,xm,ym,zm,sizem,type,nstar,nmax,fieldrot,rmax)
+      subroutine guiderefholes(xm,ym,zm,sizem,type,nstar,nmax,fieldrot,rmax)
       implicit real*8 (a-h,o-z)
       real*8 xm(nmax),ym(nmax),zm(nmax),sizem(nmax)
       real*8 fieldrot,rr,rmax
       integer nstar,nmax,i
       character*1 type(nmax)
-      character*7 id(nmax)
 !
       ng = 0
       do i=1,nstar
         rr = dsqrt(xm(i)**2 + ym(i)**2)
         if(rr.le.rmax.and.(type(i).eq.'G'.or.type(i).eq.'g')) then
           ng = ng + 1
-          call guiderefoffsets(id,xm,ym,zm,sizem,type,nmax,nstar,i,ng,1,fieldrot)
-          call guiderefoffsets(id,xm,ym,zm,sizem,type,nmax,nstar,i,ng,2,fieldrot)
-          call guiderefoffsets(id,xm,ym,zm,sizem,type,nmax,nstar,i,ng,3,fieldrot)
+          call guiderefoffsets(xm,ym,zm,sizem,type,nmax,nstar,i,ng,1,fieldrot)
+          call guiderefoffsets(xm,ym,zm,sizem,type,nmax,nstar,i,ng,2,fieldrot)
+          call guiderefoffsets(xm,ym,zm,sizem,type,nmax,nstar,i,ng,3,fieldrot)
         end if
       end do
       nstar = nstar + ng*3
@@ -427,7 +426,7 @@
 !
 !!!!!!!!!!!!
 !
-      subroutine guiderefoffsets(id,xm,ym,zm,sm,ty,nmax,nstar,is,ng,nref, &
+      subroutine guiderefoffsets(xm,ym,zm,sm,ty,nmax,nstar,is,ng,nref, &
           fieldrot)
       implicit real*8 (a-h,o-z)
       real*8 xm(nmax),ym(nmax),zm(nmax),sm(nmax)
@@ -437,7 +436,6 @@
       data yoffsets / 0.250, -0.125, -0.125 /
       parameter(sizerefhole=0.1285,convert=25.4)
       character*1 ty(nmax)
-      character*7 id(nmax)
 !
       sign = 1.0
       if(fieldrot.eq.180.0) sign = -1.0
@@ -448,14 +446,13 @@
       zm(ii) = dz/convert
       sm(ii) = sizerefhole
       ty(ii) = 'R'
-      id(ii) = 'GUIDREF'
       return
       end
 !
 !
 !!!!!!!!!!!!
 !
-      subroutine fiducialholes(id,xm,ym,zm,sizem,type,nstar,nmax)
+      subroutine fiducialholes(xm,ym,zm,sizem,type,nstar,nmax)
       implicit real*8 (a-h,o-z)
       real*8 xm(nmax),ym(nmax),zm(nmax),sizem(nmax)
       real*8 xoffsets(4),yoffsets(4)
@@ -465,7 +462,6 @@
       data yoffsets / 2.500, 2.500, -2.500, -2.500 /
       parameter(sizefidhole=0.260,zoffset=-1.500)
       character*1 type(nmax)
-      character*7 id(nmax)
 !
 !  All dimensions in inches.
 !
@@ -477,7 +473,6 @@
         zm(ii) = zoffset
         sizem(ii) = sizefidhole
         type(ii) = 'F'
-        id(ii) = 'FIDHOLE'
       end do
       nstar = nstar + nfid
       return
@@ -486,7 +481,7 @@
 !
 !!!!!!!!!!!!
 !
-      subroutine thumbscrewholes(id,xm,ym,zm,sizem,type,nstar,nmax)
+      subroutine thumbscrewholes(xm,ym,zm,sizem,type,nstar,nmax)
       implicit real*8 (a-h,o-z)
       real*8 xm(nmax),ym(nmax),zm(nmax),sizem(nmax)
       real*8 xoffsets(3),yoffsets(3)
@@ -507,8 +502,7 @@
         ym(ii) = yoffsets(i)
         zm(ii) = zoffset
         sizem(ii) = sizethumbhole
-        type(ii) = 'T'
-        id(ii) = 'THUMBSC'
+        type(ii) = 'B'
       end do
       nstar = nstar + nthumb
       return
