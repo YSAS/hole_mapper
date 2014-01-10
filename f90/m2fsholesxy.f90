@@ -84,7 +84,7 @@
 !f2py intent(out) airmass
 !f2py intent(out) nout
 !
-        print *,''
+
         do i=1,nstar
             type_out(i)=type(i)
         end do
@@ -109,6 +109,7 @@
         call thumbscrewholes(id,xm,ym,zm,sizem,type_out,nstar,nmax)
         call getfieldinfo(utdate,ut,raplugfield,decplugfield,lat,long, &
           sidtime,hangle,azimuth,elevation,airmass)
+          
         nout=nstar
 !
       end
