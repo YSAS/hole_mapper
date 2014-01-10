@@ -1,0 +1,18 @@
+!    -*- f90 -*-
+! Note: the context of this file is case sensitive.
+
+python module timestep ! in 
+    interface  ! in :timestep
+        subroutine timestep(u,n,m,dx,dy,error) ! in :timestep:timestep.f90
+            real*8 dimension(n,m),intent(in,out) :: u
+            integer, optional,intent(hide),check(shape(u,0)==n),depend(u) :: n=shape(u,0)
+            integer, optional,intent(hide),check(shape(u,1)==m),depend(u) :: m=shape(u,1)
+            real*8 intent(in) :: dx
+            real*8 intent(in) :: dy
+            real*8 intent(out) :: error
+        end subroutine timestep
+    end interface 
+end python module timestep
+
+! This file was auto-generated with f2py (version:2).
+! See http://cens.ioc.ee/projects/f2py2e/
