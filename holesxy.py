@@ -87,13 +87,13 @@ def compute_hole_positions(field_ra,field_dec,field_epoch, date,
     pos.x=[v for v in x[:nstar]]
     pos.y=[v for v in y[:nstar]]
     pos.z=[v for v in z[:nstar]]
-    pos.r=[v for v in r[:nstar]]
+    pos.r=[v/2.0 for v in r[:nstar]]
 
 
     mech.x=[v for v in x[nstar:nout]]
     mech.y=[v for v in y[nstar:nout]]
     mech.z=[v for v in z[nstar:nout]]
-    mech.r=[v for v in r[nstar:nout]]
+    mech.r=[v/2.0 for v in r[nstar:nout]]
     mech.type=[v for v in type_out[nstar:nout]]
 
     ret.airmass=airmass
