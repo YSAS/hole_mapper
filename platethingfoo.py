@@ -25,7 +25,8 @@ COLOR_SEQUENCE=['red','blue','pink','green','black','teal','purple','orange']
 #deltara=np.rad2deg*arccos(cos(180*np.deg2rad/3600)*sec(dec)**2 - tan(dec)**2)
 
 
-
+def gen_hole_hash(hole):
+    return str(hole.__hash__())
 
 class Foo(object):
     """ Class for I don't know what yet"""
@@ -58,6 +59,14 @@ class Foo(object):
         self.fields=[]
         self.selected_fields={}
 
+    def get_holes(self, holeIDs):
+        ret=[]
+        for f in self.fields:
+            for h in f.holes():
+                if gen_hole_hash(h) in holeIDs:
+                    ret.append(h)
+        return ret
+
     def _drawHole(self, hole, canvas, color=None, fcolor='White', radmult=1.0):
         
         drawimage=False
@@ -65,16 +74,14 @@ class Foo(object):
         pos=hole['x'],hole['y']
         rad=hole['r']*radmult
         
-        hash="{}{}{}{}{}".format(hole['x'], hole['y'], hole['z'], hole['r'],
-                                 hole['type']).__hash__()
-        hashtag=".{}".format(hash)
+        hashtag="."+gen_hole_hash(hole)
         
         if drawimage:
             canvas.drawCircle(pos, rad, outline=color, fill=fcolor)
         else:
             if canvas.find_withtag(hashtag):
                 log.info("drawing dupe in dark green @ {} IDs: {}".format(
-                    pos,hash))
+                    pos,gen_hole_hash(hole)))
                 fcolor='DarkGreen'
             canvas.drawCircle(pos, rad,
                               outline=color, fill=fcolor, tags=('hole',hashtag),
@@ -91,13 +98,9 @@ class Foo(object):
         for i,f in enumerate(self.selected_fields.itervalues()):
             if not f.isProcessed():
                 f.process()
-            fholes=f['G']+f['T']+f['A']+f['S']+f['R']
-            
-            for h in fholes:
+            for h in f.holes():
                 self._drawHole(h, canvas,
                                color=COLOR_SEQUENCE[i%len(COLOR_SEQUENCE)])
-
-        import ipdb;ipdb.set_trace()
 
     def select_fields(self,field_names):
 
@@ -106,6 +109,8 @@ class Foo(object):
             if name in field_names and name not in self.selected_fields:
                 self.selected_fields[name]=self.fields[i]
 
+    def save_selected_as_plate(self):
+        """Write out a .plate file with the selected fields"""
 
 
 

@@ -32,6 +32,76 @@ def getPath(sequence):
     return dir
 
 
+class HoleInfoDialog:
+        
+    def __init__(self, parent, canvas, holes):
+        self.canvas=canvas
+        self.parent=parent
+        
+        if len(holes) > 1:
+            self.initializeSelection(holes)
+        else:
+            self.initializeSingle(holes[0])
+            
+    def initializeSelection(self, holes):
+        
+        self.dialog=Tkinter.Toplevel(self.parent)
+        self.dialog.bind("<FocusOut>", self.defocusCallback)
+        self.dialog.bind("<Destroy>", self.destroyCallback)
+        
+        for i,hole in enumerate(holes):
+            
+            #self.canvas.itemconfigure('.'+id, state=Tkinter.DISABLED)
+
+            lbl_str=' '.join(['{}={}'.format(k,v) for k,v in hole.iteritems()])
+
+            def cmd():
+                self.close()
+                self.initializeSingle(hole)
+            
+            Tkinter.Label(self.dialog, text=lbl_str[0:80]).grid(row=i,column=0)
+            
+            Tkinter.Button(self.dialog,text='Select', command=cmd).grid(
+                        row=i,column=1)
+
+    def initializeSingle(self, hole):
+
+        #self.canvas.itemconfigure('.'+holeID,state=Tkinter.DISABLED)
+        self.dialog=Tkinter.Toplevel(self.parent)
+        self.dialog.bind("<FocusOut>", self.defocusCallback)
+        self.dialog.bind("<Destroy>", self.destroyCallback)
+        
+        lbl_str=' '.join(['{}={}'.format(k,v) for k,v in hole.iteritems()])
+        Tkinter.Label(self.dialog, text=lbl_str).pack()
+        
+        Tkinter.Button(self.dialog,text='Done',command=self.ok).pack()
+
+    def defocusCallback(self, event):
+        pass
+        #self.ok()
+    
+    def ok(self):
+        self.save()
+        self.close()
+    
+    def destroyCallback(self, event):
+        pass
+        #self.resetHoles()
+
+    def save(self):
+        pass    
+    
+    def close(self):
+        self.dialog.destroy()
+        
+    def resetHoles(self):
+        if isinstance(self.holeID, str):
+            self.canvas.itemconfig('.'+self.holeID,state=Tkinter.NORMAL)
+        else:
+            for id in self.holeID:
+                self.canvas.itemconfig('.'+id,state=Tkinter.NORMAL)
+
+
 
 class App(Tkinter.Tk):
     def __init__(self, parent):
@@ -71,6 +141,8 @@ class App(Tkinter.Tk):
                        command=self.load_fields).pack()
         Tkinter.Button(frame, text="Select Fields",
                        command=self.field_info_window).pack()
+        Tkinter.Button(frame, text="Make Plate",
+                       command=self.manager.save_selected_as_plate).pack()
 
         #Info output
         self.info_str=Tkinter.StringVar(value='Red: 000  Blue: 000  Total: 0000')
@@ -94,7 +166,8 @@ class App(Tkinter.Tk):
             holeIDs=tuple([tag[1:] for i in items
                                    for tag in self.canvas.gettags(i)
                                    if tag[-1].isdigit()])
-            #HoleInfoDialog(self.parent, self.canvas, self.plate, holeIDs)
+            holes=self.manager.get_holes(holeIDs)
+            HoleInfoDialog(self.parent, self.canvas, holes)
 
     def show(self):
         self.canvas.clear()
@@ -141,26 +214,27 @@ class App(Tkinter.Tk):
         #TODO: Update conflicting count
         self.manager.draw(self.canvas)
 
-def collision_detect(x,y,r):
-    #build KD Tree at all xy
-    tree=spatial.KDTree(zip(x, y))
-    #For each point get the two nearest neighbors, (itself and next closest)
-    MAX_MIN_SEP=type_clearance('G','G')
-    dists,nearest_ndx=tree.query(pts,2,eps=0,p=2,
-                                  distance_upper_bound=MAX_MIN_SEP)
-    #Dist is distance from hole i to nearest hole nearest_ndx[i]
-    dists=dists[:,1] #Don't care about self
-    nearest_ndx=nearest_ndx[:,1] #Don't care about self
 
-    
-    #Check each hole type
-    for t1 in hole_types:
-        #Flag all x,y with type G and having a nearest neighpor
-        # closer than allowed with type G
-        pot_conflict=dists < clearance(t1,'G') & isG
-        #
-        conflict_ndx[pot_conflict]
-        r[pot_conflict & ]==t1
+#def collision_detect(x,y,r):
+#    #build KD Tree at all xy
+#    tree=spatial.KDTree(zip(x, y))
+#    #For each point get the two nearest neighbors, (itself and next closest)
+#    MAX_MIN_SEP=type_clearance('G','G')
+#    dists,nearest_ndx=tree.query(pts,2,eps=0,p=2,
+#                                  distance_upper_bound=MAX_MIN_SEP)
+#    #Dist is distance from hole i to nearest hole nearest_ndx[i]
+#    dists=dists[:,1] #Don't care about self
+#    nearest_ndx=nearest_ndx[:,1] #Don't care about self
+#
+#    
+#    #Check each hole type
+#    for t1 in hole_types:
+#        #Flag all x,y with type G and having a nearest neighpor
+#        # closer than allowed with type G
+#        pot_conflict=dists < clearance(t1,'G') & isG
+#        #
+#        conflict_ndx[pot_conflict]
+#        r[pot_conflict & ]==t1
 
 
 if __name__ == "__main__":

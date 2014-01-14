@@ -12,9 +12,11 @@ VALID_TYPE_CODES=['T', 'S', 'C', 'G', 'A', 'Z','O']
 
 #List of required keys
 REQUIRED_KEYS=['ra', 'dec', 'epoch', 'id', 'type', 'priority']
+OPTIONAL_KEYS=['pm_ra','pm_dec']
+OPTIONAL_KEYS_DEFAULTS=[0.0,0.0]
 
 #List of forbidden keys
-FORBIDDEN_KEYS=['fiber', 'x', 'y', 'z', 'r', 'ep', 'de']
+FORBIDDEN_KEYS=['user']
 
 #Default priority if '-'
 DEFAULT_PRIORITY = float('-inf')
@@ -45,7 +47,9 @@ def _parse_record_row(rec, keys):
     assert len(vals)==len(keys)
     
     #Create the dictionary
-    rdict={keys[i].lower():vals[i] for i in range(len(keys)) if vals[i] !='-'}
+    rdict={keys[i].lower():vals[i] for i in range(len(keys))
+            if vals[i] !='-' and
+            keys[i].lower() in (REQUIRED_KEYS+OPTIONAL_KEYS)}
     
     #Vet all the keys
     for k in rdict.keys():
@@ -58,8 +62,8 @@ def _parse_record_row(rec, keys):
             assert k in rdict
     
     #Enforce cannonical RA & DEC format
-    rdict['ra'] = sexconvert(rdict['ra'],ra=True)
-    rdict['dec'] = sexconvert(rdict['dec'])
+    rdict['ra'] = sexconvert(rdict['ra'],dtype=float,ra=True)
+    rdict['dec'] = sexconvert(rdict['dec'],dtype=float)
     
     #Set a priority if one isn't set
     if 'priority' not in rdict:
@@ -75,7 +79,11 @@ def _parse_record_row(rec, keys):
     #Support legacy type code O by converting to T
     if rdict['type']=='O':
         rdict['type']='T'
-    
+
+    #Add any user defined keys to 'user'
+    rdict['user']={keys[i].lower():vals[i] for i in range(len(keys))
+                    if vals[i] !='-' and keys[i].lower() not in
+                    (REQUIRED_KEYS+OPTIONAL_KEYS)}
     return rdict
 
 def _get_default_id(rdict):
@@ -175,17 +183,51 @@ class field(dict):
         
         for i in (i for i,t in enumerate(mech.type) if t==GUIDE_REF_TYPE):
             #TODO: Make guide the responsible guide target
-            field['R'].append({'id':'GUIDEREF',
-                              'x':mech.x[i], 'y':mech.y[i],
-                              'z':mech.z[i], 'r':mech.r[i],
-                              'type':'R', 'guide':{}})
+            hole=Hole()
+            hole.update({'id':'GUIDEREF','x':mech.x[i], 'y':mech.y[i],
+                        'z':mech.z[i], 'r':mech.r[i],'type':'R', 'guide':{}})
+            field['R'].append(hole)
 
         field['_processed']=True
 
+    def collisions(self):
+        if not field['_collisions']:
+            holes=self.holes()
+            x=[h['x'] for h in holes]
+            y=[h['y'] for h in holes]
+            r=[h['r'] for h in holes]
+            collision_graph=jbastro.build_overlap_graph_cartesian(x,y,r,
+                                                      overlap_pct_ok=0.0)
+    
+    def drillable_holes(self):
+        pass
+
+    def undrillable_holes(self):
+        """Return something wich lists the holes that cannot be drilled """
+        pass
 
     def isProcessed(self):
         return self['_processed']
 
+    def holes(self):
+        """ return a list of all the holes the field has on the plate """
+        if not self.isProcessed():
+            return []
+        else:
+            return self['C']+self['T']+self['S']+self['A']+self['G']+self['R']
+
+
+class Hole(dict):
+    def __init__(self, *args):
+        dict.__init__(self, args)
+        self.update({'x':0.0,'y':0.0,'z':0.0,'r':0.0,'user':{},
+                    'id':'', 'priority':0.0,'type':'',
+                    'ra':0.0,'dec':0.0,'epoch':0.0,
+                    'pm_ra':0.0, 'pm_dec':0.0})
+
+    def __hash__(self):
+        return "{}{}{}{}{}".format(self['x'], self['y'], self['z'],
+                                   self['r'], self['type']).__hash__()
 
 def load_dotfield(file):
     """
@@ -241,8 +283,9 @@ def load_dotfield(file):
             elif l.lower().startswith('ra'):
                 keys=_parse_header_row(l.lower())
             else:
-                rec = _parse_record_row(l, keys)
-                ret[rec['type']].append(rec)
+                hole=Hole()
+                hole.update(_parse_record_row(l, keys))
+                ret[hole['type']].append(hole)
     except Exception as e:
         raise IOError('Failed on line '
                         '{}: {}\n  Error:{}'.format(lines.index(l),l,str(e)))
