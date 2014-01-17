@@ -89,13 +89,26 @@ def compute_hole_positions(field_ra,field_dec,field_epoch, date,
     pos.z=[v for v in z[:nstar]]
     pos.r=[v/2.0 for v in r[:nstar]]
 
-
-    mech.x=[v for v in x[nstar:nout]]
-    mech.y=[v for v in y[nstar:nout]]
-    mech.z=[v for v in z[nstar:nout]]
-    mech.r=[v/2.0 for v in r[nstar:nout]]
-    mech.type=[v for v in type_out[nstar:nout]]
-
+    nguide=(typestars=='G').sum()
+    if nguide:
+        guideref=retobj()
+        guideref.x=[v for v in x[nstar:nstar+3*nguide]]
+        guideref.y=[v for v in y[nstar:nstar+3*nguide]]
+        guideref.z=[v for v in z[nstar:nstar+3*nguide]]
+        guideref.r=[v/2.0 for v in r[nstar:nstar+3*nguide]]
+        guideref.type=[v for v in type_out[nstar:nstar+3*nguide]]
+    
+        if (np.array(guideref.r)==0.0).any():
+            import ipdb;ipdb.set_trace()
+    else:
+        guideref=None
+        
+    mech.x=[v for v in x[nstar+3*nguide:nout]]
+    mech.y=[v for v in y[nstar+3*nguide:nout]]
+    mech.z=[v for v in z[nstar+3*nguide:nout]]
+    mech.r=[v/2.0 for v in r[nstar+3*nguide:nout]]
+    mech.type=[v for v in type_out[nstar+3*nguide:nout]]
+    
     ret.airmass=airmass
     ret.ha=ha
     ret.el=el
@@ -103,6 +116,30 @@ def compute_hole_positions(field_ra,field_dec,field_epoch, date,
     ret.az=az
     
 
-    return (pos, mech, ret)
+    return (pos, guideref, mech, ret)
 
+
+def compute_standard_pos():
+    from datetime import datetime
+    ra=0.0
+    dec=-40.0
+    date=datetime(2014,9,2,0,0,0)
+    
+    deltara=lambda dec: np.rad2deg(np.arccos(
+                np.cos(np.deg2rad(180./3600.0)) * 1.0/np.cos(np.deg2rad(dec))**2 -
+                np.tan(np.deg2rad(dec))**2))
+    
+    ras= np.array([       0.0,         0.0, deltara(dec), -deltara(dec)])+ra
+    decs=np.array([180/3600.0, -180/3600.0,          0.0,           0.0])+dec
+    epochs=[2000.0]*4
+    targ_types=['T']*4
+    stds,_,mech,_=compute_hole_positions(ra, dec, 2000.0, date,
+                                         ras, decs, epochs, targ_types)
+
+    print stds.x
+    print stds.y
+    raise Exception()
+    return stds,mech
+
+compute_standard_pos()
 

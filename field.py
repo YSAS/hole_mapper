@@ -1,11 +1,15 @@
-from dimensions import SH_RADIUS
 from collections import defaultdict
 import os
 from jbastro.astroLib import sexconvert
 from datetime import datetime
 import holesxy
+from logger import getLogger
+from hole import Hole, SHACKHARTMAN_HOLE
+from target import Target
+from target import GUIDEREF_TYPE, GUIDE_TYPE
+from graphcollide import build_overlap_graph_cartesian
 
-GUIDE_REF_TYPE='R'
+log=getLogger('plateplanner.field')
 
 #List of valid type codes
 VALID_TYPE_CODES=['T', 'S', 'C', 'G', 'A', 'Z','O']
@@ -129,7 +133,6 @@ def _is_valid_ra(x):
 #Define field keys
 PROGRAM_KEYS=['name', 'obsdate']
 
-
 #Define vetting functions for keys
 KEY_VETTERS=defaultdict(lambda : lambda x: len(x.split())==1)
 KEY_VETTERS['ra']=_is_valid_ra
@@ -140,111 +143,37 @@ KEY_VETTERS['priority']=_is_floatable
 KEY_VETTERS['pm_ra']=_is_floatable
 KEY_VETTERS['pm_dec']=_is_floatable
 
-class field(dict):
-    def __init__(self, *args):
-        dict.__init__(self, args)
-        self.update({'file':'','name':None,'obsdate':None,'user':{},
-                     'G':[], 'T':[], 'C':[], 'A':[], 'S':[], 'Z':[],'R':[],
-                     '_processed':False})
-    
-    def ra(self):
-        print 'Not correcting field ra with PM'
-        return self['C'][0]['ra']
 
-    def dec(self):
-        print 'Not correcting field dec with PM'
-        return self['C'][0]['dec']
-
-    def nfib_needed(self):
-        return len(self['T'])+len(self['S'])
-
-    def process(self):
-        """
-        Process the targets in the field and update the field with xyz positions 
-        """
-        field=self
-        obs_date=self['obsdate']
-        
-        targs=field['G']+field['T']+field['A']+field['S']
-        ras=[t['ra'] for t in targs]
-        decs=[t['dec'] for t in targs]
-        #TODO: Update ra & dec with proper motions here
-        epochs=[t['epoch'] for t in targs]
-        targ_types=[t['type'] for t in targs]
-        pos, mech, info=holesxy.compute_hole_positions(field['C'][0]['ra'],
-                            field['C'][0]['dec'], field['C'][0]['epoch'],
-                            obs_date,
-                            ras, decs, epochs, targ_types, fieldrot=180.0)
-                            
-
-        #Store the info
-        for i,t in enumerate(targs):
-            t['x'],t['y'],t['z'],t['r']=pos.x[i],pos.y[i],pos.z[i],pos.r[i]
-        
-        for i in (i for i,t in enumerate(mech.type) if t==GUIDE_REF_TYPE):
-            #TODO: Make guide the responsible guide target
-            hole=Hole()
-            hole.update({'id':'GUIDEREF','x':mech.x[i], 'y':mech.y[i],
-                        'z':mech.z[i], 'r':mech.r[i],'type':'R', 'guide':{}})
-            field['R'].append(hole)
-
-        field['_processed']=True
-
-    def collisions(self):
-        if not field['_collisions']:
-            holes=self.holes()
-            x=[h['x'] for h in holes]
-            y=[h['y'] for h in holes]
-            r=[h['r'] for h in holes]
-            collision_graph=jbastro.build_overlap_graph_cartesian(x,y,r,
-                                                      overlap_pct_ok=0.0)
-    
-    def drillable_holes(self):
-        pass
-
-    def undrillable_holes(self):
-        """Return something wich lists the holes that cannot be drilled """
-        pass
-
-    def isProcessed(self):
-        return self['_processed']
-
-    def holes(self):
-        """ return a list of all the holes the field has on the plate """
-        if not self.isProcessed():
-            return []
-        else:
-            return self['C']+self['T']+self['S']+self['A']+self['G']+self['R']
+def _flatten_dictlist(dictlist, flattenkey):
+    """
+    merge items from subdictionary in flattenkey into the parent dict for each
+    dict in dictlist. if subdict keys are already in dict then prepend
+    flattenkey_. if key still in dict fail.
+    """
+    ret=[]
+    for r in dictlist:
+        toflatten=r[flattenkey]
+        rec=r.copy()
+        rec.pop(flattenkey)
+        for k in toflatten:
+            if k in rec:
+                newk='{}_{}'.format(flattenkey,k)
+                assert newk not in rec
+                rec[newk]=toflatten[k]
+            else:
+                rec[k]=toflatten[k]
+        ret.append(rec)
+    return ret
 
 
-class Hole(dict):
-    def __init__(self, *args):
-        dict.__init__(self, args)
-        self.update({'x':0.0,'y':0.0,'z':0.0,'r':0.0,'user':{},
-                    'id':'', 'priority':0.0,'type':'',
-                    'ra':0.0,'dec':0.0,'epoch':0.0,
-                    'pm_ra':0.0, 'pm_dec':0.0})
-
-    def __hash__(self):
-        return "{}{}{}{}{}".format(self['x'], self['y'], self['z'],
-                                   self['r'], self['type']).__hash__()
-
+        #TODO: User keys disallow keys we use (prepend U_)
+        #TODO: enforces all user keys are strings
 def load_dotfield(file):
     """
-    returns {'name':field_name,
-                'G':dictlist, guides
-                'T':dictlist, targets
-                'C':dictlist, shack hartman
-                'A':dictlist, acquisitions
-                'S':dictlist, skys
-                'Z':dictlist, standard stars
-                'R':dictlist} guide ref holes
-    or raises error if file has issues.
+    returns FieldCatalog() or raises error if file has issues.
     """
 
-    ret=field()
-    ret['file']=os.path.basename(file)
-    
+    ret=FieldCatalog(file=os.path.basename(file))
 
     try:
         lines=open(file,'r').readlines()
@@ -255,46 +184,259 @@ def load_dotfield(file):
 
     have_name=False
 
-    try:
-        for l in (l for l in lines if l):
-            if l[0] =='#':
-                continue
-            elif l[0] not in '+-0123456789' and not l.lower().startswith('ra'):
-                try:
-                    k,_,v=l.partition('=')
-                    k=k.strip().lower()
-                    if k=='field':
-                        k='name'
-                    v=v.strip()
-                    assert v != ''
-                except Exception as e:
-                    raise Exception('Bad key=value formatting: {}'.format(str(e)))
-                if k in VALID_TYPE_CODES:
-                    raise Exception('Key {} not allowed.'.format(k))
-                if k in PROGRAM_KEYS and ret[k]==None:
-                    if k=='obsdate':
-                        ret[k]=datetime(*map(int, v.split()))
-                    else:
-                        ret[k]=v
-                elif k not in ret['user']:
-                    ret['user'][k]=v
-                else:
-                    raise Exception('Key {} may only be defined once.'.format(k))
-            elif l.lower().startswith('ra'):
-                keys=_parse_header_row(l.lower())
+#    try:
+    for l in (l for l in lines if l):
+        if l[0] =='#':
+            continue
+        elif l[0] not in '+-0123456789' and not l.lower().startswith('ra'):
+            try:
+                k,_,v=l.partition('=')
+                k=k.strip().lower()
+                if k=='field':
+                    k='name'
+                v=v.strip()
+                assert v != ''
+            except Exception as e:
+                raise Exception('Bad key=value formatting: {}'.format(str(e)))
+
+            if k=='obsdate':
+                ret.obsdate=datetime(*map(int, v.split()))
+            elif k=='name':
+                ret.name=v
             else:
-                hole=Hole()
-                hole.update(_parse_record_row(l, keys))
-                ret[hole['type']].append(hole)
-    except Exception as e:
-        raise IOError('Failed on line '
-                        '{}: {}\n  Error:{}'.format(lines.index(l),l,str(e)))
+                ret.user[k]=v
+        elif l.lower().startswith('ra'):
+            keys=_parse_header_row(l.lower())
+        else:
+            #import ipdb;ipdb.set_trace()
+            targ=Target(**_parse_record_row(l, keys))
+            ret.add_target(targ)
+            targ.field=ret
+#    except Exception as e:
+#        raise IOError('Failed on line '
+#                        '{}: {}\n  Error:{}'.format(lines.index(l),l,str(e)))
     #Use the s-h (or field center id if none) as the field name if one wasn't
     # defined
-    if not ret['name']:
-        ret['name']=ret['C'][0]['id']
-
-    for t in ret['C']:
-        t['x'],t['y'],t['z'],t['r']=0.0,0.0,0.0,SH_RADIUS
-
+    if not ret.name:
+        ret.name=ret.sh.id
+    #import ipdb;ipdb.set_trace()
     return ret
+
+
+
+class FieldCatalog(object):
+    def __init__(self, file='', name='', obsdate=None,
+                 sh=None, user=None, guides=None, targets=None,
+                 acquisitions=None, skys=None, standards=None):
+        """sh should be a target"""
+        
+        self.file=file
+        self.name=name
+        self.obsdate=obsdate
+        self.sh=sh if targets else Target(type='C',hole=SHACKHARTMAN_HOLE)
+        self.user=user if user else {}
+        self.guides=guides if guides else []
+        self.targets=targets if targets else []
+        self.acquisitions=acquisitions if acquisitions else []
+        self.skys=skys if skys else []
+        self.standards=standards if standards else []
+        
+        self.holesxy_info=None
+        
+        self._processed=False
+
+    def ra(self):
+        print 'Not correcting field ra with PM'
+        return self.sh.ra
+
+    def dec(self):
+        print 'Not correcting field dec with PM'
+        return self.sh.dec
+
+    def add_target(self,targ):
+        if targ.is_sky:
+            self.skys.append(targ)
+        elif targ.is_target:
+            self.targets.append(targ)
+        elif targ.is_guide:
+            self.guides.append(targ)
+        elif targ.is_acquisition:
+            self.acquisitions.append(targ)
+        elif targ.is_standard:
+            self.standards.append(targ)
+        elif targ.is_sh:
+            self.sh=targ
+            self.sh.hole=SHACKHARTMAN_HOLE
+        else:
+            raise ValueError('Target {} of unknown type'.format(targ))
+
+
+    def process(self):
+        """
+        Process the targets in the field to find their update xyz positions
+        """
+        obs_date=self.obsdate
+        
+        targs=self.guides+self.targets+self.acquisitions+self.skys
+        ras=[t.ra.float for t in targs]
+        decs=[t.dec.float for t in targs]
+        
+        #TODO: Update ra & dec with proper motions here
+        
+        epochs=[t.epoch for t in targs]
+        targ_types=[t.type for t in targs]
+        
+        guide_ndxs=[i for i,t in enumerate(targ_types) if t=='G']
+        
+        pos, guideref, _, info=holesxy.compute_hole_positions(self.sh.ra.float,
+                                self.sh.dec.float, self.sh.epoch,self.obsdate,
+                                ras, decs, epochs, targ_types, fieldrot=180.0)
+        
+        #Store the info
+        for i,t in enumerate(targs):
+            t.hole=Hole(pos.x[i],pos.y[i],pos.z[i],pos.r[i],t)
+        
+        for i,ndx in enumerate(guide_ndxs):
+            holes=[Hole(guideref.x[3*i+j], guideref.y[3*i+j],
+                        guideref.z[3*i+j], guideref.r[3*i+j], targs[ndx])
+                   for j in range(3)]
+            targs[ndx].additional_holes=holes
+
+
+        self.holesxy_info=info
+
+        self._processed=True
+
+    def get_info_dict(self):
+        """ return a dictionary of field information """
+        ret={'name':self.name,
+             'file':self.file,
+             'obsdate':str(self.obsdate),
+             '(ra, dec)':'{} {}'.format(self.sh.ra.sexstr,self.sh.dec.sexstr),
+             '(az, el)':'{:3f} {:3f}'.format(self.holesxy_info.az,
+                                             self.holesxy_info.el),
+             '(ha, st)':'{:3f} {:3f}'.format(self.holesxy_info.ha,
+                                             self.holesxy_info.st),
+             'airmass':'{:2f}'.format(self.holesxy_info.airmass)}
+
+        for k,v in self.user.iteritems():
+            if k in ret:
+                ret['user_'+k]=str(v)
+            else:
+                ret[k]=str(v)
+        return ret
+
+    def get_drillable_targets(self):
+        """Return all targets in the catalog that can be drilled"""
+        try:
+            return self._drillable_targets
+        except AttributeError:
+            pass
+        
+        if not self._processed:
+            self.process()
+        
+        from time import time
+        tics=[time()]
+        
+        #Get data needed for collision graph
+        holes=self.holes()+[self.sh.hole]
+        x=[h.x for h in holes]
+        y=[h.y for h in holes]
+        r=[h.r for h in holes]
+        
+        #Cull all outside the central 29.5' 
+        
+        tic1=time()
+        
+        #Create the graph
+        coll_graph=build_overlap_graph_cartesian(x,y,r, overlap_pct_r_ok=0.9)
+
+        #Drop everything conflicting with the sh
+        dropped=coll_graph.drop_conflicting_with(len(holes)-1)
+        for i in dropped:
+            holes[i].target.conflicting=self.sh
+
+        holes.pop(-1)
+        coll_graph._nnodes-=1
+
+        tics.append(time())
+        pri=[h.target.priority for h in holes]
+        keep,drop=coll_graph.crappy_min_vertex_cover_cut(weights=pri,
+                                                         retdrop=True)
+
+        tics.append(time())
+        
+        #Now go through and figure out which targets are(not) usable
+        drillable=[holes[i].target for i in keep]
+        undrillable=[holes[i].target for i in drop]
+        
+        tics.append(time())
+        
+        #determine cause of conflict
+        for i,t in enumerate(undrillable):
+            conf=list(set(drillable[ndx]
+                          for ndx in coll_graph.collisions(drop[i])))
+            try:
+                assert len(conf) >0
+            except Exception:
+                import ipdb;ipdb.set_trace()
+            t.conflicting=conf
+        
+        drillable=list(set(drillable))
+        undrillable=set(undrillable)
+
+        tics.append(time())
+        tics=[t-tics[0] for t in tics[1:]]
+        log.debug('get_drillable_targets took: {}'.format(tics))
+
+        self._drillable_targets=drillable
+
+        return self._drillable_targets
+        
+    def isProcessed(self):
+        return self._processed
+
+    @property
+    def usable_guides(self):
+        return [g for g in self.guides if not g.conflicting]
+
+    @property
+    def usable_acquisitions(self):
+        return [g for g in self.acquisitions if not g.conflicting]
+
+    def all_targets(self):
+        return (self.skys+self.targets+self.guides+self.acquisitions)
+
+    def holes(self):
+        """ return a list of all the holes the field would like on a plate """
+        if not self._processed:
+            return []
+        else:
+            return [hole for t in self.all_targets() for hole in t.holes()]
+
+    def drillable_dictlist(self):
+        ret=[]
+        for t in (t for t in self.all_targets() if not t.conflicting):
+            d=t.hole.info
+            d.pop('field','')
+            ret.append(d)
+            if t.type==GUIDE_TYPE:
+                #Change type code for guide refs
+                for h in t.additional_holes:
+                    d=h.info
+                    d.pop('field','')
+                    d['type']=GUIDEREF_TYPE
+                    ret.append(d)
+        return ret
+
+    def undrillable_dictlist(self, flat=False):
+        ret=[t.info for t in self.all_targets() if t.conflicting]
+        map(lambda x: x.pop('field',''), ret)
+        return ret
+
+    def standards_dictlist(self, flat=False):
+        if not flat:
+            return self.standards
+        else:
+            return _flatten_dictlist(self['Z'],'user')

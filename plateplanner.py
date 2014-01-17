@@ -4,12 +4,13 @@ import ttk
 import BetterCanvas
 import os
 import argparse
-import platethingfoo
+import platemanager
 from dimensions import PLATE_RADIUS
 from ttkcalendar import date_time_picker
 
-import logger
-log=logger.getLogger('plateplanner')
+from logger import getLogger
+log=getLogger('plateplanner')
+
 
 def parse_cl():
     parser = argparse.ArgumentParser(description='Help undefined',
@@ -53,16 +54,16 @@ class HoleInfoDialog:
             
             #self.canvas.itemconfigure('.'+id, state=Tkinter.DISABLED)
 
-            lbl_str=' '.join(['{}={}'.format(k,v) for k,v in hole.iteritems()])
+            lbl_str=' '.join(['{}={}'.format(k,v)
+                              for k,v in hole.info.iteritems()])
 
             def cmd():
                 self.close()
                 self.initializeSingle(hole)
-            
-            Tkinter.Label(self.dialog, text=lbl_str[0:80]).grid(row=i,column=0)
-            
-            Tkinter.Button(self.dialog,text='Select', command=cmd).grid(
-                        row=i,column=1)
+            item=Tkinter.Label(self.dialog, text=lbl_str)
+            item.grid(row=i,column=0)
+            item=Tkinter.Button(self.dialog,text='Select', command=cmd)
+            item.grid(row=i,column=1)
 
     def initializeSingle(self, hole):
 
@@ -71,8 +72,11 @@ class HoleInfoDialog:
         self.dialog.bind("<FocusOut>", self.defocusCallback)
         self.dialog.bind("<Destroy>", self.destroyCallback)
         
-        lbl_str=' '.join(['{}={}'.format(k,v) for k,v in hole.iteritems()])
-        Tkinter.Label(self.dialog, text=lbl_str).pack()
+        
+        recs=['{}={}'.format(k,v) for k,v in hole.info.iteritems()]
+        
+        for txt in recs:
+            Tkinter.Label(self.dialog, text=txt).pack()
         
         Tkinter.Button(self.dialog,text='Done',command=self.ok).pack()
 
@@ -111,6 +115,8 @@ class App(Tkinter.Tk):
 
     def initialize(self):
         
+        self.manager=platemanager.Manager()
+        
         #Basic window stuff
         swid=120
         bhei=55
@@ -142,13 +148,11 @@ class App(Tkinter.Tk):
         Tkinter.Button(frame, text="Select Fields",
                        command=self.field_info_window).pack()
         Tkinter.Button(frame, text="Make Plate",
-                       command=self.manager.save_selected_as_plate).pack()
+                       command=self.make_plate).pack()
 
         #Info output
         self.info_str=Tkinter.StringVar(value='Red: 000  Blue: 000  Total: 0000')
         Tkinter.Label(frame2, textvariable=self.info_str).pack(anchor='w')
-    
-        self.manager=platethingfoo.Foo()
     
     def status_string(self):
         return 'Foobar'
@@ -189,14 +193,21 @@ class App(Tkinter.Tk):
     def field_info_window(self):
         print self
         new=Tkinter.Toplevel(self)
-        tree = ttk.Treeview(new, columns=('size', 'modified'))
-        tree['columns'] = ('RA', 'Dec', 'nT+S', 'nConflict', 'Plate')
-
+        cols=('RA', 'Dec', 'nT+S', 'nConflict', 'Plate')
+        tree = ttk.Treeview(new, columns=cols)
+        
+        tree.heading('#0',text='Name')
+        for c in cols:
+            tree.heading(c,text=c)
+        
         for f in self.manager.fields:
-            tree.insert('', 'end', f['name'], text=f['name'],
-                        values=(f.ra(), f.dec(),f.nfib_needed(), 0,''),
+            tree.insert('', 'end', f.name, text=f.name,
+                        values=(f.sh.ra.sexstr,
+                                f.sh.dec.sexstr,
+                                len(f.targets)+len(f.skys),
+                                0,''),
                         tags=())
-        tree.bind(sequence='<<TreeviewSelect>>',func=self.select_fields)
+        tree.bind(sequence='<<TreeviewSelect>>', func=self.select_fields)
         tree.pack()
     #    tree.tag_configure('ttk', background='yellow')
     #    tree.tag_bind('ttk', '<1>', itemClicked); # the item clicked can be found via tree.focus()
@@ -204,40 +215,33 @@ class App(Tkinter.Tk):
     def select_fields(self, event):
         log.info('Selecting {}'.format(event.widget.selection()))
         self.manager.select_fields(event.widget.selection())
-#        for name,field in self.manager.selected_fields.iteritems():
-#            if not field['obsdate']:
-#                def setdatetime(obsdate):
-#                    print ('Setting {} obsdate to {}'.format(field['name'],
-#                                                               obsdate))
-#                    field['obsdate']=obsdate
-#                date_time_picker(field['name'], setdatetime)
-        #TODO: Update conflicting count
-        self.manager.draw(self.canvas)
+        self.show()
+
+    def make_plate(self):
+        w=PopupWindow(self, get=str, query="Plate Name?")
+        self.wait_window(w.top)
+        self.manager.save_selected_as_plate(w.value)
 
 
-#def collision_detect(x,y,r):
-#    #build KD Tree at all xy
-#    tree=spatial.KDTree(zip(x, y))
-#    #For each point get the two nearest neighbors, (itself and next closest)
-#    MAX_MIN_SEP=type_clearance('G','G')
-#    dists,nearest_ndx=tree.query(pts,2,eps=0,p=2,
-#                                  distance_upper_bound=MAX_MIN_SEP)
-#    #Dist is distance from hole i to nearest hole nearest_ndx[i]
-#    dists=dists[:,1] #Don't care about self
-#    nearest_ndx=nearest_ndx[:,1] #Don't care about self
-#
-#    
-#    #Check each hole type
-#    for t1 in hole_types:
-#        #Flag all x,y with type G and having a nearest neighpor
-#        # closer than allowed with type G
-#        pot_conflict=dists < clearance(t1,'G') & isG
-#        #
-#        conflict_ndx[pot_conflict]
-#        r[pot_conflict & ]==t1
+class PopupWindow(object):
+    def __init__(self, master, get=str, query="No query specified"):
+        top=self.top=Tkinter.Toplevel(master)
+        self.l=Tkinter.Label(top,text=query)
+        self.l.pack()
+        if get == str:
+            self.e=Tkinter.Entry(top)
+            self.e.pack()
+            self.value=''
+        self.b=Tkinter.Button(top,text='Ok',command=self.cleanup)
+        self.b.pack()
+
+    def cleanup(self):
+        self.value=self.e.get()
+        self.top.destroy()
 
 
 if __name__ == "__main__":
+    log.info('Starting...')
     app = App(None)
     app.title('Hole Mapper')
     app.mainloop()
