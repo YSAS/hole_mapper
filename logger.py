@@ -3,12 +3,12 @@ import os
 
 _configured=False
 
-def setup_logging(name, logdir='', scrnlog=True, txtlog=False,
+def setup_logging(name,logdir='', scrnlog=True, txtlog=False,
                   loglevel=logging.DEBUG):
     
 
     
-    log = logging.getLogger(name)
+    log = logging.getLogger()
     log.setLevel(loglevel)
     
     log_formatter = logging.Formatter("%(asctime)s - %(levelname)s :: %(message)s")
@@ -18,8 +18,7 @@ def setup_logging(name, logdir='', scrnlog=True, txtlog=False,
     
         if not os.path.exists(logdir):
             os.mkdir(logdir)
-        txt_handler = RotatingFileHandler(
-                                          os.path.join(logdir, name+".log"),
+        txt_handler = RotatingFileHandler(os.path.join(logdir, name+".log"),
                                           backupCount=5)
         txt_handler.doRollover()
         txt_handler.setFormatter(log_formatter)
