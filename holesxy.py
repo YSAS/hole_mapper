@@ -1,12 +1,7 @@
 import numpy as np
 from jbastro.astroLib import sexconvert
 from m2fsholesxy import m2fsholesxy as m2hxy
-
-
-#_raarray=np.array(1000,dtype=np.float)
-#_decarray=np.array(1000,dtype=np.float)
-#_eparray=np.array(1000,dtype=np.float)
-#_typearray=np.array(1000,dtype='S1')
+from m2fsholesxy import m2fsholesxyplate as m2hxyplate
 
 CLAY_LONGITUDE=sexconvert(70,42,06.00,dtype=float) #70 42 06.00 in decimal degrees
 CLAY_LATITUDE=sexconvert(-29,00,12.00,dtype=float) #-29 00 12.00 in decimal degrees
@@ -53,41 +48,21 @@ def compute_hole_positions(field_ra,field_dec,field_epoch, date,
     epochstars=np.array([float(ep) for ep in epochs])
     typestars=np.array([c for c in targ_types])
 
-#    _raarray[i]=rastars[i]
-#    _decarra[i]=decstars[i]
-#    _eparray[i]=epochstars[i]
-#    _typearray[i]=typestars[i]
-
     #All coordinates are now in decimal degrees
 
     #Call the fortran code
-    x,y,z,r,type_out, st,ha,az,el,airmass,nout = m2hxy(ut, utdate, latitude,
+    x,y,z,d,type_out, st,ha,az,el,airmass,nout = m2hxy(ut, utdate, latitude,
           longitude, elevation, rafield, decfield, epochfield, fieldrot,
           rastars, decstars, epochstars, typestars)
-
-#    x=np.zeros(nstar+100,dtype=np.float)
-#    y=np.zeros(nstar+100,dtype=np.float)
-#    z=np.zeros(nstar+100,dtype=np.float)
-#    r=np.zeros(nstar+100,dtype=np.float)
-#    type_out=np.zeros(nstar+100,dtype='S1')
-#    nout=nstar+30
-#    st=0.0
-#    ha=0.0
-#    az=0.0
-#    el=0.0
-#    airmass=0.0
 
     class retobj(object):
         pass
 
-
     pos=retobj()
-    mech=retobj()
-    ret=retobj()
     pos.x=[v for v in x[:nstar]]
     pos.y=[v for v in y[:nstar]]
     pos.z=[v for v in z[:nstar]]
-    pos.r=[v/2.0 for v in r[:nstar]]
+    pos.d=[v for v in d[:nstar]]
 
     nguide=(typestars=='G').sum()
     if nguide:
@@ -95,20 +70,15 @@ def compute_hole_positions(field_ra,field_dec,field_epoch, date,
         guideref.x=[v for v in x[nstar:nstar+3*nguide]]
         guideref.y=[v for v in y[nstar:nstar+3*nguide]]
         guideref.z=[v for v in z[nstar:nstar+3*nguide]]
-        guideref.r=[v/2.0 for v in r[nstar:nstar+3*nguide]]
+        guideref.d=[v for v in d[nstar:nstar+3*nguide]]
         guideref.type=[v for v in type_out[nstar:nstar+3*nguide]]
     
-        if (np.array(guideref.r)==0.0).any():
+        if (np.array(guideref.d)==0.0).any():
             import ipdb;ipdb.set_trace()
     else:
         guideref=None
-        
-    mech.x=[v for v in x[nstar+3*nguide:nout]]
-    mech.y=[v for v in y[nstar+3*nguide:nout]]
-    mech.z=[v for v in z[nstar+3*nguide:nout]]
-    mech.r=[v/2.0 for v in r[nstar+3*nguide:nout]]
-    mech.type=[v for v in type_out[nstar+3*nguide:nout]]
     
+    ret=retobj()
     ret.airmass=airmass
     ret.ha=ha
     ret.el=el
@@ -116,30 +86,118 @@ def compute_hole_positions(field_ra,field_dec,field_epoch, date,
     ret.az=az
     
 
-    return (pos, guideref, mech, ret)
+    return (pos, guideref, ret)
 
 
-def compute_standard_pos():
-    from datetime import datetime
-    ra=0.0
-    dec=-40.0
-    date=datetime(2014,9,2,0,0,0)
+
+def get_plate_holes(fieldrot=180.0):
+    """
+    Compute x,y,z,r for the standard holes on a plate
+    """
     
-    deltara=lambda dec: np.rad2deg(np.arccos(
-                np.cos(np.deg2rad(180./3600.0)) * 1.0/np.cos(np.deg2rad(dec))**2 -
-                np.tan(np.deg2rad(dec))**2))
+    class retobj(object):
+        pass
+    mech=retobj()
     
-    ras= np.array([       0.0,         0.0, deltara(dec), -deltara(dec)])+ra
-    decs=np.array([180/3600.0, -180/3600.0,          0.0,           0.0])+dec
-    epochs=[2000.0]*4
-    targ_types=['T']*4
-    stds,_,mech,_=compute_hole_positions(ra, dec, 2000.0, date,
-                                         ras, decs, epochs, targ_types)
+    std_offset=2.44268264430000003884
+    std_offset_z=-0.0585076611999999982
+    science_d=0.166
+    fid_d=0.26
+    x=[ -std_offset,   std_offset,  0., 0.,
+       -13.75, 13.75,  -13.75, 13.75,
+       -12.125, -2.91000008580000013581,  12.78999996189999954765]
 
-    print stds.x
-    print stds.y
-    raise Exception()
-    return stds,mech
+    y=[ 0., 0., -std_offset, std_offset,
+       2.5, 2.5, -2.5, -2.5,
+       7., -13.69499969479999990085, 5.6939997673000002365]
+    
+    z=[std_offset_z, std_offset_z,std_offset_z,std_offset_z,
+       -1.5, -1.5, -1.5, -1.5,
+       -1.5, -1.5, -1.5]
 
-compute_standard_pos()
+    d=[science_d, science_d, science_d, science_d,
+       fid_d, fid_d, fid_d, fid_d,
+       fid_d, fid_d, fid_d]
+       
+    type_out=['Z', 'Z', 'Z', 'Z', 'F', 'F', 'F', 'F', 'B', 'B', 'B']
+
+    mech.x=x
+    mech.y=y
+    mech.z=z
+    mech.d=d
+    mech.type=type_out
+
+#    rafield=0.0
+#    decfield=0.0
+#    epochfield=2000.0
+#    
+#    deltara=lambda dec: np.rad2deg(np.arccos(
+#                np.cos(np.deg2rad(180./3600.0)) *
+#                1.0/np.cos(np.deg2rad(dec))**2 -
+#                np.tan(np.deg2rad(dec))**2))
+#    
+#    rastars= np.array([              0.0,                0.0,
+#                       deltara(decfield), -deltara(decfield)]) + rafield
+#                       
+#    decstars=np.array([       180/3600.0,        -180/3600.0,
+#                                     0.0,                0.0]) + decfield
+#                                     
+#    epochstars=np.array([2000.0]*4)
+#
+#    nstar=len(rastars)
+#
+#    #Call the fortran code
+#    x,y,z,d,type_out = m2hxyplate(rafield, decfield, epochfield, fieldrot,
+#                                  rastars, decstars, epochstars)
+
+
+#    mech.x=x.tolist()
+#    mech.y=y.tolist()
+#    mech.z=z.tolist()
+#    mech.d=d.tolist()
+#    mech.type=[t for t in type_out]
+#    import ipdb;ipdb.set_trace()
+
+    
+    return mech
+
+
+#def plater(fieldrot=180.0):
+#    """
+#    Compute x,y,z,r for the standard holes on a plate
+#    """
+#    
+#    rafield=0.0
+#    decfield=0.0
+#    epochfield=2000.0
+#    
+#    deltara=lambda dec,delt_as: np.rad2deg(np.arccos(
+#                np.cos(np.deg2rad(delt_as/3600.0)) *
+#                1.0/np.cos(np.deg2rad(dec))**2 -
+#                np.tan(np.deg2rad(dec))**2))
+#    
+#    rastars= np.array([              0.0,                0.0]) + rafield
+#                       
+#    decstars=np.array([       29.5/60/2,        29.5/60/2]) + decfield
+#                                     
+#    epochstars=np.array([2000.0]*2)
+#
+#    nstar=len(rastars)
+#
+#    #Call the fortran code
+#    x,y,z,r,type_out = m2hxyplate(rafield, decfield, epochfield, fieldrot,
+#                                  rastars, decstars, epochstars)
+#
+#
+#    print x
+#    print y
+#    
+#    raise Exception
+#
+##    import ipdb;ipdb.set_trace()
+#
+#    
+#    return mech
+#
+#plater()
 

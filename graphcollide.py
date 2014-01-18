@@ -2,7 +2,7 @@ from jbastro.great_circle_dist import dist_radec_fast
 import numpy as np
 
 
-def build_overlap_graph_cartesian(x, y, r, overlap_pct_r_ok=0):
+def build_overlap_graph_cartesian(x, y, d, overlap_pct_r_ok=0):
     """
     Generate a dict of lists for crappy_min_vertex_cover_cut
     with edges between points that conflict
@@ -21,7 +21,7 @@ def build_overlap_graph_cartesian(x, y, r, overlap_pct_r_ok=0):
     edges={}
     x=np.array(x)
     y=np.array(y)
-    r=np.array(r)
+    r=np.array(d)/2.0
     hole_radii_set=set(r.tolist())
     
     for i,coord in enumerate(zip(x,y)):

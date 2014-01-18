@@ -56,7 +56,7 @@
       character*1 type_out(nmax)
 
 !f2py intent(hide) nstar
-!f2py intent(hide) nmax
+!f2py integer, optional,intent(hide),depend(rastars) :: nmax=len(rastars)+100
 !f2py intent(in) ut
 !f2py intent(in) utdate
 !f2py intent(in) long
@@ -105,13 +105,65 @@
 !adds 3 + 4 + 1 (not yet) + 3*nG
 
         call guiderefholes(xm,ym,zm,sizem,type_out,nstar,nmax,fieldrot,rmax)
-        call fiducialholes(xm,ym,zm,sizem,type_out,nstar,nmax)
-        call thumbscrewholes(xm,ym,zm,sizem,type_out,nstar,nmax)
         call getfieldinfo(utdate,ut,raplugfield,decplugfield,lat,long, &
           sidtime,hangle,azimuth,elevation,airmass)
           
         nout=nstar
 !
+      end
+!
+!
+!!!!!!!!!!!!
+!
+      subroutine m2fsholesxyplate(rafield,decfield,epochfield,fieldrot, nstar, &
+          rastars, decstars, epochstars, xm, ym, zm, sizem, type_out, nmax)
+      !
+      implicit real*8 (a-h,o-z)
+      integer i
+      integer tconfig
+      integer nmax,nstar
+      !
+      parameter(tconfig=3)
+
+      real*8 rafield,decfield,epochfield,fieldrot
+      real*8 rastars(nstar),decstars(nstar),epochstars(nstar)
+
+      real*8 x(nstar),y(nstar)
+      real*8 xi(nstar),eta(nstar)
+
+      real*8 xm(nmax),ym(nmax),zm(nmax),sizem(nmax)
+      character*1 type_out(nmax)
+
+      !f2py intent(hide) nstar
+      !f2py integer, optional,intent(hide),depend(rastars) :: nmax=len(rastars)+7
+      !f2py intent(in) rafield
+      !f2py intent(in) decfield
+      !f2py intent(in) epochfield
+      !f2py intent(in) fieldrot
+      !f2py intent(in) rastars
+      !f2py intent(in) decstars
+      !f2py intent(in) epochstars
+      !f2py intent(in) tconfig
+
+      !
+      !f2py intent(out) xm
+      !f2py intent(out) ym
+      !f2py intent(out) zm
+      !f2py intent(out) sizem
+
+      !f2py intent(out) type_out
+
+      do i=1,nstar
+        type_out(i)='Z'
+      end do
+
+      call calcstandard(rastars,decstars,epochstars, &
+            rafield,decfield,epochfield,xi,eta,nstar)
+      call transformxy(xi,eta,nstar,x,y,tconfig)
+      call machinexyz(x,y,type_out,nstar,fieldrot,xm,ym,zm,sizem)
+      call fiducialholes(xm,ym,zm,sizem,type_out,nstar,nmax)
+      call thumbscrewholes(xm,ym,zm,sizem,type_out,nstar,nmax)
+
       end
 !
 !
@@ -388,6 +440,9 @@
          size = starsize
          return
       else if(type.eq.'X'.or.type.eq.'x') then
+         size = starsize
+         return
+      else if(type.eq.'Z'.or.type.eq.'z') then
          size = starsize
          return
       else if(type.eq.'G'.or.type.eq.'g') then

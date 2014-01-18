@@ -24,12 +24,16 @@ def defdict(dic,default='-'):
     x.update(dic)
     return x
 
-def _dictlist_to_records(dictlist, col_first=None, col_last=None):
+def _dictlist_to_records(dictlist, col_first=None, col_last=None,
+                         required_only=False):
     
     if not col_first:
         col_first=[]
     if not col_last:
         col_last=[]
+    if required_only and len(col_last)+len(col_first)==0:
+        raise ValueError('Must specify required columns with required_only')
+
     #Get all the columns
     cols=list(set([k.lower() for rec in dictlist for k in rec.keys()]))
     
@@ -40,8 +44,11 @@ def _dictlist_to_records(dictlist, col_first=None, col_last=None):
         except ValueError:
             pass
 
-    cols=col_first+cols+col_last
-    
+    if required_only:
+        cols=col_first+col_last
+    else:
+        cols=col_first+cols+col_last
+
     fmt=_make_fmt_string(cols, dictlist)
     
     #Create the records
@@ -50,11 +57,12 @@ def _dictlist_to_records(dictlist, col_first=None, col_last=None):
     rec+=[fmt.format(r=defdict(dic)) for dic in dictlist]
     return rec
 
-PLATEHOLE_REQUIRED_COLS=['id','x','y','z','r','type']
-UNDRILLABLE_REQUIRED_COLS=['id','ra','dec','epoch','priority','type', 'conflict']
+PLATEHOLE_REQUIRED_COLS=['id','x','y','z','d']
+UNDRILLABLE_REQUIRED_COLS=['id','ra','dec','epoch','priority','type',
+                           'conflicts']
 STANDARDS_REQUIRED_COLS=['id','ra','dec','epoch','priority']
 DRILLABLE_REQUIRED_COLS=['id','ra','dec','epoch','priority','type', 'x','y',
-                         'z','r']
+                         'z','d']
 
 def write(name, plate_holes, fields, dir='./'):
     filename='{}{}.plate'.format(dir, name)
@@ -104,4 +112,25 @@ def write(name, plate_holes, fields, dir='./'):
                                       STANDARDS_REQUIRED_COLS)
             for r in recs:
                 fp.write(r)
+
+
+
+DRILLFILE_REQUIRED_COLS=['x','y','z','d','type','id']
+def write_drill(name, plate_holes, fields, dir='./'):
+    
+    
+    file_fmt_str='{}{}_All_Holes_{}.txt'
+    
+    dicts=[d for f in fields for d in f.drillable_dictlist()]+plate_holes
+    diams=set(d['d'] for d in dicts)
+    
+    for diam in diams:
+        dicts_for_file=[d for d in dicts if d['d']==diam]
+        with open(file_fmt_str.format(dir, name, diam),'w') as fp:
+
+            recs=_dictlist_to_records(dicts_for_file, DRILLFILE_REQUIRED_COLS,
+                                      required_only=True)
+            for r in recs[1:]:
+                fp.write(r)
+
 

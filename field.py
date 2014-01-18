@@ -288,17 +288,17 @@ class FieldCatalog(object):
         
         guide_ndxs=[i for i,t in enumerate(targ_types) if t=='G']
         
-        pos, guideref, _, info=holesxy.compute_hole_positions(self.sh.ra.float,
+        pos, guideref, info=holesxy.compute_hole_positions(self.sh.ra.float,
                                 self.sh.dec.float, self.sh.epoch,self.obsdate,
                                 ras, decs, epochs, targ_types, fieldrot=180.0)
         
         #Store the info
         for i,t in enumerate(targs):
-            t.hole=Hole(pos.x[i],pos.y[i],pos.z[i],pos.r[i],t)
+            t.hole=Hole(pos.x[i],pos.y[i],pos.z[i],pos.d[i],t)
         
         for i,ndx in enumerate(guide_ndxs):
             holes=[Hole(guideref.x[3*i+j], guideref.y[3*i+j],
-                        guideref.z[3*i+j], guideref.r[3*i+j], targs[ndx])
+                        guideref.z[3*i+j], guideref.d[3*i+j], targs[ndx])
                    for j in range(3)]
             targs[ndx].additional_holes=holes
 
@@ -343,14 +343,12 @@ class FieldCatalog(object):
         holes=self.holes()+[self.sh.hole]
         x=[h.x for h in holes]
         y=[h.y for h in holes]
-        r=[h.r for h in holes]
-        
-        #Cull all outside the central 29.5' 
-        
+        d=[h.d for h in holes]
+                
         tic1=time()
         
         #Create the graph
-        coll_graph=build_overlap_graph_cartesian(x,y,r, overlap_pct_r_ok=0.9)
+        coll_graph=build_overlap_graph_cartesian(x,y,d, overlap_pct_r_ok=0.9)
 
         #Drop everything conflicting with the sh
         dropped=coll_graph.drop_conflicting_with(len(holes)-1)
@@ -417,7 +415,8 @@ class FieldCatalog(object):
 
     def drillable_dictlist(self):
         ret=[]
-        for t in (t for t in self.all_targets() if not t.conflicting):
+        for t in (t for t in self.all_targets()
+                  if not t.conflicting and t.on_plate):
             d=t.hole.info
             d.pop('field','')
             ret.append(d)
@@ -431,7 +430,8 @@ class FieldCatalog(object):
         return ret
 
     def undrillable_dictlist(self, flat=False):
-        ret=[t.info for t in self.all_targets() if t.conflicting]
+        ret=[t.info for t in self.all_targets()
+             if t.conflicting or not t.on_plate]
         map(lambda x: x.pop('field',''), ret)
         return ret
 

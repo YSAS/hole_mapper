@@ -11,8 +11,9 @@ from logger import getLogger
 from dimensions import PLATE_RADIUS, SH_RADIUS
 from field import load_dotfield
 from graphcollide import build_overlap_graph_cartesian
-
-
+from holesxy import get_plate_holes
+from target import Target
+from hole import Hole
 log=getLogger('plateplanner.foo')
 
 
@@ -31,6 +32,11 @@ class Manager(object):
         self.selected_fields=[]
         log.info('Started Manager')
         self.plate_holes=[]
+        mech=get_plate_holes()
+        for i in range(len(mech.x)):
+            t=Target(type=mech.type[i])
+            t.hole=Hole(mech.x[i],mech.y[i],mech.z[i],mech.d[i],t)
+            self.plate_holes.append(t)
 
     def load(self, file):
         """ 
@@ -72,7 +78,7 @@ class Manager(object):
         drawimage=False
         
         pos=hole.x,hole.y
-        rad=hole.r*radmult
+        rad=hole.d*radmult/2.0
         
         hashtag="."+str(hash(hole))
         
@@ -112,13 +118,14 @@ class Manager(object):
         self._determine_conflicts()
 
     def _determine_conflicts(self):
-        platetargs = [t for f in self.selected_fields
+        targs = [t for f in self.selected_fields
                         for t in f.get_drillable_targets() ]
-        holes=[h for t in platetargs for h in t.holes()]+self.plate_holes
+        holes=([h for t in targs for h in t.holes()]+
+               [h for t in self.plate_holes for h in t.holes()])
         x=[h.x for h in holes]
         y=[h.y for h in holes]
-        r=[h.r for h in holes]
-        coll_graph=build_overlap_graph_cartesian(x,y,r,overlap_pct_r_ok=0.9)
+        d=[h.d for h in holes]
+        coll_graph=build_overlap_graph_cartesian(x,y,d,overlap_pct_r_ok=0.9)
 
     
         #priorityies must first be redistributed onto the same scale
@@ -173,9 +180,17 @@ class Manager(object):
                     dropped=coll_graph.drop_conflicting_with(coll_ndx)
                     for i in dropped:
                         holes[i].target.conflicting=holes[coll_ndx].target
+            else:
+                log.warn('Collision with {}'.format(coll_targ))
+                
 
-
-                    
+    def plate_drillable_dictlist(self):
+        return [{'id':t.id,
+            'x':'{:.5f}'.format(t.hole.x),
+            'y':'{:.5f}'.format(t.hole.y),
+            'z':'{:.5f}'.format(t.hole.z),
+            'd':'{:.5f}'.format(t.hole.d),
+            'type':t.type} for t in self.plate_holes if not t.conflicting]
 
     def save_selected_as_plate(self, name):
         """
@@ -194,5 +209,8 @@ class Manager(object):
         ....
         """
         import write_dotplate
-        write_dotplate.write(name, self.plate_holes, self.selected_fields)
+        
+        ph=self.plate_drillable_dictlist()
+        write_dotplate.write(name, ph, self.selected_fields)
+        write_dotplate.write_drill(name, ph, self.selected_fields)
 

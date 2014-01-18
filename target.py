@@ -1,4 +1,5 @@
 from coordinate import RA,Dec
+from dimensions import PLATE_TARGET_RADIUS_LIMIT
 
 SH_TYPE='C'
 STANDARD_TYPE='Z'
@@ -7,6 +8,8 @@ ACQUISITION_TYPE='A'
 TARGET_TYPE='T'
 SKY_TYPE='S'
 GUIDEREF_TYPE='R'
+FIDUCIAL_TYPE='F'
+THUMBSCREW_TYPE='B'
 
 class Target(object):
     def __init__(self, **kwargs):
@@ -22,6 +25,13 @@ class Target(object):
         self.priority=float(kwargs.pop('priority',0.0))
         self.type=kwargs.pop('type','')
         self.field=kwargs.pop('field',None)
+        
+        if self.type==STANDARD_TYPE:
+            self.id='STANDARD'
+        elif self.type==FIDUCIAL_TYPE:
+            self.id='FIDHOLE'
+        elif self.type==THUMBSCREW_TYPE:
+            self.id='THUMBSCREW'
 
         hole=kwargs.pop('hole',None)
         if type(hole)==list:
@@ -63,6 +73,14 @@ class Target(object):
                 else:
                     ret.append(ct.id)
             return ', '.join(ret)
+
+    @property
+    def on_plate(self):
+        if not self.hole:
+            return False
+        else:
+            return ((self.hole.x**2 + self.hole.y**2)<
+                    PLATE_TARGET_RADIUS_LIMIT**2)
 
     @property
     def info(self):
