@@ -12,7 +12,7 @@ from graphcollide import build_overlap_graph_cartesian
 log=getLogger('plateplanner.field')
 
 #List of valid type codes
-VALID_TYPE_CODES=['T', 'S', 'C', 'G', 'A', 'Z','O']
+from target import VALID_TYPE_CODES
 
 #List of required keys
 REQUIRED_KEYS=['ra', 'dec', 'epoch', 'id', 'type', 'priority']
@@ -142,28 +142,6 @@ KEY_VETTERS['type']=lambda x: x in VALID_TYPE_CODES
 KEY_VETTERS['priority']=_is_floatable
 KEY_VETTERS['pm_ra']=_is_floatable
 KEY_VETTERS['pm_dec']=_is_floatable
-
-
-def _flatten_dictlist(dictlist, flattenkey):
-    """
-    merge items from subdictionary in flattenkey into the parent dict for each
-    dict in dictlist. if subdict keys are already in dict then prepend
-    flattenkey_. if key still in dict fail.
-    """
-    ret=[]
-    for r in dictlist:
-        toflatten=r[flattenkey]
-        rec=r.copy()
-        rec.pop(flattenkey)
-        for k in toflatten:
-            if k in rec:
-                newk='{}_{}'.format(flattenkey,k)
-                assert newk not in rec
-                rec[newk]=toflatten[k]
-            else:
-                rec[k]=toflatten[k]
-        ret.append(rec)
-    return ret
 
 
         #TODO: User keys disallow keys we use (prepend U_)
@@ -325,6 +303,9 @@ class FieldCatalog(object):
             else:
                 ret[k]=str(v)
         return ret
+    
+    def get_assignable_targets(self):
+        """Returns  """
 
     def get_drillable_targets(self):
         """Return all targets in the catalog that can be drilled"""
@@ -435,8 +416,5 @@ class FieldCatalog(object):
         map(lambda x: x.pop('field',''), ret)
         return ret
 
-    def standards_dictlist(self, flat=False):
-        if not flat:
-            return self.standards
-        else:
-            return _flatten_dictlist(self['Z'],'user')
+    def standards_dictlist(self):
+        return [t.info for t in self.standards]

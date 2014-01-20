@@ -23,5 +23,8 @@ class Hole(object):
             ret.update(self.target.info)
         return ret
 
+    def distance(self,(x,y)):
+        return math.hypot(self.x-x,self.y-y)
+
 SHACKHARTMAN_HOLE=Hole(d=2*dimensions.SH_RADIUS)
 

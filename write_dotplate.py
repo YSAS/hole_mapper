@@ -1,5 +1,15 @@
 from collections import defaultdict
 
+
+PLATEHOLE_REQUIRED_COLS=['id','x','y','z','d']
+UNDRILLABLE_REQUIRED_COLS=['id','ra','dec','epoch','priority','type',
+                           'conflicts']
+STANDARDS_REQUIRED_COLS=['id','ra','dec','epoch','priority']
+DRILLABLE_REQUIRED_COLS=['id','ra','dec','epoch','priority','type', 'x','y',
+                         'z','d']
+DRILLFILE_REQUIRED_COLS=['x','y','z','d','type','id']
+
+
 def _format_attrib_nicely(itemdict):
     items=[item for item in itemdict.iteritems() ]
     key_col_wid=max([len(k[1]) for k in items])+6
@@ -57,12 +67,6 @@ def _dictlist_to_records(dictlist, col_first=None, col_last=None,
     rec+=[fmt.format(r=defdict(dic)) for dic in dictlist]
     return rec
 
-PLATEHOLE_REQUIRED_COLS=['id','x','y','z','d']
-UNDRILLABLE_REQUIRED_COLS=['id','ra','dec','epoch','priority','type',
-                           'conflicts']
-STANDARDS_REQUIRED_COLS=['id','ra','dec','epoch','priority']
-DRILLABLE_REQUIRED_COLS=['id','ra','dec','epoch','priority','type', 'x','y',
-                         'z','d']
 
 def write(name, plate_holes, fields, dir='./'):
     filename='{}{}.plate'.format(dir, name)
@@ -114,11 +118,8 @@ def write(name, plate_holes, fields, dir='./'):
                 fp.write(r)
 
 
-
-DRILLFILE_REQUIRED_COLS=['x','y','z','d','type','id']
 def write_drill(name, plate_holes, fields, dir='./'):
-    
-    
+
     file_fmt_str='{}{}_All_Holes_{}.txt'
     
     dicts=[d for f in fields for d in f.drillable_dictlist()]+plate_holes

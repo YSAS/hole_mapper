@@ -156,6 +156,7 @@ class Cassette(object):
         """
         return [self.map[fiber] for fiber in sorted(self.map.keys())]
 
+    @property
     def n_avail(self):
         return len(self.usable)-self.used
     
@@ -264,3 +265,31 @@ def red_cassette_names():
 def new_cassette_dict(slitwid=180):
     return {side+str(i)+j: Cassette(side+str(i)+j, slitwid)
     for side in 'RB' for i in range(1,9) for j in 'hl'}
+
+
+class CassetteConfig(object):
+    """ A set of M2FS cassettes"""
+    def __init__(self):
+        self._cassettes=[Cassette() for i in range(16)]
+        #TODO: Write
+
+    def __iter__(self):
+        return iter(self._cassettes)
+    
+    def reset(self):
+        """ Reset the cassettes (undo any assignments) """
+        ...
+        #TODO: Write
+
+    def assign_fiber(self, fiber, target):
+        """ Assign fiber to target """
+        ...
+        #TODO: Write
+
+    def assign_cassette(self, cassette_name, target):
+        """ assign target to the cassette """
+        ...
+        #TODO: Write
+
+
+    def map_fibers(
