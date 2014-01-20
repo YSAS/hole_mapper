@@ -4,7 +4,7 @@ import ttk
 import BetterCanvas
 import os
 import argparse
-import platemanager
+import fieldmanager
 from dimensions import PLATE_RADIUS
 from ttkcalendar import date_time_picker
 
@@ -115,7 +115,7 @@ class App(Tkinter.Tk):
 
     def initialize(self):
         
-        self.manager=platemanager.Manager()
+        self.manager=fieldmanager.Manager()
         
         #Basic window stuff
         swid=120
