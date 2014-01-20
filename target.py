@@ -68,15 +68,16 @@ class Target(object):
         return '{} ({}, {}) type={}'.format(self.id,self.ra.sexstr,
                                          self.dec.sexstr,self.type)
     
-    def __setattr__(self, name, value):
-        """ Override to update cassette distances when hole is set """
-        if name=='hole':
-            object.__setattr__(self, name, value)
-            dists={c:self.hole.distance(cp)
-                   for c, cp in Cassette.cassette_positions.iteritems()}
-            object.__setattr__(self, '_cassette_distances', dists)
-        else:
-            object.__setattr__(self, name, value)
+    @property
+    def hole(self):
+        return self._hole
+    
+    @hole.setter
+    def hole(self, hole):
+        self._hole=hole
+        dists={c:self._hole.distance(cp)
+            for c, cp in Cassette.cassette_positions.iteritems()}
+        self._cassette_distances=dists
     
     def holes(self):
         if self.hole:
