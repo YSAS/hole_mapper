@@ -1,5 +1,5 @@
 import dimensions
-
+import math
 class Hole(object):
     def __init__(self, x=0.0,y=0.0,z=0.0,d=0.0, target=None):
         self.x=x
@@ -11,7 +11,6 @@ class Hole(object):
     
     def __hash__(self):
         return "{}{}{}{}".format(self.x, self.y, self.z, self.d).__hash__()
-
 
     @property
     def info(self):
@@ -25,6 +24,3 @@ class Hole(object):
 
     def distance(self,(x,y)):
         return math.hypot(self.x-x,self.y-y)
-
-SHACKHARTMAN_HOLE=Hole(d=2*dimensions.SH_RADIUS)
-

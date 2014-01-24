@@ -14,39 +14,6 @@ def rangify(data):
             str_list.append('%d' % ilist[0])
     return ', '.join(str_list)
 
-def fiber2cassettename(fib):
-    ret = fib[0:2]
-    if int(fib.split('-')[1])>8:
-        return ret+'h'
-    else:
-        return ret+'l'
-
-def left_only(cassettes):
-    if not cassettes:
-        return type(cassettes)()
-    if type(cassettes) == dict:
-        return {k:v for k,v in cassettes.iteritems() if v.onLeft()}
-    elif type(cassettes) in [list, tuple]:
-        if type(cassettes[0])==Cassette:
-            return [c for c in cassettes if c.onLeft()]
-        else:
-            #assume list of cassette names
-            _cass=new_cassette_dict()
-            return [c for c in cassettes if _cass[c].onLeft()]
-
-def right_only(cassettes):
-    if not cassettes:
-        return type(cassettes)()
-    if type(cassettes) == dict:
-        return {k:v for k,v in cassettes.iteritems() if v.onRight()}
-    elif type(cassettes) in [list, tuple]:
-        if type(cassettes[0])==Cassette:
-            return [c for c in cassettes if c.onRight()]
-        else:
-            #assume list of cassette names
-            _cass=new_cassette_dict()
-            return [c for c in cassettes if _cass[c].onRight()]
-
 #in res and asc -x is on right looking at plate
 def _init_cassette_positions():
     """
@@ -114,11 +81,15 @@ def _init_cassette_positions():
 
     return _cassette_positions
 
-cassette_positions=_init_cassette_positions()
 
+CASSETTE_NAMES=[c+str(i)+j for c in 'BR' for j in 'lh' for i in range(1,9)]
+BLUE_CASSETTE_NAMES=['B'+str(i)+j for i in range(1,9) for j in 'hl']
+RED_CASSETTE_NAMES=['R'+str(i)+j for i in range(1,9) for j in 'hl']
+
+CASSETTE_POSITIONS=_init_cassette_positions()
 
 class Cassette(object):
-    def __init__(self, name, slit, usable=None):
+    def __init__(self, name, usable=None):
         assert 'h' in name or 'l' in name
         if usable == None and 'h' in name:
             self.usable=range(9,17)
@@ -127,169 +98,260 @@ class Cassette(object):
         else:
             self.usable=usable
         self.name=name
-        self.map={} #fiber # is key, hole is value
-        self.pos=cassette_positions[name]
+        self.pos=CASSETTE_POSITIONS[name]
         self.used=0
-        self._defaultslit=slit #This is for now, in the future we might just
-        #set the slits for the holes and see what happens
-        self._slit=defaultdict(lambda:self._defaultslit)
-        self.holes=[]
-    
-    def slit(self,setup):
-        return self._slit[setup]
-    
-    def color(self):
-        if self.name[0]=='R':
-            return 'red'
-        else:
-            return 'blue'
+        self.targets=[]
+        self.map={} #fiber # is key, target is value
 
-    def first_hole(self):
-        return self.map[min(self.map)]
-
-    def last_hole(self):
-        return self.map[max(self.map)]
-
-    def ordered_holes(self):
-        """
-        Return list of holes in order of fiber number
-        """
-        return [self.map[fiber] for fiber in sorted(self.map.keys())]
+#    def ordered_targets(self):
+#        """ Return list of targets in order of fiber number """
+#        return [self.map[fiber] for fiber in sorted(self.map.keys())]
 
     @property
     def n_avail(self):
         return len(self.usable)-self.used
     
-    def consume(self):
-        self.used+=1
-        assert self.used <= len(self.usable)
-    
     def reset(self):
         self.used=0
-        self.holes=[]
+        self.targets=[]
         self.map={}
-        self._slit=defaultdict(lambda:self._defaultslit)
-    
-    def slit_compatible(self, hole):
-        """ true if the holes slit matches the slit for the holes setup"""
-        slit=self._slit[hole['SETUP']]
-        return (slit==-1) or (slit==hole['SLIT'])
-    
-    def assign_hole(self, hole):
+
+    def assign(self, target):
         """Add the hole to the cassette and assign the cassette to the hole"""
         if self.n_avail()==0:
-            import pdb;pdb.set_trace()
+            import ipdb;ipdb.set_trace()
             raise Exception('Cassette Full')
 
-        if not self.slit_compatible(hole):
-            raise ValueError('Hole not compatible with cassette')
-        if hole['FIBER']!='':
+        if target.fiber:
             print "assigning hole with preset fiber"
-            if fiber2cassettename(hole['FIBER'])!=self.name:
-                raise ValueError('Hole not compatible with cassette')
-            self.map[int(hole['FIBER'].split('-')[1])]=hole
-            self._slit[hole['SETUP']]=hole['SLIT']
+            if target.fiber.cassette_name!=self.name:
+                raise ValueError('target not compatible with cassette')
+            if target.fiber.number in self.map:
+                raise ValueError('preset fiber already mapped')
+            self.map[target.fiber.number]=target
         else:
-            hole.assign_cassette(self.name)
-        self.consume()
-        self.holes.append(hole)
+            target.assign(cassette=self.name)
 
-    def unassign_hole(self, hole):
+        self.used+=1
+
+        self.targets.append(target)
+
+    def unassign(self, target):
         """
         Remove the hole from the cassette and unassign cassette from the hole
         """
-        if hole not in self.holes:
-            import pdb;pdb.set_trace()
-            raise Exception('Hole not in cassette')
+        if target not in self.target:
+            import ipdb;ipdb.set_trace()
+            raise Exception('target not in cassette')
         self.used-=1
-        self.holes.remove(hole)
+        self.targets.remove(target)
         for k in self.map.keys():
             if self.map[k]==hole:
                 self.map.pop(k)
-        hole.unassign()
-
-    def _assign_fiber(self, hole):
-        """
-        Associate hole with the next available fiber. Sets assignment for hole.
-        """
-        #Get next available fiber
-        #min of self.usable not in self.map
-        free=filter(lambda x: x not in self.map, self.usable)
-        
-        #assert len(free)>0
-        if len(free)==0:
-            import ipdb;ipdb.set_trace()
-        
-        num=min(free)
-        
-        #Assign pair in the cassette map
-        self.map[num]=hole
-        
-        #Tell the hole its fiber
-        hole.assign({'CASSETTE':self.name, 'FIBERNO':num})
+                break
+        target.unassign()
 
     def label(self):
         """Return a string label for the cassette e.g. R1 1-8 or B3 1,4,7"""
         return self.name[0:2]+' '+rangify(sorted(self.map.keys()))
 
     def map_fibers(self, remap=False):
+        """
+        Associate targets with the individual fibers. Sets assignment for targets.
+        """
+
         #assuming -x is to left
         if remap:
             for k in self.map.keys():
-                if not self.map[k]['USER_ASSIGNED']:
+                if not self.map[k].preset_fiber:
                     self.map.pop(k)
-        holes=[h for h in self.holes if h not in self.map.values()]
-        holes.sort(key=operator.attrgetter('x'), reverse=not self.onRight())
+    
+        targs=[t for t in self.targets if t not in self.map.values()]
+        targs.sort(key=operator.attrgetter('hole.x'), reverse=self.on_left)
 
         #assign the next fiber
-        for h in holes:
-            self._assign_fiber(h)
+        for t in targs:
+            #Get next available fiber
+            #min of self.usable not in self.map
+            free=filter(lambda x: x not in self.map, self.usable)
+            
+            #assert len(free)>0
+            if len(free)==0:
+                import ipdb;ipdb.set_trace()
+            
+            num=min(free)
+            
+            #Assign pair in the cassette map
+            self.map[num]=t
+            
+            #Tell the hole its fiber
+            t.assign(fiber=Fiber(cassette=self.name,fnum=num))
 
-    def onLeft(self):
+    @property
+    def on_left(self):
         return not self.onRight()
 
-    def onRight(self):
+    @property
+    def on_right(self):
         side=int(self.name[1]) % 2  != 0
         assert side == (self.pos[0] < 0)
         return side
 
-    def get_hole(self, fiber):
-        return self.map.get(int(fiber.split('-')[1]),None)
-
-def blue_cassette_names():
-    return ['B'+str(i)+j for i in range(1,9) for j in 'hl']
-
-def red_cassette_names():
-    return ['R'+str(i)+j for i in range(1,9) for j in 'hl']
-
-def new_cassette_dict(slitwid=180):
-    return {side+str(i)+j: Cassette(side+str(i)+j, slitwid)
-    for side in 'RB' for i in range(1,9) for j in 'hl'}
-
+    def get_target(self, fiber):
+        assert fiber.cassette_name==self.name
+        return self.map.get(fiber.number,None)
 
 class CassetteConfig(object):
     """ A set of M2FS cassettes"""
-    def __init__(self):
-        self._cassettes=[Cassette() for i in range(16)]
-        #TODO: Write
+    def __init__(self, usable=None, usableR=None, usableB=None):
+        if usable:
+            assert len(usable)==16
+            assert not usableR
+            assert not usableB
+            usableR=usableB=usable
+        else:
+            if not usableR:
+                usableR=(True,)*16
+            if not usableB:
+                usableB=(True,)*16
+
+        assert len(usableR)==16
+        assert len(usableB)==16
+
+        fiber_stat=databasegetter.get_fiber_staus()
+        
+        self._cassettes=[]
+        for name in RED_CASSETTE_NAMES:
+            use=[usableR[i] and fiber_stat[name][i] for i in range(16)]
+            self._cassettes.append(Cassette(name, use))
+        for name in BLUE_CASSETTE_NAMES:
+            use=[usableB[i] and fiber_stat[name][i] for i in range(16)]
+            self._cassettes.append(Cassette(name, use))
+
 
     def __iter__(self):
         return iter(self._cassettes)
-    
+
+    @property
+    def n_r_usable(self):
+        return sum(len(c.usable) for c in self if c.name in RED_CASSETTE_NAMES)
+
+    @property
+    def n_b_usable(self):
+        return sum(len(c.usable) for c in self if c.name in BLUE_CASSETTE_NAMES)
+
     def reset(self):
         """ Reset the cassettes (undo any assignments) """
-        ...
-        #TODO: Write
+        for c in self:
+            c.reset()
 
-    def assign_fiber(self, fiber, target):
-        """ Assign fiber to target """
-        ...
-        #TODO: Write
+    def assign(self, target, cassette_name):
+        """ Assign target to a cassette fiber to target """
+        cass=[c for c in self if c.name == cassette_name][0]
+        cass.assign(t)
 
-    def assign_cassette(self, cassette_name, target):
-        """ assign target to the cassette """
-        ...
-        #TODO: Write
+    def map(self, remap=False):
+        for c in self:
+            c.map_fibers(remap=remap)
 
+    def condense(self):
+        _condense_cassette_assignemnts([c for c in self if c.on_left])
+        _condense_cassette_assignemnts([c for c in self if c.on_right])
 
-    def map_fibers(
+    def rejigger(self):
+        _rejigger_cassette_assignemnts([c for c in self if c.on_left])
+        _rejigger_cassette_assignemnts([c for c in self if c.on_right])
+
+def _condense_cassette_assignemnts(cassettes):
+    #Grab cassettes with available fibers
+    non_full=[c for c in cassettes if c.n_avail >0 and c.used>0]
+              
+    to_check=list(non_full)
+    to_check.sort(key= lambda x: x.n_avail())
+    
+    while to_check:
+        
+        trial=to_check.pop()
+        
+        #Try to reassign all holes to non full cassettes
+        targets=list(trial.targets)
+        for t in targets:
+            #If hole can't be assigned then screw it
+            if not t.is_assignable:
+                break
+            #Try assigning the hole to another tetris
+            recomp_non_full=False
+            for c in non_full:
+                if t.is_assignable(cassette=c):
+                    trial.unassign(t)
+                    c.assign(t)
+                    recomp_non_full=True
+                    break
+            if recomp_non_full:
+                #Redetermine what is full
+                recomp_non_full=False
+                non_full=[c for c in non_full if c.n_avail>0]
+    
+        #If we have emptied the cassette then don't add anything to it
+        if trial.used == 0:
+            try:
+                non_full.remove(trial)
+            except ValueError,e:
+                #it is possible that trial filled up, was dropped from non_full
+                # or something like that
+                pass
+        
+        #Update sort of to check
+        to_check.sort(key= lambda x: x.n_avail)
+
+def _rejigger_cassette_assignemnts(cassettes):
+    """Go through the cassettes swapping holes to eliminate
+    verticle excursions
+    """
+    cassettes.sort(key=lambda c: c.pos[1])
+    
+    for i in range(len(cassettes)-1):
+        cassette=cassettes[i]
+        higer_cassettes=cassettes[i:]
+
+        swappable_cassette_targets=[t for t in cassette.targets
+                                    if t.is_assignable]
+
+        swappable_higher_targets=[t for c in higer_cassettes
+                                    for h in c.targets
+                                    if t.is_assignable(cassette=cassette)]
+        if len(swappable_higher_targets) ==0:
+            continue
+        
+        targets=swappable_cassette_targets+swappable_higher_targets
+        targets.sort(key=operator.attrgetter('hole.y'))
+        
+        #Find index of lowest target not in the cassette
+        sort_ndxs=[targets.index(t) for t in swappable_cassette_targets]
+        first_higher_ndx=len(sort_ndxs)
+        for i in range(len(sort_ndxs)):
+            if i not in sort_ndxs:
+                first_higher_ndx=i
+                break
+        
+        #For targets not at start of sorted list
+        for i in sort_ndxs:
+            if i > first_higher_ndx:
+                low_target=targets[i]
+                #attempt exchange with lower holes
+                for j in range(first_higher_ndx, i):
+                    #nb high cassette might be same
+                    high_cassette=[c for c in cassettes
+                                   if c.name==targets[j].assigned_cassette][0]
+                    if high_cassette==cassette:
+                        continue
+                    if (targets[j].is_assignable(cassette=cassette) and
+                        low_target.is_assignable(cassette=high_cassette)):
+                        #Unassign
+                        high_cassette.unassign(targets[j])
+                        cassette.unassign(low_target)
+                        #Assign
+                        high_cassette.assign(low_target)
+                        cassette.assign(targets[j])
+                        break
+

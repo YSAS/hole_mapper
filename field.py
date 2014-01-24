@@ -4,203 +4,12 @@ from jbastro.astroLib import sexconvert
 from datetime import datetime
 import holesxy
 from logger import getLogger
-from hole import Hole, SHACKHARTMAN_HOLE
+from hole import Hole
 from target import Target
-from target import GUIDEREF_TYPE, GUIDE_TYPE
+from target import GUIDEREF_TYPE, GUIDE_TYPE, ACQUISITION_TYPE, SH_TYPE
 from graphcollide import build_overlap_graph_cartesian
 
 log=getLogger('plateplanner.field')
-
-#List of valid type codes
-from target import VALID_TYPE_CODES
-
-#List of required keys
-REQUIRED_KEYS=['ra', 'dec', 'epoch', 'id', 'type', 'priority']
-OPTIONAL_KEYS=['pm_ra','pm_dec']
-OPTIONAL_KEYS_DEFAULTS=[0.0,0.0]
-
-#List of forbidden keys
-FORBIDDEN_KEYS=['user']
-
-#Default priority if '-'
-DEFAULT_PRIORITY = float('-inf')
-
-#TODO: Encapsulate user defined params in 'user' for each targdict
-def _parse_header_row(l):
-    """ Verify row is a valid header and break it into keys """
-    keys=l.split()
-    
-    assert len(keys) >= len(REQUIRED_KEYS)
-    
-    #Duplicates forbidden
-    assert len(keys) == len(set(keys))
-    
-    #Must have all the required keys
-    assert len([k for k in keys if k in REQUIRED_KEYS]) == len(REQUIRED_KEYS)
-    
-    #Must not have any forbidden keys
-    assert len([k for k in keys if k in FORBIDDEN_KEYS])==0
-    
-    return keys
-
-def _parse_record_row(rec, keys):
-    
-    vals=rec.split()
-    
-    #Number of values in the row must match the number of keys
-    assert len(vals)==len(keys)
-    
-    #Create the dictionary
-    rdict={keys[i].lower():vals[i] for i in range(len(keys))
-            if vals[i] !='-' and
-            keys[i].lower() in (REQUIRED_KEYS+OPTIONAL_KEYS)}
-    
-    #Vet all the keys
-    for k in rdict.keys():
-        if not KEY_VETTERS[k](rdict[k]):
-            raise Exception('Key error {} for: {}'.format(k,rec))
-
-    #Make sure all the required keys are set
-    for k in REQUIRED_KEYS:
-        if k not in ['id', 'priority']:
-            assert k in rdict
-    
-    #Enforce cannonical RA & DEC format
-    rdict['ra'] = sexconvert(rdict['ra'],dtype=float,ra=True)
-    rdict['dec'] = sexconvert(rdict['dec'],dtype=float)
-    
-    #Set a priority if one isn't set
-    if 'priority' not in rdict:
-        rdict['priority'] = DEFAULT_PRIORITY
-    
-    #Generate the default ID if one wasnt defined
-    if 'id' not in rdict:
-        rdict['id'] = _get_default_id(rdict)
-    
-    #Force type to be upper case
-    rdict['type']=rdict['type'].upper()
-    
-    #Support legacy type code O by converting to T
-    if rdict['type']=='O':
-        rdict['type']='T'
-
-    #Add any user defined keys to 'user'
-    rdict['user']={keys[i].lower():vals[i] for i in range(len(keys))
-                    if vals[i] !='-' and keys[i].lower() not in
-                    (REQUIRED_KEYS+OPTIONAL_KEYS)}
-    return rdict
-
-def _get_default_id(rdict):
-    """ typecodeRA_DEC """
-    return '{}{ra}_{dec}'.format(rdict['type'], ra=rdict['ra'], dec=rdict['dec'])
-
-def _is_floatable(x):
-    """ True iff float(x) succeeds """
-    try:
-        float(x)
-        return True
-    except Exception:
-        return False
-
-def _is_valid_dec(x):
-    """ True iff the string x is a valid dec """
-    try:
-        if _is_floatable(x):
-            assert -90 <= float(x) and float(x) <= 90
-        else:
-            h,m,s =x.split(':')
-            assert -90 <= int(h) and int(h) <= 90
-            assert 0 <=int(m) and int(m) < 60
-            assert 0<=float(s) and float(s) < 60
-    except Exception:
-        return False
-    return True
-
-def _is_valid_ra(x):
-    """ True iff the string x is a valid ra """
-    try:
-        if _is_floatable(x):
-            assert 0 <= float(x) and float(x) <= 360
-        else:
-            h,m,s =x.split(':')
-            assert 0<=int(h) and int(h) <=24
-            assert 0<=int(m) and int(m) < 60
-            assert 0<=float(s) and float(s) < 60
-    except Exception:
-        return False
-    return True
-
-#Define field keys
-PROGRAM_KEYS=['name', 'obsdate']
-
-#Define vetting functions for keys
-KEY_VETTERS=defaultdict(lambda : lambda x: len(x.split())==1)
-KEY_VETTERS['ra']=_is_valid_ra
-KEY_VETTERS['dec']=_is_valid_dec
-KEY_VETTERS['epoch']=_is_floatable
-KEY_VETTERS['type']=lambda x: x in VALID_TYPE_CODES
-KEY_VETTERS['priority']=_is_floatable
-KEY_VETTERS['pm_ra']=_is_floatable
-KEY_VETTERS['pm_dec']=_is_floatable
-
-
-        #TODO: User keys disallow keys we use (prepend U_)
-        #TODO: enforces all user keys are strings
-def load_dotfield(file):
-    """
-    returns FieldCatalog() or raises error if file has issues.
-    """
-
-    ret=FieldCatalog(file=os.path.basename(file))
-
-    try:
-        lines=open(file,'r').readlines()
-    except IOError as e:
-        raise e
-
-    lines=[l.strip() for l in lines]
-
-    have_name=False
-
-#    try:
-    for l in (l for l in lines if l):
-        if l[0] =='#':
-            continue
-        elif l[0] not in '+-0123456789' and not l.lower().startswith('ra'):
-            try:
-                k,_,v=l.partition('=')
-                k=k.strip().lower()
-                if k=='field':
-                    k='name'
-                v=v.strip()
-                assert v != ''
-            except Exception as e:
-                raise Exception('Bad key=value formatting: {}'.format(str(e)))
-
-            if k=='obsdate':
-                ret.obsdate=datetime(*map(int, v.split()))
-            elif k=='name':
-                ret.name=v
-            else:
-                ret.user[k]=v
-        elif l.lower().startswith('ra'):
-            keys=_parse_header_row(l.lower())
-        else:
-            #import ipdb;ipdb.set_trace()
-            targ=Target(**_parse_record_row(l, keys))
-            ret.add_target(targ)
-            targ.field=ret
-#    except Exception as e:
-#        raise IOError('Failed on line '
-#                        '{}: {}\n  Error:{}'.format(lines.index(l),l,str(e)))
-    #Use the s-h (or field center id if none) as the field name if one wasn't
-    # defined
-    if not ret.name:
-        ret.name=ret.sh.id
-    #import ipdb;ipdb.set_trace()
-    return ret
-
-
 
 class FieldCatalog(object):
     def __init__(self, file='', name='', obsdate=None,
@@ -211,7 +20,7 @@ class FieldCatalog(object):
         self.file=file
         self.name=name
         self.obsdate=obsdate
-        self.sh=sh if targets else Target(type='C',hole=SHACKHARTMAN_HOLE)
+        self.sh=sh if sh else Target(type='C')
         self.user=user if user else {}
         self.guides=guides if guides else []
         self.targets=targets if targets else []
@@ -244,7 +53,6 @@ class FieldCatalog(object):
             self.standards.append(targ)
         elif targ.is_sh:
             self.sh=targ
-            self.sh.hole=SHACKHARTMAN_HOLE
         else:
             raise ValueError('Target {} of unknown type'.format(targ))
 
@@ -303,12 +111,12 @@ class FieldCatalog(object):
             else:
                 ret[k]=str(v)
         return ret
-    
-    def get_assignable_targets(self):
-        """Returns  """
 
     def get_drillable_targets(self):
-        """Return all targets in the catalog that can be drilled"""
+        """
+        Return all targets (S,T,G,A) in the catalog that can be drilled
+        parial overlaps between S-T, S-S, & T-T allowed
+        """
         try:
             return self._drillable_targets
         except AttributeError:
@@ -317,63 +125,58 @@ class FieldCatalog(object):
         if not self._processed:
             self.process()
         
-        from time import time
-        tics=[time()]
         
         #Get data needed for collision graph
         holes=self.holes()+[self.sh.hole]
         x=[h.x for h in holes]
         y=[h.y for h in holes]
         d=[h.d for h in holes]
-                
-        tic1=time()
-        
-        #Create the graph
+
+        #Per Mario:
+        #No overlap with guides/acquisitions/sh
+        coll_graph=build_overlap_graph_cartesian(x,y,d, overlap_pct_r_ok=0.0)
+        #Drop everything conflicting with the sh, guides or acquisitions
+        ndxs=[i for i in range(len(holes))
+              if holes[i].target.type in
+              [GUIDE_TYPE, ACQUISITION_TYPE, SH_TYPE]]
+              
+        to_drop=[]
+        for n in ndxs:
+            dropped=coll_graph.drop_conflicting_with(n)
+            to_drop+=dropped
+            for i in dropped:
+                holes[i].target.conflicting=holes[n].target
+        to_drop+=ndxs
+
+        holes[:]=[h for i,h in enumerate(holes) if i not in to_drop]
+        x=[h.x for h in holes]
+        y=[h.y for h in holes]
+        d=[h.d for h in holes]
+        #Now do it again but allowing some overlap
         coll_graph=build_overlap_graph_cartesian(x,y,d, overlap_pct_r_ok=0.9)
 
-        #Drop everything conflicting with the sh
-        dropped=coll_graph.drop_conflicting_with(len(holes)-1)
-        for i in dropped:
-            holes[i].target.conflicting=self.sh
-
-        holes.pop(-1)
-        coll_graph._nnodes-=1
-
-        tics.append(time())
         pri=[h.target.priority for h in holes]
         keep,drop=coll_graph.crappy_min_vertex_cover_cut(weights=pri,
                                                          retdrop=True)
-
-        tics.append(time())
         
         #Now go through and figure out which targets are(not) usable
         drillable=[holes[i].target for i in keep]
         undrillable=[holes[i].target for i in drop]
         
-        tics.append(time())
-        
         #determine cause of conflict
-        for i,t in enumerate(undrillable):
-            conf=list(set(drillable[ndx]
-                          for ndx in coll_graph.collisions(drop[i])))
-            try:
-                assert len(conf) >0
-            except Exception:
-                import ipdb;ipdb.set_trace()
-            t.conflicting=conf
+        for d,t in zip(drop,undrillable):
+            t.conflicting=[holes[i].target for i in coll_graph.collisions(d)]
         
         drillable=list(set(drillable))
-        undrillable=set(undrillable)
+        #undrillable=set(undrillable)
 
-        tics.append(time())
-        tics=[t-tics[0] for t in tics[1:]]
-        log.debug('get_drillable_targets took: {}'.format(tics))
 
         self._drillable_targets=drillable
 
         return self._drillable_targets
-        
-    def isProcessed(self):
+    
+    @property
+    def is_processed(self):
         return self._processed
 
     @property
@@ -389,10 +192,11 @@ class FieldCatalog(object):
 
     def holes(self):
         """ return a list of all the holes the field would like on a plate """
-        if not self._processed:
+        try:
+            return [hole for t in self.all_targets() for hole in t.holes]
+        except AttributeError:
+            log.warning('field.holes() called before processing')
             return []
-        else:
-            return [hole for t in self.all_targets() for hole in t.holes()]
 
     def drillable_dictlist(self):
         ret=[]
@@ -418,3 +222,72 @@ class FieldCatalog(object):
 
     def standards_dictlist(self):
         return [t.info for t in self.standards]
+
+
+class Field(object):
+    def __init__(self, field_info=None, drilled=None, undrilled=None,
+                 standards=None):
+        """
+        drilled, undrilled, & standards should be lists of target
+        """
+        
+        self.info=field_info #Dict, see keys returned by fieldcatalog.info
+        self.name=info['name']
+        self.undrilled=undrilled
+        self.standards=standards
+
+        guides=[g for g in drilled if g.type in [GUIDE_TYPE, GUIDEREF_TYPE] ]
+        for id in set(g.id for g in guides):
+            refs=[g for g in guides if g.id==id and d.type==GUIDEREF_TYPE]
+            guide=[g for g in guides if g.id==id and d.type==GUIDE_TYPE][0]
+            for r in refs:
+                guides.remove(r)
+            guide.additional_holes=[r.hole for r in refs]
+
+        self.guides=guides
+            
+        self.targets=[g for g in drilled if g.is_target]
+        self.acquisitions=[g for g in drilled if g.is_acquisition]
+        self.skys=[g for g in drilled if g.is_sky]
+
+        
+    def get_assignable(self, n):
+        """
+        Returns up to n simultaneously pluggable targets and compatible 
+        guides, & acquisitons
+        """
+
+#    def all_targets(self):
+#        return (self.skys+self.targets+self.guides+self.acquisitions)
+#
+#    def holes(self):
+#        """ return a list of all the holes the field would like on a plate """
+#        if not self._processed:
+#            return []
+#        else:
+#            return [hole for t in self.all_targets() for hole in t.holes()]
+
+#    def drillable_dictlist(self):
+#        ret=[]
+#        for t in (t for t in self.all_targets()
+#                  if not t.conflicting and t.on_plate):
+#            d=t.hole.info
+#            d.pop('field','')
+#            ret.append(d)
+#            if t.type==GUIDE_TYPE:
+#                #Change type code for guide refs
+#                for h in t.additional_holes:
+#                    d=h.info
+#                    d.pop('field','')
+#                    d['type']=GUIDEREF_TYPE
+#                    ret.append(d)
+#        return ret
+#
+#    def undrillable_dictlist(self, flat=False):
+#        ret=[t.info for t in self.all_targets()
+#             if t.conflicting or not t.on_plate]
+#        map(lambda x: x.pop('field',''), ret)
+#        return ret
+#
+#    def standards_dictlist(self):
+#        return [t.info for t in self.standards]

@@ -1,10 +1,9 @@
-def condense_cassette_assignemnts(cassette_dict):
+def condense_cassette_assignemnts(cassettes):
     #Grab cassettes with available fibers
-    non_full=[c for c in cassette_dict.itervalues()
-              if c.n_avail()>0 and c.used>0]
+    non_full=[c for c in cassettes if c.n_avail > 0 and c.used > 0]
               
     to_check=list(non_full)
-    to_check.sort(key= lambda x: x.n_avail())
+    to_check.sort(key= lambda x: x.n_avail)
     
     while to_check:
         
@@ -12,7 +11,7 @@ def condense_cassette_assignemnts(cassette_dict):
         
     
         #Try to reassign all holes to non full cassettes
-        holes=list(trial.holes)
+        holes=list(trial.targets)
         for h in holes:
             #If hole can't be assigned then screw it
             if not h.isAssignable():

@@ -1,6 +1,8 @@
 from coordinate import RA,Dec
-from dimensions import PLATE_TARGET_RADIUS_LIMIT
+from dimensions import PLATE_TARGET_RADIUS_LIMIT, SH_RADIUS
 from copy import copy, deepcopy
+from cassettes import CASSETTE_POSITIONS
+from hole import Hole
 
 SH_TYPE='C'
 STANDARD_TYPE='Z'
@@ -12,7 +14,8 @@ GUIDEREF_TYPE='R'
 FIDUCIAL_TYPE='F'
 THUMBSCREW_TYPE='B'
 
-VALID_TYPE_CODES=['T', 'S', 'C', 'G', 'A', 'Z','O']
+VALID_TYPE_CODES=['T', 'S', 'C', 'G', 'A', 'Z','O','F','B','R']
+
 
 class Target(object):
     def __init__(self, **kwargs):
@@ -36,6 +39,8 @@ class Target(object):
         elif self.type==THUMBSCREW_TYPE:
             self.id='THUMBSCREW'
         
+        self._hole=None
+        self._additional_holes=[]
         hole=kwargs.pop('hole',None)
         if type(hole)==list:
             self.hole=hole[0]
@@ -43,30 +48,80 @@ class Target(object):
         else:
             self.hole=hole
             self.additional_holes=[]
-        
+    
+        if self.type==SH_TYPE:
+            self.hole=Hole(d=2*SH_RADIUS)
+            self.additional_holes=[]
+    
         self.user=kwargs.pop('user',{})
 
-        self.conflicting=None
+        self._conflicting=set()
+        
+        #Slit
+#        self.slit=kwargs.pop('slit',None)
 
-        if not self.is_sh:
-            for h in self.holes():
-                h.target=self
+        #Setup
+#        self.setup=kwargs.pop('setup',None)
 
         #Fiber
         self.preset_fiber=kwargs.pop('fiber',None)
         if type(self.preset_fiber)==str:
             self.preset_fiber=Fiber(self.preset_fiber)
         self.fiber=self.preset_fiber
+    
+        #Cassette
+        self.cassette=None
         
         #Cassette Restrictions
         pucn=kwargs.pop('usable_cassettes','').split(',')
-        self.preset_usable_cassette_names=set(map(lambda x: x.strip().lower(),
+        self._preset_usable_cassette_names=set(map(lambda x: x.strip().lower(),
                                                   pucn))
-        self.usable_cassette_names=self.preset_usable_cassette_names.copy()
-
+        self._usable_cassette_names=self._preset_usable_cassette_names.copy()
+            
     def __str__(self):
         return '{} ({}, {}) type={}'.format(self.id,self.ra.sexstr,
                                          self.dec.sexstr,self.type)
+    
+    def assign(self, cassette=None, fiber=None):
+        if cassette:
+            assert self.fiber==None
+            assert cassette in self._preset_usable_cassette_names
+            self._usable_cassette_names=set([cassette])
+        else:
+            assert fiber !=None
+            if self.preset_fiber:
+                assert self.preset_fiber==fiber
+            self.fiber=fiber
+            self._usable_cassette_names=set([fiber.cassette_name])
+            
+    def unassign(self):
+        if self.preset_fiber:
+            raise Exception('User assignments are irrevocable')
+        else:
+            self.fiber=None
+
+    @property
+    def conflicting(self):
+        try:
+            ret=self._conflicting.pop()
+            self._conflicting.add(ret)
+        except KeyError:
+            ret=None
+        return ret
+    
+    @conflicting.setter
+    def conflicting(self, targets):
+        if type(targets)==type(None):
+            targets=[]
+        elif type(targets)!=type(self):
+            assert len(targets)!=0
+
+        if type(targets)==set:
+            self._conflicting=targets
+        elif type(targets) in [list, tuple]:
+            self._conflicting=set(targets)
+        else:
+            self._conflicting=set([targets])
     
     @property
     def hole(self):
@@ -75,30 +130,44 @@ class Target(object):
     @hole.setter
     def hole(self, hole):
         self._hole=hole
-        dists={c:self._hole.distance(cp)
-            for c, cp in Cassette.cassette_positions.iteritems()}
-        self._cassette_distances=dists
+        if hole:
+            dists={c:self._hole.distance(cp)
+                    for c, cp in CASSETTE_POSITIONS.iteritems()}
+            self._cassette_distances=dists
+            self._hole.target=self
+
+    @property
+    def additional_holes(self):
+        return self._additional_holes
     
+    @additional_holes.setter
+    def additional_holes(self, holes):
+        self._additional_holes=holes
+
+        if not self.is_sh:
+            for h in self._additional_holes:
+                h.target=self
+
+    @property
     def holes(self):
         if self.hole:
             return [self.hole]+self.additional_holes
         else:
             return self.additional_holes
 
+#    @property
+#    def required_slit(self):
+#        """Return the required slit per the target, then per the setup"""
+
     @property
     def conflicting_ids(self):
-        if not self.conflicting:
-            return ''
-        if type(self.conflicting)==type(self):
-            return self.conflicting.id
-        else:
-            ret=[]
-            for ct in self.conflicting:
-                if ct.field:
-                    ret.append('{}:{}'.format(ct.field.name, ct.id))
-                else:
-                    ret.append(ct.id)
-            return ', '.join(ret)
+        ret=[]
+        for ct in self._conflicting:
+            if ct.field:
+                ret.append('{}:{}'.format(ct.field.name, ct.id))
+            else:
+                ret.append(ct.id)
+        return ', '.join(ret)
 
     @property
     def on_plate(self):
@@ -154,6 +223,7 @@ class Target(object):
 
     @property
     def is_assigned(self):
+        """Must return true if fiber is user assigned """
         return self.fiber!=None
 
     @property
@@ -162,27 +232,27 @@ class Target(object):
         Return number indicating if hole should be assigned a fiber sooner
         or later (lower)
         """
-        if self.cassette:
+        if len(self._usable_cassette_names)==1:
             return 0.0 #Don't care, we've already been assigned to a cassette
         else:
             #TODO: Should this be normalized by the number of usable cassettes
-            return sum(self.distance_to_cassette(c)
-                       for c in self.usable_cassette_names)
+            return sum(self._cassette_distances[c]
+                       for c in self._usable_cassette_names)
 
     @property
     def nearest_usable_cassette(self):
         """Return name of nearest usable cassette """
-        if len(self.usable_cassette_names)==1:
-            return self.usable_cassette_names[0]
+        if len(self._usable_cassette_names)==1:
+            return self._usable_cassette_names[0]
         
-        usable=[(c, self.distance_to_cassette(c))
-                for c in self.usable_cassette_names]
+        usable=[(c, self._cassette_distances[c])
+                for c in self._usable_cassette_names]
                 
         return min(usable, key=operator.itemgetter(1))[0]
 
     def reset_assignment(self):
         self.fiber=copy(self.preset_fiber)
-        self.usable_cassette_names=self.preset_usable_cassette_names.copy()
+        self._usable_cassette_names=self._preset_usable_cassette_names.copy()
 
     @property
     def cassette_name(self):
@@ -190,11 +260,21 @@ class Target(object):
         if self.fiber:
             return self.fiber.cassette.name
         elif len(self.usable_cassettes)==1:
-            return self.usable_cassette_names[0]
+            return self._usable_cassette_names[0]
         else:
             return None
 
-    def is_assignable(self, cassette=None, fiber=None):
+    @property
+    def assigned_cassette(self):
+        """Required by rejigger"""
+        if self.fiber:
+            return self.fiber.cassette_name
+        elif len(self._usable_cassette_names)==1:
+            return self._usable_cassette_names[0]
+        else:
+            return ''
+
+    def is_assignable(self, cassette=None):
         """
         True iff target can be (re)assigned, optionally to specified cassette
         or fiber.
@@ -202,31 +282,15 @@ class Target(object):
         assignable.
         Do not specify both cassette and fiber
         """
-        if self.preset_fiber:
+        if not self.hole or self.preset_fiber:
             return False
-        if cassette or fiber:
-            if cassette:
-                name=cassette.name
-            if fiber:
-                name=fiber.cassette.name
-            if self.preset_usable_cassette_names:
-                #we are asking is R or R8 in R8l or B4h in B4l, etc.
-                # assignment can be more or less specific as desired
-                x=filter(lambda x: x in name, self.preset_usable_cassette_names)
-                ret=len(x)>0
-            #TODO: Sort this out
-            ret&=cassette.slit_compatible(self)
-            return
+        elif cassette:
+            #TODO: Note this breaks if the usability of the cassettes evolves during assignment
+            return cassette.name in self._preset_usable_cassette_names
         else:
             return True
-            
-    def distance_to_cassette(self, cassette_name):
-        """ return the distance to the cassette """
-        return self._cassette_distances[cassette]
 
-#TODO: everything after here
-
-    def assign_possible_cassettes_by_name(self, cassette_names,
+    def set_possible_cassettes_by_name(self, cassette_names,
                                           update_with_intersection=False):
         """
         Add cassettes to the list of possible cassettes usable with hole.
@@ -234,28 +298,22 @@ class Target(object):
         cand previously set possible cassettes is used as the set of 
         possibles
         """
-        if type(cassette_names)!=list :
-            raise TypeError('casssettes must be a list of cassette names')
+        if type(cassette_names) not in [list, set, tuple]:
+            raise TypeError('casssettes must be a list/set/tupel of cassette names')
         if self.fiber:
             raise Exception('Fiber already assigned')
-        if self.cassette_name:
-            raise Exception('Cassette already assigned')
-
-        #If no possibles have ever been set, set and finish
-        if not self.usable_cassette_names:
-            #TODO: What about if the pool dwindles to nothing we shouldn't
-            # start over!
-            self.usable_cassette_names=set(cassettes)
-            return
 
         #Otherwise update the list of possibles
         if update_with_intersection:
-            self.usable_cassette_names.intersection_update(cassette_names)
+            self._usable_cassette_names.intersection_update(cassette_names)
         else:
-            self.usable_cassette_names.update(cassette_names)
-            if self.preset_usable_cassette_names:
-                self.usable_cassette_names.intersection_update(
-                    self.preset_usable_cassette_names)
+            self._usable_cassette_names.update(cassette_names)
+            if self._preset_usable_cassette_names:
+                self._usable_cassette_names.intersection_update(
+                    self._preset_usable_cassette_names)
 
-        assert len(self.usable_cassette_names)>0 #See above todo
+        assert len(self._usable_cassette_names)>0
+
+SH_TARGET=Target(type=SH_TYPE)
+
 

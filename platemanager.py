@@ -43,24 +43,25 @@ class Manager(object):
         """ 
         Routine to a file
 
-        At present only .plate files are supported.
+        At present only .setup files are supported.
         """
         try:
-            self.plate=load_dotfield(file)
+            self.setups=load_dotsetup(file)
             log.info("Loaded {}")
         except IOError as e:
             log.warn(str(e))
 
     def clear(self):
-        self.fields=[]
-        self.selected_fields=[]
+        for s in self.setups:
+            setup.reset()
 
     def get_holes(self, holeIDs):
         ret=[]
-        for f in self.fields:
-            for h in f.holes():
-                if str(hash(h)) in holeIDs:
-                    ret.append(h)
+        for setup in self.setups:
+            for f in setup.field:
+                for h in f.holes():
+                    if str(hash(h)) in holeIDs:
+                        ret.append(h)
         return ret
 
     def _drawHole(self, hole, canvas, color=None, fcolor='White', radmult=1.0):
@@ -90,10 +91,8 @@ class Manager(object):
         canvas.drawCircle( (0,0) , PLATE_RADIUS)
         canvas.drawCircle( (0,0) , SH_RADIUS)
         
-        for i,f in enumerate(self.selected_fields):
-            if not f.isProcessed():
-                f.process()
-            
+        for i,f in enumerate(self.selected_setup):
+
             c=COLOR_SEQUENCE[i%len(COLOR_SEQUENCE)]
             for h in f.holes():
                 if h.target.conflicting !=None:
@@ -102,8 +101,9 @@ class Manager(object):
                 fcolor=c if h.target.conflicting else 'White'
                 self._drawHole(h, canvas, color=c, fcolor=fcolor)
 
-    def select_setups(self, names):
-        self.plate.
+    def select_setup(self, name):
+        self.selected_setup=[s for s in self.setups if s.name == name][0]
+        self.selected_setup.assign()
 
 #    def select_fields(self,field_names):
 #        ndxs=[i for i,f in enumerate(self.fields) if f.name in field_names]

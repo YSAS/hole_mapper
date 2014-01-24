@@ -149,6 +149,9 @@ class App(Tkinter.Tk):
                        command=self.field_info_window).pack()
         Tkinter.Button(frame, text="Make Plate",
                        command=self.make_plate).pack()
+        Tkinter.Button(frame, text="Toggle Conflicts",
+                       command=self.toggle_conflicts).pack()
+        self.show_conflicts=True
 
         #Info output
         self.info_str=Tkinter.StringVar(value='Red: 000  Blue: 000  Total: 0000')
@@ -173,10 +176,14 @@ class App(Tkinter.Tk):
             holes=self.manager.get_holes(holeIDs)
             HoleInfoDialog(self.parent, self.canvas, holes)
 
+    def toggle_conflicts(self):
+        self.show_conflicts=not self.show_conflicts
+        self.show()
+
     def show(self):
         self.canvas.clear()
         self.info_str.set(self.status_string())
-        self.manager.draw(self.canvas)
+        self.manager.draw(self.canvas, show_conflicts=self.show_conflicts)
 
     def load_fields(self):
         from tkFileDialog import askopenfilename
