@@ -9,7 +9,8 @@ import operator
 import os.path
 from logger import getLogger
 from dimensions import PLATE_RADIUS, SH_RADIUS
-from readerswriters import load_dotfield
+from readerswriters import _dictlist_to_records, _format_attrib_nicely
+from field import load_dotfield
 from graphcollide import build_overlap_graph_cartesian
 from holesxy import get_plate_holes
 from target import Target
@@ -22,8 +23,85 @@ COLOR_SEQUENCE=['red','blue','pink','green','black','teal','purple','orange']
 MIN_GUIDES=2
 MIN_ACQUISITIONS=3
 
+PLATEHOLE_REQUIRED_COLS=['id','type','x','y','z','d']
+UNDRILLABLE_REQUIRED_COLS=['id','ra','dec','epoch','pm_ra','pm_dec','priority',
+                           'type', 'conflicts']
+STANDARDS_REQUIRED_COLS=['id','ra','dec','epoch','priority','pm_ra','pm_dec',
+                         'type']
+DRILLABLE_REQUIRED_COLS=['id','ra','dec','epoch','pm_ra','pm_dec', 'priority',
+                         'type', 'x','y', 'z','d']
+DRILLFILE_REQUIRED_COLS=['x','y','z','d','type','id']
+
 
 #deltara=np.rad2deg*arccos(cos(180*np.deg2rad/3600)*sec(dec)**2 - tan(dec)**2)
+
+def write_dotplate(name, plate_holes, fields, dir='./'):
+    filename='{}{}.plate'.format(dir, name)
+
+    #get list of crap for the plate
+    with open(filename,'w') as fp:
+    
+        #Write the [Plate] section
+        fp.write("[Plate]\n")
+
+        for r in _format_attrib_nicely({'name':name}):
+            fp.write(r)
+
+        #Write out mechanical holes
+        fp.write("[PlateHoles]\n")
+        recs=_dictlist_to_records(plate_holes, PLATEHOLE_REQUIRED_COLS)
+        for r in recs:
+            fp.write(r)
+        
+        #Write out the fields
+        for i,f in enumerate(fields):
+
+            #Write out field info section
+            fp.write("[Field{}]\n".format(i))
+            
+            #Write out the field attributes
+            for r in _format_attrib_nicely(f.get_info_dict()):
+                fp.write(r)
+            
+            #Write out holes not drilled on the plate
+            fp.write("[Field{}:Undrilled]\n".format(i))
+            recs=_dictlist_to_records(f.undrillable_dictlist(),
+                                      UNDRILLABLE_REQUIRED_COLS)
+            for r in recs:
+                fp.write(r)
+
+            #Write out holes drilled on the plate
+            fp.write("[Field{}:Drilled]\n".format(i))
+            recs=_dictlist_to_records(f.drillable_dictlist(),
+                                      DRILLABLE_REQUIRED_COLS)
+            for r in recs:
+                fp.write(r)
+
+            #Write out standard stars
+            fp.write("[Field{}:Standards]\n".format(i))
+            recs=_dictlist_to_records(f.standards_dictlist(),
+                                      STANDARDS_REQUIRED_COLS)
+            for r in recs:
+                fp.write(r)
+
+
+def write_drill(name, plate_holes, fields, dir='./'):
+    """ Write drill files for vince """
+    file_fmt_str='{}{}_All_Holes_{}.txt'
+    
+    dicts=[d for f in fields for d in f.drillable_dictlist()]+plate_holes
+    diams=set(d['d'] for d in dicts)
+    
+    for diam in diams:
+        dicts_for_file=[d for d in dicts if d['d']==diam]
+        with open(file_fmt_str.format(dir, name, diam),'w') as fp:
+
+            recs=_dictlist_to_records(dicts_for_file, DRILLFILE_REQUIRED_COLS,
+                                      required_only=True)
+            for r in recs[1:]:
+                fp.write(r)
+
+
 
 class Manager(object):
     """ Class for I don't know what yet"""
@@ -124,8 +202,8 @@ class Manager(object):
         
         #Determine the conflicts
         targs = [t for f in self.selected_fields
-                 for t in f.get_drillable_targets() ]
-        holes=([h for t in targs for h in t.holes]+
+                   for t in f.get_drillable_targets() ]
+        holes=([h for t in targs for h in t.holes] +
                [h for t in self.plate_holes for h in t.holes])
         self._determine_conflicts(holes)
     
@@ -138,30 +216,27 @@ class Manager(object):
         y=[h.y for h in holes]
         d=[h.d for h in holes]
         
-        
-        
-        
-        
         #Nothing can conflict with guides or acquisitions
         coll_graph=build_overlap_graph_cartesian(x,y,d)
 
-        
         #Take care of Guides & Acquisitions
-        
         keep=[]
         discard=[]
-        
+        import ipdb
         #Guides
         for f in self.selected_fields:
             #sort guides according to number of collisions
             #take all with no collisions and as many with collisions needed
             #until have at least two
 
+#onc154 ngc2264_a:gui12
+#ngc2264_a:gui10 ONC_a:ali1
+
+#            ipdb.set_trace()
             #get guide hole indicies & number of collisions
             hndxs=[(i,len(coll_graph.collisions(i)))
-                   for i in range(len(holes))
-                   if holes[i].target.is_guide and holes[i].target.field==f]
-            
+                   for i in range(len(holes)) if holes[i].target.is_guide and holes[i].target.field==f]
+#            ipdb.set_trace()
             #sum up collisions for the holes for each guide
             tmp=[]
             for g in f.guides:
@@ -171,7 +246,7 @@ class Manager(object):
                     hole_ndxs.append(i)
                     total_collisions+=nc
                 tmp.append((hole_ndxs,total_collisions))
-            
+#            ipdb.set_trace()
             tmp.sort(key=lambda x: x[1])
             
             #Figure out which guides to keep
@@ -183,7 +258,7 @@ class Manager(object):
                     with_coll.append(ndxs)
                 else:
                     no_coll.append(ndxs)
-        
+#            ipdb.set_trace()
             keep+=no_coll
             
             if len(no_coll) <MIN_GUIDES:
@@ -191,7 +266,7 @@ class Manager(object):
                 discard+=with_coll[MIN_GUIDES-len(keep):]
             else:
                 discard+=with_coll
-    
+#        ipdb.set_trace()
         #Now Acquisitions
         for f in self.selected_fields:
             #sort acquisitions according to number of collisions
@@ -210,12 +285,12 @@ class Manager(object):
             #Figure out which guides to keep
             no_coll=[]
             with_coll=[]
-            while tmp:
-                ndxs, tc=tmp.pop(0)
+            while hndxs:
+                ndx, tc=hndxs.pop(0)
                 if tc:
-                    with_coll.append(ndxs)
+                    with_coll.append([ndx])
                 else:
-                    no_coll.append(ndxs)
+                    no_coll.append([ndx])
         
             keep+=no_coll
             
@@ -225,11 +300,14 @@ class Manager(object):
             else:
                 discard+=with_coll
     
-        #Update the graph & fing the targets that had conflicts
+        #Update the graph & flag the targets that had conflicts
         for to_drop in discard:
+            conflictors=[]
             for ndx in to_drop:
-                conflictors=coll_graph.drop(ndx)
-                holes[ndx].target.conflicting=[holes[i].target for i in conflictors]
+                #If you conflict with one hole in a guide,
+                # you conflict with them all
+                conflictors+=coll_graph.drop(ndx)
+            holes[ndx].target.conflicting=[holes[i].target for i in conflictors]
                 
         for to_keep in keep:
             for ndx in to_keep:
@@ -238,6 +316,7 @@ class Manager(object):
                 for d in dropped:
                     holes[d].target.conflicting=holes[ndx]
 
+#        ipdb.set_trace()
 
         #Now finally dump the processed things from holes
         discard=[i for l in discard+keep for i in l]
@@ -287,12 +366,12 @@ class Manager(object):
                 
 
     def plate_drillable_dictlist(self):
-        return [{'id':t.id,
-            'x':'{:.5f}'.format(t.hole.x),
-            'y':'{:.5f}'.format(t.hole.y),
-            'z':'{:.5f}'.format(t.hole.z),
-            'd':'{:.5f}'.format(t.hole.d),
-            'type':t.type} for t in self.plate_holes if not t.conflicting]
+        ret=[]
+        for t in (t for t in self.plate_holes if not t.conflicting):
+            d={'id':t.id,'type':t.type}
+            d.update(t.hole.holeinfo)
+            ret.append(d)
+        return ret
 
     def save_selected_as_plate(self, name):
         """
@@ -310,9 +389,7 @@ class Manager(object):
         targets
         ....
         """
-        import write_dotplate
-        
         ph=self.plate_drillable_dictlist()
-        write_dotplate.write(name, ph, self.selected_fields)
-        write_dotplate.write_drill(name, ph, self.selected_fields)
+        write_dotplate(name, ph, self.selected_fields)
+        write_drill(name, ph, self.selected_fields)
 

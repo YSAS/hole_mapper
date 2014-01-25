@@ -1,6 +1,12 @@
 import numpy as np
 import operator
 from collections import defaultdict
+from logger import getLogger
+from fiber import Fiber
+import logging
+log=getLogger('cassettes')
+log.setLevel(logging.INFO)
+
 
 def rangify(data):
     from itertools import groupby
@@ -13,6 +19,30 @@ def rangify(data):
         else:
             str_list.append('%d' % ilist[0])
     return ', '.join(str_list)
+
+def _get_fiber_staus():
+    """ returns a dict
+        
+        {cassettename:8-tuple of booleans with True being good}
+        """
+    default={n:[True]*8 for n in CASSETTE_NAMES}
+    file='example.deadfibers' #m2fsConfig.get_dead_fiber_file()
+    with open(file,'r') as fp:
+        lines=fp.readlines()
+    lines=[l.strip() for l in lines]
+    lines=[l for l in lines if l and not l.startswith('#')]
+    for l in lines:
+        cass,_,deads=l.partition(' ')
+        assert (len(cass)==2 and
+                cass[0].upper() in 'RB'
+                and cass[1] in '12345678')
+        deads=map(int,deads.split(','))
+        for d in (d-1 for d in deads if d>0 and d<9):
+            default[cass.upper()+'l'][d]=False
+        for d in (d-9 for d in deads if d>8 and d<17):
+            default[cass.upper()+'h'][d]=False
+
+    return default
 
 #in res and asc -x is on right looking at plate
 def _init_cassette_positions():
@@ -90,13 +120,18 @@ CASSETTE_POSITIONS=_init_cassette_positions()
 
 class Cassette(object):
     def __init__(self, name, usable=None):
+        """ Usable is range 1-8 regardless of h or l"""
         assert 'h' in name or 'l' in name
-        if usable == None and 'h' in name:
-            self.usable=range(9,17)
-        elif usable == None and 'l' in name:
-            self.usable=range(1,9)
+        if 'h' in name:
+            if usable == None:
+                self.usable=range(9,17)
+            else:
+                self.usable=[u+8 for u in usable]
         else:
-            self.usable=usable
+            if usable == None:
+                self.usable=range(1,9)
+            else:
+                self.usable=usable
         self.name=name
         self.pos=CASSETTE_POSITIONS[name]
         self.used=0
@@ -107,10 +142,23 @@ class Cassette(object):
 #        """ Return list of targets in order of fiber number """
 #        return [self.map[fiber] for fiber in sorted(self.map.keys())]
 
+    def __str__(self):
+        return "{}: {} used. {} usable {} mapped".format(self.name, self.used,
+                                               self.usable, self.map.keys())
+                                            
+    @property
+    def side(self):
+        return self.name[0].lower()
+
     @property
     def n_avail(self):
         return len(self.usable)-self.used
     
+    @property
+    def ordered_targets(self):
+        """ list of targets ardered according to fiber number """
+        return [self.map[fiber] for fiber in sorted(self.map.keys())]
+
     def reset(self):
         self.used=0
         self.targets=[]
@@ -118,7 +166,8 @@ class Cassette(object):
 
     def assign(self, target):
         """Add the hole to the cassette and assign the cassette to the hole"""
-        if self.n_avail()==0:
+        log.debug("Assign: {} to {}".format(target,self))
+        if not self.n_avail:
             import ipdb;ipdb.set_trace()
             raise Exception('Cassette Full')
 
@@ -140,17 +189,19 @@ class Cassette(object):
         """
         Remove the hole from the cassette and unassign cassette from the hole
         """
-        if target not in self.target:
+        if target not in self.targets:
             import ipdb;ipdb.set_trace()
             raise Exception('target not in cassette')
+        target.unassign()
         self.used-=1
         self.targets.remove(target)
         for k in self.map.keys():
-            if self.map[k]==hole:
+            if self.map[k]==target:
                 self.map.pop(k)
                 break
-        target.unassign()
 
+
+    @property
     def label(self):
         """Return a string label for the cassette e.g. R1 1-8 or B3 1,4,7"""
         return self.name[0:2]+' '+rangify(sorted(self.map.keys()))
@@ -159,7 +210,10 @@ class Cassette(object):
         """
         Associate targets with the individual fibers. Sets assignment for targets.
         """
-
+        if len([t for t in self.targets if t.assigned_cassette !=self.name
+                or t._assigned_cassette_name!=self.name])>0:
+            import ipdb;ipdb.set_trace()
+        
         #assuming -x is to left
         if remap:
             for k in self.map.keys():
@@ -186,10 +240,14 @@ class Cassette(object):
             
             #Tell the hole its fiber
             t.assign(fiber=Fiber(cassette=self.name,fnum=num))
+        
+        if len([t for t in self.targets if t.assigned_cassette !=self.name
+                or t._assigned_cassette_name!=self.name])>0:
+            import ipdb;ipdb.set_trace()
 
     @property
     def on_left(self):
-        return not self.onRight()
+        return not self.on_right
 
     @property
     def on_right(self):
@@ -218,19 +276,22 @@ class CassetteConfig(object):
         assert len(usableR)==16
         assert len(usableB)==16
 
-        fiber_stat=databasegetter.get_fiber_staus()
+        fiber_stat=_get_fiber_staus()
         
         self._cassettes=[]
         for name in RED_CASSETTE_NAMES:
-            use=[usableR[i] and fiber_stat[name][i] for i in range(16)]
+            use=[i+1 for i in range(8) if usableR[i] and fiber_stat[name][i]]
             self._cassettes.append(Cassette(name, use))
         for name in BLUE_CASSETTE_NAMES:
-            use=[usableB[i] and fiber_stat[name][i] for i in range(16)]
+            use=[i+1 for i in range(8) if usableB[i] and fiber_stat[name][i]]
             self._cassettes.append(Cassette(name, use))
 
 
     def __iter__(self):
         return iter(self._cassettes)
+
+    def get_cassette(self, name):
+        return [c for c in self if c.name == name][0]
 
     @property
     def n_r_usable(self):
@@ -246,9 +307,8 @@ class CassetteConfig(object):
             c.reset()
 
     def assign(self, target, cassette_name):
-        """ Assign target to a cassette fiber to target """
-        cass=[c for c in self if c.name == cassette_name][0]
-        cass.assign(t)
+        """ Assign target to a cassette &  fiber to target """
+        self.get_cassette(cassette_name).assign(target)
 
     def map(self, remap=False):
         for c in self:
@@ -267,7 +327,7 @@ def _condense_cassette_assignemnts(cassettes):
     non_full=[c for c in cassettes if c.n_avail >0 and c.used>0]
               
     to_check=list(non_full)
-    to_check.sort(key= lambda x: x.n_avail())
+    to_check.sort(key= lambda x: x.n_avail)
     
     while to_check:
         
@@ -309,7 +369,7 @@ def _rejigger_cassette_assignemnts(cassettes):
     verticle excursions
     """
     cassettes.sort(key=lambda c: c.pos[1])
-    
+#    import ipdb;ipdb.set_trace()
     for i in range(len(cassettes)-1):
         cassette=cassettes[i]
         higer_cassettes=cassettes[i:]
@@ -317,10 +377,15 @@ def _rejigger_cassette_assignemnts(cassettes):
         swappable_cassette_targets=[t for t in cassette.targets
                                     if t.is_assignable]
 
+#        if not swappable_cassette_targets:
+#            import ipdb;ipdb.set_trace()
+
         swappable_higher_targets=[t for c in higer_cassettes
-                                    for h in c.targets
+                                    for t in c.targets
                                     if t.is_assignable(cassette=cassette)]
-        if len(swappable_higher_targets) ==0:
+        
+        if not swappable_higher_targets:
+#            import ipdb;ipdb.set_trace()
             continue
         
         targets=swappable_cassette_targets+swappable_higher_targets
@@ -345,6 +410,7 @@ def _rejigger_cassette_assignemnts(cassettes):
                                    if c.name==targets[j].assigned_cassette][0]
                     if high_cassette==cassette:
                         continue
+#                    import ipdb;ipdb.set_trace()
                     if (targets[j].is_assignable(cassette=cassette) and
                         low_target.is_assignable(cassette=high_cassette)):
                         #Unassign

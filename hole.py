@@ -14,13 +14,25 @@ class Hole(object):
 
     @property
     def info(self):
-        ret={'x':'{:.5f}'.format(self.x),
-             'y':'{:.5f}'.format(self.y),
-             'z':'{:.5f}'.format(self.z),
-             'd':'{:.5f}'.format(self.d)}
+        ret=self.holeinfo
         if self.target:
             ret.update(self.target.info)
         return ret
+    
+    @property
+    def holeinfo(self):
+        return {'x':'{:.4f}'.format(self.x),
+                'y':'{:.4f}'.format(self.y),
+                'z':'{:.4f}'.format(self.z),
+                'd':'{:.4f}'.format(self.d)}
 
     def distance(self,(x,y)):
         return math.hypot(self.x-x,self.y-y)
+
+    @property
+    def position(self):
+        return self.x, self.y
+
+    @property
+    def id(self):
+        return str(hash(self))

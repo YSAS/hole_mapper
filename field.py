@@ -5,9 +5,17 @@ from datetime import datetime
 import holesxy
 from logger import getLogger
 from hole import Hole
-from target import Target
+from target import Target,ConflictDummy
 from target import GUIDEREF_TYPE, GUIDE_TYPE, ACQUISITION_TYPE, SH_TYPE
 from graphcollide import build_overlap_graph_cartesian
+from dimensions import PLATE_TARGET_RADIUS_LIMIT
+from readerswriters import _parse_header_row, _parse_record_row
+import numpy as np
+
+
+REQUIRED_FIELD_KEYS=['ra', 'dec', 'epoch', 'id', 'type', 'priority']
+FIELD_KEYS=REQUIRED_FIELD_KEYS+['pm_ra','pm_dec']
+REQUIRED_FIELD_RECORD_ENTRIES=['ra', 'dec', 'epoch', 'type']
 
 log=getLogger('plateplanner.field')
 
@@ -131,6 +139,19 @@ class FieldCatalog(object):
         x=[h.x for h in holes]
         y=[h.y for h in holes]
         d=[h.d for h in holes]
+        
+        #First exclude anything not actually on the plate
+        exclude,=np.where(np.array(x)**2+np.array(y)**2 >
+                          PLATE_TARGET_RADIUS_LIMIT**2)
+        
+        for i in exclude:
+            holes[i].target.conflicting=ConflictDummy(id='offplate')
+
+        holes=[h for h in holes if not h.target.conflicting]
+        x=[h.x for h in holes]
+        y=[h.y for h in holes]
+        d=[h.d for h in holes]
+
 
         #Per Mario:
         #No overlap with guides/acquisitions/sh
@@ -146,7 +167,9 @@ class FieldCatalog(object):
             to_drop+=dropped
             for i in dropped:
                 holes[i].target.conflicting=holes[n].target
-        to_drop+=ndxs
+        
+        #Drop the shack hartman
+        to_drop+=[len(holes)-1]
 
         holes[:]=[h for i,h in enumerate(holes) if i not in to_drop]
         x=[h.x for h in holes]
@@ -224,22 +247,80 @@ class FieldCatalog(object):
         return [t.info for t in self.standards]
 
 
+def load_dotfield(file):
+    """
+    returns FieldCatalog() or raises error if file has issues.
+    """
+
+    ret=FieldCatalog(file=os.path.basename(file))
+
+    try:
+        lines=open(file,'r').readlines()
+    except IOError as e:
+        raise e
+
+    lines=[l.strip() for l in lines]
+
+    have_name=False
+
+#    try:
+    for l in (l for l in lines if l):
+        if l[0] =='#':
+            continue
+        elif l[0] not in '+-0123456789' and not l.lower().startswith('ra'):
+            try:
+                k,_,v=l.partition('=')
+                k=k.strip().lower()
+                if k=='field':
+                    k='name'
+                v=v.strip()
+                assert v != ''
+            except Exception as e:
+                raise Exception('Bad key=value formatting: {}'.format(str(e)))
+
+            if k=='obsdate':
+                ret.obsdate=datetime(*map(int, v.split()))
+            elif k=='name':
+                ret.name=v
+            else:
+                ret.user[k]=v
+        elif l.lower().startswith('ra'):
+            keys=_parse_header_row(l.lower(), REQUIRED=REQUIRED_FIELD_KEYS)
+            user_keys=[k for k in keys if k not in FIELD_KEYS]
+        else:
+            #import ipdb;ipdb.set_trace()
+            rec=_parse_record_row(l, keys, user_keys,
+                                  REQUIRED=REQUIRED_FIELD_RECORD_ENTRIES)
+            targ=Target(**rec)
+            ret.add_target(targ)
+            targ.field=ret
+#    except Exception as e:
+#        raise IOError('Failed on line '
+#                        '{}: {}\n  Error:{}'.format(lines.index(l),l,str(e)))
+    #Use the s-h (or field center id if none) as the field name if one wasn't
+    # defined
+    if not ret.name:
+        ret.name=ret.sh.id
+    #import ipdb;ipdb.set_trace()
+    return ret
+
+
 class Field(object):
     def __init__(self, field_info=None, drilled=None, undrilled=None,
                  standards=None):
         """
         drilled, undrilled, & standards should be lists of target
         """
-        
+
         self.info=field_info #Dict, see keys returned by fieldcatalog.info
-        self.name=info['name']
+        self.name=field_info['name']
         self.undrilled=undrilled
         self.standards=standards
 
         guides=[g for g in drilled if g.type in [GUIDE_TYPE, GUIDEREF_TYPE] ]
         for id in set(g.id for g in guides):
-            refs=[g for g in guides if g.id==id and d.type==GUIDEREF_TYPE]
-            guide=[g for g in guides if g.id==id and d.type==GUIDE_TYPE][0]
+            refs=[g for g in guides if g.id==id and g.type==GUIDEREF_TYPE]
+            guide=[g for g in guides if g.id==id and g.type==GUIDE_TYPE][0]
             for r in refs:
                 guides.remove(r)
             guide.additional_holes=[r.hole for r in refs]
@@ -250,44 +331,11 @@ class Field(object):
         self.acquisitions=[g for g in drilled if g.is_acquisition]
         self.skys=[g for g in drilled if g.is_sky]
 
-        
-    def get_assignable(self, n):
-        """
-        Returns up to n simultaneously pluggable targets and compatible 
-        guides, & acquisitons
-        """
+    def all_targets(self):
+        return (self.skys+self.targets+self.guides+self.acquisitions)
 
-#    def all_targets(self):
-#        return (self.skys+self.targets+self.guides+self.acquisitions)
-#
-#    def holes(self):
-#        """ return a list of all the holes the field would like on a plate """
-#        if not self._processed:
-#            return []
-#        else:
-#            return [hole for t in self.all_targets() for hole in t.holes()]
+    @property
+    def holes(self):
+        """ return a list of all the holes the field has on the plate """
+        return [hole for t in self.all_targets() for hole in t.holes]
 
-#    def drillable_dictlist(self):
-#        ret=[]
-#        for t in (t for t in self.all_targets()
-#                  if not t.conflicting and t.on_plate):
-#            d=t.hole.info
-#            d.pop('field','')
-#            ret.append(d)
-#            if t.type==GUIDE_TYPE:
-#                #Change type code for guide refs
-#                for h in t.additional_holes:
-#                    d=h.info
-#                    d.pop('field','')
-#                    d['type']=GUIDEREF_TYPE
-#                    ret.append(d)
-#        return ret
-#
-#    def undrillable_dictlist(self, flat=False):
-#        ret=[t.info for t in self.all_targets()
-#             if t.conflicting or not t.on_plate]
-#        map(lambda x: x.pop('field',''), ret)
-#        return ret
-#
-#    def standards_dictlist(self):
-#        return [t.info for t in self.standards]

@@ -1,11 +1,15 @@
+from ConfigParser import RawConfigParser
+import os.path
+from plate import get_plate
+from cassettes import CassetteConfig
+from cassettes import CASSETTE_NAMES, RED_CASSETTE_NAMES, BLUE_CASSETTE_NAMES
+import ipdb
 
-DEFAULT_FOCUS=280.0
-
-FILTER_NAMES=['BK7']
+FILTER_NAMES=['BK7','IanR']
 SLIT_NAMES=['180 um','125 um','98 um','75 um','58 um','45 um']
-MODE_NAMES=['HiRes','LoRes']
-HIRES_MODE='hires'
+MODE_NAMES_PLIST_NAME_MAP={'hires':'HiRes','lores':'LoRes'}
 
+HIRES_MODE='hires'
 
 
 REQUIRED_PLUGGED_SECTION_KEYS=['fiber', 'id', 'ra', 'dec', 'epoch', 'type',
@@ -13,60 +17,66 @@ REQUIRED_PLUGGED_SECTION_KEYS=['fiber', 'id', 'ra', 'dec', 'epoch', 'type',
 
 
 
-class SetupConfig(object):
+class M2FSConfig(object):
     def __init__(self, side=None, mode=None, slit=None, loel=None,
                  hiaz=None, hiel=None, focus=None,
                  binning=None, filter=None, n_amps=None, speed=None):
         
-        self.side=side
-    
-        self.mode=mode
-        assert self.mode in MODE_NAMES
+        self.side=side.upper()
+        
+        
+        self.mode=mode.lower()
+        assert self.mode in MODE_NAMES_PLIST_NAME_MAP
         
         self.slit=slit
         assert slit in SLIT_NAMES
-
+        
         self.loel=loel
-
+        
         self.hiaz=hiaz
         self.hiel=hiel
-
+        
         self.focus=focus
-
+        
         self.binning=binning
         self.speed=speed
         self.n_amps=n_amps
-
+        
         self.filter=filter
         assert filter in FILTER_NAMES
     
-
     @property
     def info(self):
         c=self
         r={'binning_{}'.format(self.side):'{} ({})'.format(c.binning, c.n_amps),
-           'filter_{}'.format(self.side):c.filter,
-           'focus_{}'.format(self.side):str(c.focus),
-           'hiaz_{}'.format(self.side):str(c.hiaz),
-           'hiel_{}'.format(self.side):str(c.hiel),
-           'loel_{}'.format(self.side):str(c.loel),
-           'slide_{}'.format(self.side):c.mode, #LoRes or HiRes
-           'slit_{}'.format(self.side):c.slit,
-           'speed_{}'.format(self.side):c.speed}
+            'filter_{}'.format(self.side):c.filter,
+            'focus_{}'.format(self.side):str(c.focus),
+            'hiaz_{}'.format(self.side):str(c.hiaz),
+            'hiel_{}'.format(self.side):str(c.hiel),
+            'loel_{}'.format(self.side):str(c.loel),
+            'slide_{}'.format(self.side):MODE_NAMES_PLIST_NAME_MAP[c.mode],
+            'slit_{}'.format(self.side):c.slit,
+            'speed_{}'.format(self.side):c.speed}
         return r
 
+
+
 class Setup(object):
-    def __init__(self, setupfile, fieldname, configR, configB, assignwith=[]):
+    def __init__(self, setupfile, platename, fieldname,
+                 configR, configB, assignwith=None):
         
         ok_fibers_r=configR.pop('tetris_config') #boolean 16 tuple,fibers to use
         ok_fibers_b=configB.pop('tetris_config') #boolean 16 tuple,fibers to use
-        self.b=configB
-        selb.r=configR
+        self.b=M2FSConfig(side='B',**configB)
+        self.r=M2FSConfig(side='R',**configR)
         self.name=os.path.basename(setupfile)
-        self.plate=databasegetter.get_plate_for_field(fieldname)
+        self.plate=get_plate(platename)
         self.field=self.plate.fields[fieldname]
 
-        self.assign_with=map(databasegetter.get_setup, assignwith) #setups
+        if not assignwith:
+            self.assign_with=[]
+        else:
+            self.assign_with=assignwith
         
         self.cassette_config=CassetteConfig(usableR=ok_fibers_r,
                                             usableB=ok_fibers_b)
@@ -195,24 +205,33 @@ class Setup(object):
         _assign_fibers(self.cassette_config, to_assign)
 
 
-def usable_cassette(setup, assign_with=[]):
+def usable_cassette(setup, assign_with=None):
+    """ 
+    This function recieves the setup and any setups which should be
+    assigned simultaneously and returns the list of targets for which 
+    assignments should be computed, with their
+    _preset_usable_cassette_names attribute set to a set of cassette names
+    which may be used
+    To override this create a .py file with the same name of the setup in the
+    same directory as the setup with single? function named usable_cassette
+    """
     to_assign=setup.field.skys+setup.field.targets
     
     to_assign_with=[t for s in assign_with
                       for t in s.field.skys+s.field.targets]
     
     if not to_assign_with:
-        if len(to_assign) <= self.cassette_config.n_r_usable:
+        if len(to_assign) <= setup.cassette_config.n_r_usable:
             #put all on one side by setting
             for t in to_assign:
                 t._preset_usable_cassette_names=set(RED_CASSETTE_NAMES)
-        elif len(to_assign) <= self.cassette_config.n_b_usable:
+        elif len(to_assign) <= setup.cassette_config.n_b_usable:
             for t in to_assign:
                 t._preset_usable_cassette_names=set(BLUE_CASSETTE_NAMES)
         else:
-            for t in self.field.targets:
+            for t in setup.field.targets:
                 t._preset_usable_cassette_names=set(CASSETTE_NAMES)
-            for i, t in enumerate(self.field.skys):
+            for i, t in enumerate(setup.field.skys):
                 if i % 2:
                     t._preset_usable_cassette_names=set(RED_CASSETTE_NAMES)
                 else:
@@ -228,9 +247,11 @@ def usable_cassette(setup, assign_with=[]):
             else:
                 t._preset_usable_cassette_names=set(BLUE_CASSETTE_NAMES)
 
+    to_assign=to_assign[:setup.cassette_config.n_b_usable+
+                         setup.cassette_config.n_r_usable]
     return to_assign
 
-def _assign_fibers(cassettes, targets):
+def _assign_fibers(cassettes, to_assign):
     """
     
     cassettes should be a cassettesconfig 
@@ -307,7 +328,7 @@ def _assign_fibers(cassettes, targets):
                      if t.is_sky and not t.is_assigned]
     unassigned_objs=[t for t in to_assign
                      if t.is_target and not t.is_assigned]
-                    
+
     #Grab targets with assignments and configure the cassettes
     assigned=[t for t in to_assign if t.is_assigned]
     for t in assigned:
@@ -317,7 +338,6 @@ def _assign_fibers(cassettes, targets):
     #All targets must have possible_cassettes_names set
 
     #TODO: What about targets with preset usable cassette restrictions
-
 
     #While there are holes w/o an assigned cassette (groups don't count)
     while unassigned_skys:
@@ -333,8 +353,7 @@ def _assign_fibers(cassettes, targets):
                 import ipdb;ipdb.set_trace()
             #Set the cassettes that are usable for the hole
             #  no_add is true so we keep the distribution of sky fibers
-            t.set_possible_cassettes_by_name(possible_cassettes,
-                                       update_with_intersection=True)
+            t.update_possible_cassettes_by_name(possible_cassettes)
 
         #Get hole furthest from its cassettes and assign to nearest available
         unassigned_skys.sort(key=lambda t: t.plug_priority)
@@ -344,40 +363,200 @@ def _assign_fibers(cassettes, targets):
 
     #While there are holes w/o an assigned cassette (groups don't count)
     while unassigned_objs:
+        
+#        for foo in to_assign:
+#            if (foo.assigned_cassette and
+#                foo not in cassettes.get_cassette(foo.assigned_cassette).targets):
+#                import ipdb;ipdb.set_trace()
+
         #Update cassette availability for each hole (a cassette may have filled)
-        for h in unassigned_objs:
+        for t in unassigned_objs:
             #Get cassettes with correct slit and free fibers
             # n.b these are just cassette name strings
             possible_cassettes=[c.name for c in cassettes
                                 if t.is_assignable(cassette=c) and
                                 c.n_avail >0]
+
             if not possible_cassettes:
                 print 'Could not find a suitable cassette for {}'.format(t)
                 import ipdb;ipdb.set_trace()
             #Set the cassetes that are usable for the hole
             #  no_add is true so we keep the distribution of sky fibers
-            t.set_possible_cassettes_by_name(possible_cassettes,
-                                       update_with_intersection=True)
+            t.update_possible_cassettes_by_name(possible_cassettes)
+
 
         #Get hole furthest from its cassettes and assign to nearest available
         unassigned_objs.sort(key=lambda t: t.plug_priority)
         t=unassigned_objs.pop()
-        cassettes.assign_cassette(t.nearest_usable_cassette, t)
+#        if t.id in ['na196']:
+#            import ipdb;ipdb.set_trace()
+        cassettes.assign(t, t.nearest_usable_cassette)
 
 
     ####All targets have now been assigned to a cassette####
 
+    for t in to_assign:
+        if t not in cassettes.get_cassette(t.assigned_cassette).targets:
+            import ipdb;ipdb.set_trace()
+
     #For each cassette assign fiber numbers with x coordinate of holes
     cassettes.map()
     
+    for t in to_assign:
+        if t not in cassettes.get_cassette(t.assigned_cassette).targets:
+            import ipdb;ipdb.set_trace()
+
     #Compact the assignments (get rid of underutillized cassettes)
     cassettes.condense()
+
+    for t in to_assign:
+        if t not in cassettes.get_cassette(t.assigned_cassette).targets:
+            import ipdb;ipdb.set_trace()
     
     #Rejigger the fibers
     cassettes.rejigger()
-    
+
+    for t in to_assign:
+        if t not in cassettes.get_cassette(t.assigned_cassette).targets:
+            import ipdb;ipdb.set_trace()
+
     #Remap fibers
     cassettes.map(remap=True)
 
 
+def _config_dict_from_dotsetup_dict(section_dict, side):
+    
+    get_key= lambda d, key, side : d.get(key+side, d.get(key, None))
+    
+    try:
+        conf_name=get_key(section_dict, 'config', side)
+        return get_config(conf_name, side)
+    except KeyError:
+        pass
+    #Load the config piecemeal
+    config={'mode':get_key(section_dict, 'mode',side),
+            'binning':get_key(section_dict, 'binning',side),
+            'filter':get_key(section_dict, 'filter',side),
+            'slit':get_key(section_dict, 'slit',side),
+            'tetris_config':get_key(section_dict, 'tetris_config',side),
+            'n_amps':get_key(section_dict, 'n_amps',side),
+            'speed':get_key(section_dict, 'speed',side)}
+    
+    try:
+        config['focus']=get_key(section_dict, 'focus', side)
+    except KeyError:
+        pass
+    
+    if config['mode'].lower()==HIRES_MODE:
+        config['hiel']=get_key(section_dict, 'elevation', side)
+        config['hiaz']=get_key(section_dict, 'azimuth', side)
+    else:
+        config['loel']=get_key(section_dict, 'elevation', side)
+
+    config['tetris_config']=tuple(map(lambda x: bool(int(x)),
+                                      config['tetris_config'].split(',')))
+
+    return config
+
+
+
+def load_dotsetup(filename, load_awith=False):
+    """ read in a dotsetup file """
+    #Read in the setups
+    cp=RawConfigParser()
+    cp.optionxform=str
+    with open(filename) as fp:
+        cp.readfp(fp)
+    
+    setups=[]
+    
+    #Parse it all
+    for sec in cp.sections():
+        section_dict=dict(cp.items(sec))
+        
+        configB=_config_dict_from_dotsetup_dict(section_dict, 'B')
+        configR=_config_dict_from_dotsetup_dict(section_dict, 'R')
+        #TODO: Handle case where setup uses only one side
+        
+        field=section_dict['field']
+        plate=section_dict['plate']
+        if load_awith:
+            setup_names=section_dict.get('assignwith','')
+            if setup_names:
+                assignwith=[]
+                for name in setup_names.split(','):
+                    assignwith.append(get_setup(name.strip()))
+            else:
+                assignwith=[]
+
+        setup=Setup(filename, section_dict['plate'], section_dict['field'],
+                    configR, configB, assignwith=assignwith)
+
+        setups.append(setup)
+    
+    return setups
+
+
+
+def _load_dotconfigdef(filename):
+
+    #Read file
+    try:
+        lines=open(filename,'r').readlines()
+    except IOError as e:
+        raise e
+
+    lines=[l.strip() for l in lines]
+
+    section_dict={}
+    for l in (l for l in lines if l and l[0]!='#'):
+        k,v=l.split('=')
+        assert k.strip() not in section_dict
+        section_dict[k.strip()]=v.strip()
+
+    configR=_config_dict_from_dotsetup_dict(section_dict,'R')
+    configB=_config_dict_from_dotsetup_dict(section_dict,'B')
+
+    return configR, configB
+
+
+def get_config(configname, side=None):
+    #TODO: This needs to be maintained by some code
+    conf_file_map={'5B':'example.configdef'}
+    
+    try:
+        configR,configB=_load_dotconfigdef(conf_file_map[configname])
+        if not side:
+            return configR,configB
+        elif side.lower()=='r':
+            return configR
+        elif side.lower()=='b':
+            return configB
+        else:
+            raise ValueError("Invalid side: '{}'".format(side))
+    except IOError:
+        raise ValueError('Config {} not known'.format(configname))
+
+def get_setup(setupname, load_awith=False, search_dir=None):
+    """Set alone to false to load any assign with setups"""
+    dir='./'
+    try:
+        return load_dotsetup(os.path.join(dir,setupname)+'.setup', load_awith)
+    except IOError:
+        raise ValueError('Could not find setup {}'.format(setupname))
+
+
+def get_custom_usable_cassette_func(setupname, search_dir=None):
+    """ if file exists file should have a function with the following sig:
+    targets_configured_for_assignement=usable_cassette(setup_object, list_of_assign_with_setup_objects)
+    """
+    dir='./'
+    try:
+        loc=locals()
+        globa=globals()
+        with open(os.path.join(dir,setupname)+'.py') as f:
+            exec(f.read(), globa, loc) #I'm a very bad person
+        return loc['usable_cassette']
+    except IOError:
+        raise NameError()
 

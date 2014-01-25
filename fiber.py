@@ -1,5 +1,5 @@
 class Fiber(object):
-    def __init__(self, name=None, cassette=None, fnunm=None):
+    def __init__(self, name=None, cassette=None, fnum=None):
         """name = e.g. R3-14"""
         if name:
             if tyep(name)==Fiber:
@@ -11,6 +11,9 @@ class Fiber(object):
 
     def __eq__(self, other):
         return self.name==other.name
+    
+    def __str__(self):
+        return self.name
 
     @property
     def number(self):
@@ -24,6 +27,6 @@ class Fiber(object):
     def cassette_num(self):
         return int(self.name[1])
     
-    @propery
+    @property
     def cassette_name(self):
-        return self.name[:2]+('h' if self.fiber_num>8 else 'l')
+        return self.name[:2]+('h' if self.number>8 else 'l')
