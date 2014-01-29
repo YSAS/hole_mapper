@@ -1,0 +1,7 @@
+[submodule "jbastro"]
+    path = jbastropackage
+    url = git://github.com/baileyji/jbastro.giti
+
+[submodule "jbastro_module"]
+	path = jbastro_module
+	url = git://github.com/baileyji/jbastro.git
