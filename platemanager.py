@@ -13,6 +13,8 @@ from setup import load_dotsetup
 from graphcollide import build_overlap_graph_cartesian
 from holesxy import get_plate_holes
 
+from hole import Hole
+
 log=getLogger('plateplanner.platemanager')
 
 
@@ -22,7 +24,7 @@ COLOR_SEQUENCE=['red','blue','pink','green','black','teal','purple','orange']
 LABEL_MAX_Y=.7
 MIN_LABEL_Y_SEP=0.05 #must be < 2*LABEL_MAX_Y/16
 LABEL_RADIUS=0.95*PLATE_RADIUS
-#PROJ_PLATE_LABEL_Y=.95
+PROJ_PLATE_LABEL_Y=.95*PLATE_RADIUS
 
 
 def distribute(x, min_x, max_x, min_sep):
@@ -41,6 +43,8 @@ class Manager(object):
     def __init__(self):
         log.info('Started Manager')
         self.do_coord_shift=False
+        self.setups=[]
+        self.selected_setup=None
 
     def load(self, file):
         """ 
@@ -78,25 +82,20 @@ class Manager(object):
         #TODO
 
 
-    def _draw_hole(self, hole, canvas, color=None,
-                   fcolor='White', radmult=1.0, drawimage=False):
+    def _draw_hole(self, hole, canvas, color=None, fcolor='White', radmult=1.0):
         
-        pos=hole.x,hole.y
+        pos=self.proj_coord_shift(h.position)
         rad=hole.d*radmult/2.0
-        
         hashtag="."+hole.id
         
-        if drawimage:
-            canvas.drawCircle(pos, rad, outline=color, fill=fcolor)
-        else:
-            if canvas.find_withtag(hashtag):
-                log.info("drawing dupe in dark green @ {} IDs: {}".format(
-                    pos, str(hash(hole))))
-                fcolor='DarkGreen'
-            canvas.drawCircle(pos, rad,
-                              outline=color, fill=fcolor, tags=('hole',hashtag),
-                              activefill='Green', activeoutline='Green',
-                              disabledfill='Orange', disabledoutline='Orange')
+        if canvas.find_withtag(hashtag):
+            log.info("drawing dupe in dark green @ {} IDs: {}".format(
+                pos, str(hash(hole))))
+            fcolor='DarkGreen'
+        canvas.drawCircle(pos, rad,
+                          outline=color, fill=fcolor, tags=('hole',hashtag),
+                          activefill='Green', activeoutline='Green',
+                          disabledfill='Orange', disabledoutline='Orange')
 
     def draw(self, canvas):
         
@@ -131,11 +130,54 @@ class Manager(object):
 #                fcolor=c if h.target.conflicting else 'White'
 #                self._draw_hole(h, canvas, color=c, fcolor=fcolor)
 
-    def _draw_with_assignements(self, setup, canvas, lblcolor='black'):
+    def draw_image(self, canvas, channel='all',radmult=.75):
+            #the active setup
+            setup=self.selected_setup
+            
+            plate_name=setup.name
+
+            #Draw the plate name and active setup
+            canvas.drawText((0,PROJ_PLATE_LABEL_Y), plate_name,
+                            color='White',center=0)
+#            canvas.drawText((0,PROJ_PLATE_LABEL_Y-.05), other_text,
+#                            color='White',center=0)
+
+            #Shack Hartman
+#            self._draw_hole(Hole(x=0,y=0,d=2*SH_RADIUS), canvas,
+#                            color='Magenta',fcolor='Magenta',
+#                            radmult=radmult,drawimage=True)
+
+            #Assignments
+            self._draw_with_assignements(self.selected_setup, canvas,
+                                         radmult=radmult)
+            
+            #Guides an Acquisitions
+            for t in setup.field.guides+setup.field.acquisitions:
+                self._draw_hole(t.hole, canvas, color='Yellow',fcolor='Yellow',
+                                radmult=radmult)
+
+            #Standards
+            for t in setup.plate.plate_holes:
+                self._draw_hole(t.hole, canvas,
+                                color='Magenta',fcolor='Magenta',
+                                radmult=radmult)
+
+            #Draw little white dots where all the other holes are
+            for h in self.inactive_holes:
+                pos=self.proj_coord_shift(h.position)
+                canvas.drawSquare(pos, h.d/6.0, fill='White', outline='White')
+
+    @property
+    def inactive_holes(self):
+        """ return iterable of the holes that should be drawn as little 
+        white dots"""
+        return []
+
+    def _draw_with_assignements(self, setup, canvas, radmult=1.0,
+                                lblcolor='black'):
         """Does not draw holes for color if not selected"""
         drawred=True
         drawblue=True
-        drawimage=False
         
         #List of cassette labels and first hole positions
         labeldata=[]
@@ -148,7 +190,7 @@ class Manager(object):
             
             if drawred and cassette.side=='r':
                 #Draw the cassette
-                self._draw_cassette(cassette, canvas, drawimage=drawimage)
+                self._draw_cassette(cassette, canvas, radmult=radmult)
                 #Add the label, color, and start pos to the pot
                 labeldata.append(('red',
                                   cassette.ordered_targets[0].hole.position,
@@ -157,7 +199,7 @@ class Manager(object):
 
             if drawblue and cassette.side=='b':
                 #Draw the cassette
-                self._draw_cassette(cassette, canvas, drawimage=drawimage)
+                self._draw_cassette(cassette, canvas, radmult=radmult)
                 #Add the label, color, and start pos to the pot
                 labeldata.append(('blue',
                                   cassette.ordered_targets[0].hole.position,
@@ -204,10 +246,10 @@ class Manager(object):
             canvas.drawText(tpos, label, color=lblcolor)
 
             #Connect label to cassette path
-            canvas.drawLine(tpos, self.plate_coord_shift(hpos),
+            canvas.drawLine(tpos, self.proj_coord_shift(hpos),
                             fill=color, dashing=1)
 
-    def _draw_cassette(self, cassette, canvas,  drawimage=False):
+    def _draw_cassette(self, cassette, canvas, radmult=1.0):
     
         if cassette.side=='r':
             color='red'
@@ -219,17 +261,16 @@ class Manager(object):
 
         pluscrosscolor='Lime'
 
-
         holes=[t.hole for t in cassette.ordered_targets]
         
         #Draw an x across the first hole
-        x,y=self.plate_coord_shift(holes[0].position)
+        x,y=self.proj_coord_shift(holes[0].position)
         r=2*0.08675
         canvas.drawLine((x-r,y+r),(x+r,y-r), fill=pluscrosscolor)
         canvas.drawLine((x-r,y-r),(x+r,y+r), fill=pluscrosscolor)
         
         #Draw a + over the last hole
-        x,y=self.plate_coord_shift(holes[-1].position)
+        x,y=self.proj_coord_shift(holes[-1].position)
         r=1.41*2*0.08675
         canvas.drawLine((x-r,y),(x+r,y), fill=pluscrosscolor)
         canvas.drawLine((x,y-r),(x,y+r), fill=pluscrosscolor)
@@ -237,7 +278,7 @@ class Manager(object):
         #Draw the holes in the cassette
         for h in holes:
             self._draw_hole(h, canvas, color=color, fcolor=color,
-                            drawimage=drawimage)
+                            radmult=radmult)
 
         if cassette.used==1:
             return
@@ -246,11 +287,11 @@ class Manager(object):
         for i in range(len(holes)-1):
             p0=holes[i].position
             p1=holes[i+1].position
-            canvas.drawLine(self.plate_coord_shift(p0),
-                            self.plate_coord_shift(p1),
+            canvas.drawLine(self.proj_coord_shift(p0),
+                            self.proj_coord_shift(p1),
                             fill=color)
 
-    def plate_coord_shift(self, (x, y), force=False):
+    def proj_coord_shift(self, (x, y), force=False):
         """ Shifts x and y to their new positions in scaled space,
             if self.doCoordShift is True or force is set to True.
             out=in otherwise"""

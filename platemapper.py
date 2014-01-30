@@ -102,11 +102,44 @@ class App(Tkinter.Tk):
     def __init__(self, parent):
         Tkinter.Tk.__init__(self, parent)
         self.parent = parent
-        self.initialize()
-
-    def initialize(self):
-        
         self.manager=platemanager.Manager()
+        self.initialize_main()
+        self.initialize_projector()
+    
+    def initialize_projector(self):
+        # create a second window and make it cover the entire projector screen
+        self.proj_win=Tkinter.Toplevel(self.parent)
+        self.proj_win.overrideredirect(1)
+        self.proj_win.geometry("768x768+1494+0")
+
+        self.moving={'stat':False}
+        self.proj_win.bind("<Button-1>",self._start_proj_win_move)
+        self.proj_win.bind("<ButtonRelease-1>",self._stop_proj_win_move)
+        self.proj_win.bind("<B1-Motion>", self._move_proj_win)
+        
+        self.proj_can=BetterCanvas.BetterCanvas(self.proj_win, 768, 768,
+                                                PLATE_RADIUS, PLATE_RADIUS,
+                                                bg='Black')
+        
+        self.proj_can.place(x=-3,y=-3)
+
+    def _start_proj_win_move(self,event):
+        self._proj_moving={'stat':True, 'xs':event.x_root, 'ys':event.y_root,
+                           'xi':self.proj_win.winfo_rootx(),
+                           'yi':self.proj_win.winfo_rooty()}
+
+    def _stop_proj_win_move(self,event):
+        self._proj_moving['stat']=False
+
+    def _move_proj_win(self,event):
+        if self._proj_moving['stat']:
+            dx=event.x_root-self._proj_moving['xs']
+            dy=event.y_root-self._proj_moving['ys']
+            xnew=self._proj_moving['xi']+dx
+            ynew=self._proj_moving['yi']+dy
+            self.proj_win.geometry("768x768+%i+%i"%(xnew,ynew))
+
+    def initialize_main(self):
         
         #Basic window stuff
         swid=120
@@ -145,7 +178,7 @@ class App(Tkinter.Tk):
         self.show_conflicts=True
 
         #Info output
-        self.info_str=Tkinter.StringVar(value='Red: 000  Blue: 000  Total: 0000')
+        self.info_str=Tkinter.StringVar(value=self.status_string())
         Tkinter.Label(frame2, textvariable=self.info_str).pack(anchor='w')
     
     def status_string(self):
@@ -173,8 +206,10 @@ class App(Tkinter.Tk):
 
     def show(self):
         self.canvas.clear()
+        self.proj_can.clear()
         self.info_str.set(self.status_string())
         self.manager.draw(self.canvas)
+        self.manager.draw_image(self.proj_can)
 
     def load_setup(self):
         from tkFileDialog import askopenfilename
@@ -186,7 +221,6 @@ class App(Tkinter.Tk):
         if file:
             self.manager.load(file)
         self.show()
-
 
     def field_info_window(self):
         print self
@@ -207,8 +241,7 @@ class App(Tkinter.Tk):
                         tags=())
         tree.bind(sequence='<<TreeviewSelect>>', func=self.select_fields)
         tree.pack()
-    #    tree.tag_configure('ttk', background='yellow')
-    #    tree.tag_bind('ttk', '<1>', itemClicked); # the item clicked can be found via tree.focus()
+        tree.focus()
 
     def select_fields(self, event):
         log.info('Selecting {}'.format(event.widget.selection()))
