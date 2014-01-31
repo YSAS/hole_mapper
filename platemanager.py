@@ -12,17 +12,18 @@ from dimensions import PLATE_RADIUS, SH_RADIUS
 from setup import load_dotsetup
 from graphcollide import build_overlap_graph_cartesian
 from holesxy import get_plate_holes
-
+import math
 from hole import Hole
-
+import numpy as np
 log=getLogger('plateplanner.platemanager')
 
 
 COLOR_SEQUENCE=['red','blue','pink','green','black','teal','purple','orange']
+GUIDE_COLOR_SEQUENCE=['green','purple','orange','yellow']
 
 
-LABEL_MAX_Y=.7
-MIN_LABEL_Y_SEP=0.05 #must be < 2*LABEL_MAX_Y/16
+LABEL_MAX_Y=.7*PLATE_RADIUS
+MIN_LABEL_Y_SEP=0.05*PLATE_RADIUS #must be < 2*LABEL_MAX_Y/16
 LABEL_RADIUS=0.95*PLATE_RADIUS
 PROJ_PLATE_LABEL_Y=.95*PLATE_RADIUS
 
@@ -32,17 +33,46 @@ def distribute(x, min_x, max_x, min_sep):
     Adjust x such that all x are min_space apart,
     near original positions, and within min_x & max_x
     """
-    import numpy as np
     return np.linspace(min_x, max_x, len(x))
 
 
 #deltara=np.rad2deg*arccos(cos(180*np.deg2rad/3600)*sec(dec)**2 - tan(dec)**2)
 
+class CoordShift(object):
+    def __init__(self, D=64.0, R=50.68, rm=13.21875, a=0.03):
+        self.enabled=False
+        self.D=D
+        self.R=R
+        self.rm=rm
+        self.a=a
+
+    def shift(self, (x,y), force=False):
+        """ 
+        Shifts x and y to their new positions in scaled space,
+        if self.doCoordShift is True or force is set to True.
+        out=in otherwise
+        """
+        if (x==0.0 and y==0.0) or not (self.enabled or force):
+            return (x,y)
+        else:
+            r=math.hypot(x, y)
+            #psi = angle clockwise from vertical
+            #psi=90.0 - math.atan2(y,x)
+            cpsi=y/r
+            spsi=x/r
+            d=math.sqrt(self.R**2 - r**2) - math.sqrt(self.R**2 - self.rm**2)
+            dr=d*r/(self.D+d)
+            rp=(r-dr)*(1.0+self.a*cpsi)
+
+            return (rp*spsi, rp*cpsi)
+
+
 class Manager(object):
     """ Class for I don't know what yet"""
     def __init__(self):
         log.info('Started Manager')
-        self.do_coord_shift=False
+        self.proj_coord_shift=CoordShift()
+        
         self.setups=[]
         self.selected_setup=None
 
@@ -54,7 +84,7 @@ class Manager(object):
         """
         try:
             self.setups=load_dotsetup(file, load_awith=True)
-            self.selected_setup=self.setups[0]
+            self.selected_setup=self.setups
             self.selected_setup.assign()
             log.info("Loaded {}")
         except IOError as e:
@@ -65,11 +95,7 @@ class Manager(object):
             setup.reset()
 
     def get_holes(self, holeIDs):
-        ret=[]
-        for setup in self.setups:
-            for h in setup.field.holes():
-                if h.id in holeIDs:
-                    ret.append(h)
+        ret=[h for h in self.selected_setup.plate.all_holes if h.id in holeIDs]
         return ret
     
     def select_setup(self, name):
@@ -79,12 +105,12 @@ class Manager(object):
 
     def save_plug_and_config(self):
         """Write .plug and .m2fs of the loaded setup"""
-        #TODO
-
+        for s in [self.selected_setup]+[self.selected_setup.assign_with]:
+            s.write(dir='./')
 
     def _draw_hole(self, hole, canvas, color=None, fcolor='White', radmult=1.0):
         
-        pos=self.proj_coord_shift(h.position)
+        pos=self.proj_coord_shift.shift(hole.position)
         rad=hole.d*radmult/2.0
         hashtag="."+hole.id
         
@@ -98,37 +124,25 @@ class Manager(object):
                           disabledfill='Orange', disabledoutline='Orange')
 
     def draw(self, canvas):
+        setup=self.selected_setup
         
         #Make a circle of appropriate size in the window
         canvas.drawCircle( (0,0) , PLATE_RADIUS)
         canvas.drawCircle( (0,0) , SH_RADIUS)
         
+        self._draw_with_assignements(setup, canvas)
         
-#        inactiveHoles=setup.plate..difference(setup['unused_holes'])
-#        inactiveHoles.difference_update(setup['holes'])
-#        
-#        inactiveHoles.add(self.plateHoleInfo.standard['hole'])
-#        inactiveHoles.add(self.plateHoleInfo.sh_hole)
-#        
-#        #Draw the holes that aren't in the current setup
-#        for h in inactiveHoles:
-#            self.drawHole(h, canvas)
-
+        #Guides an Acquisitions
+        for t in setup.field.guides+setup.field.acquisitions:
+            self._draw_hole(t.hole, canvas, color='Yellow',fcolor='Yellow')
         
-        self._draw_with_assignements(self.selected_setup, canvas)
+        #Standards
+        for t in setup.plate.plate_holes:
+            self._draw_hole(t.hole, canvas, color='Magenta',fcolor='Magenta')
         
-#        for g in setup.field.guides:
-#            if not g.conflicting::.conflicting)
-#        
-#        for i,f in enumerate(self.selected_setup):
-#
-#            c=COLOR_SEQUENCE[i%len(COLOR_SEQUENCE)]
-#            for h in f.holes():
-#                if h.target.conflicting !=None:
-#                    log.warn('{} conflicts with {}'.format(
-#                                         h.target, h.target.conflicting_ids))
-#                fcolor=c if h.target.conflicting else 'White'
-#                self._draw_hole(h, canvas, color=c, fcolor=fcolor)
+        #Draw holes for everything else
+        for h in self.inactive_holes(showing_b=True, showing_r=True):
+            self._draw_hole(h, canvas)
 
     def draw_image(self, canvas, channel='all',radmult=.75):
             #the active setup
@@ -137,24 +151,34 @@ class Manager(object):
             plate_name=setup.name
 
             #Draw the plate name and active setup
-            canvas.drawText((0,PROJ_PLATE_LABEL_Y), plate_name,
-                            color='White',center=0)
-#            canvas.drawText((0,PROJ_PLATE_LABEL_Y-.05), other_text,
-#                            color='White',center=0)
+            canvas.drawText((0,PROJ_PLATE_LABEL_Y), setup.name,
+                            color=GUIDE_COLOR_SEQUENCE[0],center=0)
+            for i,aw in enumerate(setup.assign_with):
+                canvas.drawText((0,PROJ_PLATE_LABEL_Y-(i+1)*0.05*PLATE_RADIUS),
+                                aw.name,
+                                color=GUIDE_COLOR_SEQUENCE[i+1],center=0)
 
             #Shack Hartman
-#            self._draw_hole(Hole(x=0,y=0,d=2*SH_RADIUS), canvas,
-#                            color='Magenta',fcolor='Magenta',
-#                            radmult=radmult,drawimage=True)
+            self._draw_hole(Hole(x=0,y=0,d=2*SH_RADIUS), canvas,
+                            color='Magenta',fcolor='Magenta',
+                            radmult=radmult)
 
             #Assignments
             self._draw_with_assignements(self.selected_setup, canvas,
-                                         radmult=radmult)
+                                         radmult=radmult, lblcolor='white')
             
             #Guides an Acquisitions
             for t in setup.field.guides+setup.field.acquisitions:
-                self._draw_hole(t.hole, canvas, color='Yellow',fcolor='Yellow',
-                                radmult=radmult)
+                self._draw_hole(t.hole, canvas, radmult=radmult,
+                                color=GUIDE_COLOR_SEQUENCE[0],
+                                fcolor=GUIDE_COLOR_SEQUENCE[0])
+
+
+            for i,aw in enumerate(setup.assign_with):
+                for t in aw.field.guides+aw.field.acquisitions:
+                    self._draw_hole(t.hole, canvas, radmult=radmult,
+                                    color=GUIDE_COLOR_SEQUENCE[i+1],
+                                    fcolor=GUIDE_COLOR_SEQUENCE[i+1])
 
             #Standards
             for t in setup.plate.plate_holes:
@@ -163,15 +187,43 @@ class Manager(object):
                                 radmult=radmult)
 
             #Draw little white dots where all the other holes are
-            for h in self.inactive_holes:
-                pos=self.proj_coord_shift(h.position)
+            for h in self.inactive_holes(showing_b=True, showing_r=True):
+                pos=self.proj_coord_shift.shift(h.position)
                 canvas.drawSquare(pos, h.d/6.0, fill='White', outline='White')
 
-    @property
-    def inactive_holes(self):
+    def inactive_holes(self, showing_b=False, showing_r=False):
         """ return iterable of the holes that should be drawn as little 
         white dots"""
-        return []
+        
+        #Compile all active holes
+        active_holes=[]
+        
+        #Get the assigned targets
+        if showing_b:
+            targ=self.selected_setup.cassette_config.assigned_targets(side='b')
+            active_holes.extend([t.hole for t in targ])
+        if showing_r:
+            targ=self.selected_setup.cassette_config.assigned_targets(side='r')
+            active_holes.extend([t.hole for t in targ])
+        
+        #Get the guide and acquisition
+        targ=(self.selected_setup.field.guides+
+              self.selected_setup.field.acquisitions)
+        active_holes.extend([t.hole for t in targ])
+        
+        for aw in self.selected_setup.assign_with:
+            targ=aw.field.guides+aw.field.acquisitions
+            active_holes.extend([t.hole for t in targ])
+        
+        #Get the plate holes
+        targ=self.selected_setup.plate.plate_holes
+        active_holes.extend([t.hole for t in targ])
+        
+        #Find all the inactive holes
+        all_holes=self.selected_setup.plate.all_holes
+        
+
+        return [h for h in all_holes if h not in active_holes]
 
     def _draw_with_assignements(self, setup, canvas, radmult=1.0,
                                 lblcolor='black'):
@@ -215,7 +267,7 @@ class Manager(object):
         lefts=filter(lambda i:labeldata[i][3]==False, range(len(labeldata)))
         y=distribute([labeldata[i][1][1] for i in lefts],
                      -LABEL_MAX_Y, LABEL_MAX_Y, MIN_LABEL_Y_SEP)
-        x=LABEL_RADIUS**2 - y**2
+        x=np.sqrt(LABEL_RADIUS**2 - y**2)
         for i in range(len(lefts)):
             labelpos[lefts[i]]=x[i], y[i]
 
@@ -223,7 +275,7 @@ class Manager(object):
         rights=filter(lambda i:labeldata[i][3]==True, range(len(labeldata)))
         y=distribute([labeldata[i][1][1] for i in rights],
                      -LABEL_MAX_Y, LABEL_MAX_Y, MIN_LABEL_Y_SEP)
-        x=-(LABEL_RADIUS**2 - y**2)
+        x=-np.sqrt(LABEL_RADIUS**2 - y**2)
         for i in range(len(rights)):
             labelpos[rights[i]]=x[i], y[i]
         
@@ -246,7 +298,7 @@ class Manager(object):
             canvas.drawText(tpos, label, color=lblcolor)
 
             #Connect label to cassette path
-            canvas.drawLine(tpos, self.proj_coord_shift(hpos),
+            canvas.drawLine(tpos, self.proj_coord_shift.shift(hpos),
                             fill=color, dashing=1)
 
     def _draw_cassette(self, cassette, canvas, radmult=1.0):
@@ -264,13 +316,13 @@ class Manager(object):
         holes=[t.hole for t in cassette.ordered_targets]
         
         #Draw an x across the first hole
-        x,y=self.proj_coord_shift(holes[0].position)
+        x,y=self.proj_coord_shift.shift(holes[0].position)
         r=2*0.08675
         canvas.drawLine((x-r,y+r),(x+r,y-r), fill=pluscrosscolor)
         canvas.drawLine((x-r,y-r),(x+r,y+r), fill=pluscrosscolor)
         
         #Draw a + over the last hole
-        x,y=self.proj_coord_shift(holes[-1].position)
+        x,y=self.proj_coord_shift.shift(holes[-1].position)
         r=1.41*2*0.08675
         canvas.drawLine((x-r,y),(x+r,y), fill=pluscrosscolor)
         canvas.drawLine((x,y-r),(x,y+r), fill=pluscrosscolor)
@@ -287,32 +339,7 @@ class Manager(object):
         for i in range(len(holes)-1):
             p0=holes[i].position
             p1=holes[i+1].position
-            canvas.drawLine(self.proj_coord_shift(p0),
-                            self.proj_coord_shift(p1),
+            canvas.drawLine(self.proj_coord_shift.shift(p0),
+                            self.proj_coord_shift.shift(p1),
                             fill=color)
-
-    def proj_coord_shift(self, (x, y), force=False):
-        """ Shifts x and y to their new positions in scaled space,
-            if self.doCoordShift is True or force is set to True.
-            out=in otherwise"""
-        if (not self.do_coord_shift and
-            not force or (x==0.0 and y==0.0)):
-            return (x,y)
-        else:
-            D=self.coordShift_D
-            a=self.coordShift_a
-            R=self.coordShift_R
-            rm=self.coordShift_rm
-            
-            r=math.hypot(x, y)
-            #psi = angle clockwise from vertical
-            #psi=90.0 - math.atan2(y,x)
-            cpsi=y/r
-            spsi=x/r
-            d=math.sqrt(R**2 - r**2) - math.sqrt(R**2 - rm**2)
-            dr=d*r/(D+d)
-            
-            rp=(r-dr)*(1.0+a*cpsi)
-
-            return (rp*spsi, rp*cpsi)
 

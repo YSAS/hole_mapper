@@ -7,6 +7,7 @@ import logging
 log=getLogger('cassettes')
 log.setLevel(logging.INFO)
 
+from pathconf import DEAD_FIBER_FILE
 
 def rangify(data):
     from itertools import groupby
@@ -26,8 +27,7 @@ def _get_fiber_staus():
         {cassettename:8-tuple of booleans with True being good}
         """
     default={n:[True]*8 for n in CASSETTE_NAMES}
-    file='example.deadfibers' #m2fsConfig.get_dead_fiber_file()
-    with open(file,'r') as fp:
+    with open(DEAD_FIBER_FILE,'r') as fp:
         lines=fp.readlines()
     lines=[l.strip() for l in lines]
     lines=[l for l in lines if l and not l.startswith('#')]
@@ -136,15 +136,21 @@ class Cassette(object):
         self.pos=CASSETTE_POSITIONS[name]
         self.used=0
         self.targets=[]
-        self.map={} #fiber # is key, target is value
+        self._init_fibers()
 
-#    def ordered_targets(self):
-#        """ Return list of targets in order of fiber number """
-#        return [self.map[fiber] for fiber in sorted(self.map.keys())]
+        self.map={} #fiber # is key, target is value
 
     def __str__(self):
         return "{}: {} used. {} usable {} mapped".format(self.name, self.used,
                                                self.usable, self.map.keys())
+    
+    def _init_fibers(self):
+        if 'h' in name:
+            self.fibers={i:Fiber(cassette=self.name, fnum=i)
+                            for i in range(9,17)}
+        else:
+            self.fibers={i:Fiber(cassette=self.name, fnum=i)
+                         for i in range(1,9)}
                                             
     @property
     def side(self):
@@ -163,6 +169,7 @@ class Cassette(object):
         self.used=0
         self.targets=[]
         self.map={}
+        self._init_fibers()
 
     def assign(self, target):
         """Add the hole to the cassette and assign the cassette to the hole"""
@@ -178,6 +185,7 @@ class Cassette(object):
             if target.fiber.number in self.map:
                 raise ValueError('preset fiber already mapped')
             self.map[target.fiber.number]=target
+            self.fibers[target.fiber.number]=target.fiber
         else:
             target.assign(cassette=self.name)
 
@@ -192,14 +200,17 @@ class Cassette(object):
         if target not in self.targets:
             import ipdb;ipdb.set_trace()
             raise Exception('target not in cassette')
-        target.unassign()
+        target.unassign() #will raise exception if user assigned
         self.used-=1
         self.targets.remove(target)
         for k in self.map.keys():
             if self.map[k]==target:
                 self.map.pop(k)
+                self.fibers[k].target=None
                 break
-
+    
+    def fnum_to_hl_ndx(num):
+        num % 8
 
     @property
     def label(self):
@@ -237,6 +248,7 @@ class Cassette(object):
             
             #Assign pair in the cassette map
             self.map[num]=t
+            self.fibers[num].target=t
             
             #Tell the hole its fiber
             t.assign(fiber=Fiber(cassette=self.name,fnum=num))
@@ -258,6 +270,11 @@ class Cassette(object):
     def get_target(self, fiber):
         assert fiber.cassette_name==self.name
         return self.map.get(fiber.number,None)
+
+    @property
+    def fibers(self):
+        for i in self.fiber_
+        Fiber
 
 class CassetteConfig(object):
     """ A set of M2FS cassettes"""
@@ -290,6 +307,14 @@ class CassetteConfig(object):
     def __iter__(self):
         return iter(self._cassettes)
 
+    @property
+    def b_cassettes(self):
+        return (c for c in self if c.side=='b')
+
+    @property
+    def r_cassettes(self):
+        return (c for c in self if c.side=='r')
+
     def get_cassette(self, name):
         return [c for c in self if c.name == name][0]
 
@@ -321,6 +346,21 @@ class CassetteConfig(object):
     def rejigger(self):
         _rejigger_cassette_assignemnts([c for c in self if c.on_left])
         _rejigger_cassette_assignemnts([c for c in self if c.on_right])
+
+    def assigned_targets(self, side=None):
+        targets=[]
+        if side==None or side.lower()=='b':
+            for c in self.b_cassettes:
+                targets.extend(c.targets)
+        if side==None or side.lower()=='r':
+            for c in self.r_cassettes:
+                targets.extend(c.targets)
+        return targets
+
+    @property
+    def fibers(self):
+        return [f for c in self for f in c.fibers]
+
 
 def _condense_cassette_assignemnts(cassettes):
     #Grab cassettes with available fibers

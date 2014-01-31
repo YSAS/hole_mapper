@@ -3,7 +3,12 @@ import os.path
 from plate import get_plate
 from cassettes import CassetteConfig
 from cassettes import CASSETTE_NAMES, RED_CASSETTE_NAMES, BLUE_CASSETTE_NAMES
-import ipdb
+from pathconf import CONFIGDEF_DIRECTORY, SETUP_DIRECTORY
+from readerswriters import _dictlist_to_records, _format_attrib_nicely
+from logger import getLogger
+
+log = getLogger('setup')
+
 
 FILTER_NAMES=['BK7','IanR']
 SLIT_NAMES=['180 um','125 um','98 um','75 um','58 um','45 um']
@@ -14,7 +19,6 @@ HIRES_MODE='hires'
 
 REQUIRED_PLUGGED_SECTION_KEYS=['fiber', 'id', 'ra', 'dec', 'epoch', 'type',
                                'priority','pm_ra','pm_dec']
-
 
 
 class M2FSConfig(object):
@@ -69,17 +73,21 @@ class Setup(object):
         ok_fibers_b=configB.pop('tetris_config') #boolean 16 tuple,fibers to use
         self.b=M2FSConfig(side='B',**configB)
         self.r=M2FSConfig(side='R',**configR)
-        self.name=os.path.basename(setupfile)
+        self.name,_,_=os.path.basename(setupfile).rpartition('.')
         self.plate=get_plate(platename)
-        self.field=self.plate.fields[fieldname]
-
+        self.field=self.plate.get_field(fieldname)
+        self.cassette_config=CassetteConfig(usableR=ok_fibers_r,
+                                            usableB=ok_fibers_b)
         if not assignwith:
             self.assign_with=[]
         else:
             self.assign_with=assignwith
+            for aw in self.assign_with:
+                aw.plate=self.plate
+                aw.field=self.plate.get_field(aw.field.name)
+                #aw.cassette_config=self.cassette_config
         
-        self.cassette_config=CassetteConfig(usableR=ok_fibers_r,
-                                            usableB=ok_fibers_b)
+
 
     @property
     def uses_r_side(self):
@@ -95,7 +103,7 @@ class Setup(object):
     def info(self):
         ret=self.field.info.copy()
     
-        addit={'assign_with':', '.join(name for name in self.assigned_with),
+        addit={'assign_with':', '.join(s.name for s in self.assign_with),
                'plate':self.plate.name}
         
         addit.update(self.r.info)
@@ -151,12 +159,12 @@ class Setup(object):
         records
         """
         filename='{}_{}.fibermap'.format(self.plate.name,self.name)
-    
+        import ipdb;ipdb.set_trace()
         with open(os.path.join(dir, filename),'w') as fp:
     
             fp.write("[setup]\n")
 
-            recs=_format_dict_nicely(self.info)
+            recs=_format_attrib_nicely(self.info)
             for r in recs:
                 fp.write(r+'\n')
     
@@ -166,12 +174,12 @@ class Setup(object):
             def dicter(fiber):
                 if not f.target:
                     return {'fiber':fiber.name,'id':'unplugged'}
-                elif f.target not in setup.targets:
+                elif f.target not in self.field.all_targets:
                     return {'fiber':fiber.name,'id':'unassigned'}
                 else:
                     return fiber.target.dictlist
             
-            dl=[dicter(f) for f in setup.cassette_config.fibers]
+            dl=[dicter(f) for f in self.cassette_config.fibers]
             recs=_dictlist_to_records(dl, col_first=REQUIRED_PLUGGED_SECTION_KEYS)
             
             fp.write("[guides]\n")
@@ -200,7 +208,7 @@ class Setup(object):
             func=get_custom_usable_cassette_func(self.name)
         except NameError:
             func=usable_cassette
-        
+            
         to_assign=func(self, self.assign_with)
         _assign_fibers(self.cassette_config, to_assign)
 
@@ -239,9 +247,9 @@ def usable_cassette(setup, assign_with=None):
     else:
         #Assume we are distributing everything evenly
         to_assign+=to_assign_with
-        for t in (t for t in to_assign if t.type==TARGET_TYPE):
+        for t in (t for t in to_assign if t.is_target):
             t._preset_usable_cassette_names=set(CASSETTE_NAMES)
-        for i, t in enumerate(t for t in to_assign if t.type==SKY_TYPE):
+        for i, t in enumerate(t for t in to_assign if t.is_sky):
             if i % 2:
                 t._preset_usable_cassette_names=set(RED_CASSETTE_NAMES)
             else:
@@ -337,8 +345,6 @@ def _assign_fibers(cassettes, to_assign):
 
     #All targets must have possible_cassettes_names set
 
-    #TODO: What about targets with preset usable cassette restrictions
-
     #While there are holes w/o an assigned cassette (groups don't count)
     while unassigned_skys:
         #Update cassette availability for each hole (a cassette may have filled)
@@ -428,11 +434,10 @@ def _config_dict_from_dotsetup_dict(section_dict, side):
     
     get_key= lambda d, key, side : d.get(key+side, d.get(key, None))
     
-    try:
-        conf_name=get_key(section_dict, 'config', side)
+    conf_name=get_key(section_dict, 'config', side)
+    if conf_name:
         return get_config(conf_name, side)
-    except KeyError:
-        pass
+
     #Load the config piecemeal
     config={'mode':get_key(section_dict, 'mode',side),
             'binning':get_key(section_dict, 'binning',side),
@@ -480,21 +485,18 @@ def load_dotsetup(filename, load_awith=False):
         
         field=section_dict['field']
         plate=section_dict['plate']
+        assignwith=[]
         if load_awith:
             setup_names=section_dict.get('assignwith','')
-            if setup_names:
-                assignwith=[]
-                for name in setup_names.split(','):
-                    assignwith.append(get_setup(name.strip()))
-            else:
-                assignwith=[]
+            for name in setup_names.split(','):
+                assignwith.append(get_setup(name.strip()))
 
         setup=Setup(filename, section_dict['plate'], section_dict['field'],
                     configR, configB, assignwith=assignwith)
 
         setups.append(setup)
     
-    return setups
+    return setups[0]
 
 
 
@@ -521,11 +523,10 @@ def _load_dotconfigdef(filename):
 
 
 def get_config(configname, side=None):
-    #TODO: This needs to be maintained by some code
-    conf_file_map={'5B':'example.configdef'}
-    
+
+    cfile=os.path.join(CONFIGDEF_DIRECTORY,configname)+'.configdef'
     try:
-        configR,configB=_load_dotconfigdef(conf_file_map[configname])
+        configR,configB=_load_dotconfigdef(cfile)
         if not side:
             return configR,configB
         elif side.lower()=='r':
@@ -537,25 +538,25 @@ def get_config(configname, side=None):
     except IOError:
         raise ValueError('Config {} not known'.format(configname))
 
-def get_setup(setupname, load_awith=False, search_dir=None):
+def get_setup(setupname, load_awith=False):
     """Set alone to false to load any assign with setups"""
-    dir='./'
     try:
-        return load_dotsetup(os.path.join(dir,setupname)+'.setup', load_awith)
+        return load_dotsetup(os.path.join(SETUP_DIRECTORY,setupname)+'.setup',
+                             load_awith)
     except IOError:
         raise ValueError('Could not find setup {}'.format(setupname))
 
-
-def get_custom_usable_cassette_func(setupname, search_dir=None):
+def get_custom_usable_cassette_func(setupname):
     """ if file exists file should have a function with the following sig:
     targets_configured_for_assignement=usable_cassette(setup_object, list_of_assign_with_setup_objects)
     """
-    dir='./'
     try:
         loc=locals()
         globa=globals()
-        with open(os.path.join(dir,setupname)+'.py') as f:
+        file=os.path.join(SETUP_DIRECTORY,setupname)+'.py'
+        with open(file,'r') as f:
             exec(f.read(), globa, loc) #I'm a very bad person
+        log.warning('Using custom usable cassette function: {} '.format(file))
         return loc['usable_cassette']
     except IOError:
         raise NameError()

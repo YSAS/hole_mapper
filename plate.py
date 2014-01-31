@@ -2,7 +2,9 @@ from target import Target
 from field import Field
 import os.path
 
-from readerswriters import _parse_header_row,_parse_record_row
+from pathconf import PLATE_DIRECTORY
+
+from readerswriters import _parse_header_row, _parse_record_row
 
 REQUIRED_UNDRILLED_SECTION_KEYS=['ra', 'dec', 'epoch', 'id', 'type', 'priority',
                                  'pm_ra','pm_dec']
@@ -21,8 +23,18 @@ class Plate(object):
         self.name=info_dict.pop('name')
         self.user=info_dict.copy()
         self.plate_holes=plate_holes
-        self.fields={f.name:f for f in fields}
+        self.fields=fields
 
+    def get_field(self, name):
+        try:
+            return [f for f in self.fields if f.name ==name][0]
+        except IndexError:
+            raise ValueError('No field by given name')
+
+    @property
+    def all_holes(self):
+        return ([h for f in self.fields for h in f.holes]+
+                [h for t in self.plate_holes for h in t.holes])
 
 def load_dotplate(filename):
 
@@ -99,11 +111,10 @@ def load_dotplate(filename):
         fields.append(Field(field_dict, drilled, undrilled, standards))
 
     #Finally the plate
-    return Plate({'name':sections['plate']},plate_holes,fields)
+    return Plate(sections['plate']['processed'], plate_holes, fields)
 
-def get_plate(platename, search_dir=None):
-    dir=search_dir if search_dir else './'
+def get_plate(platename):
     try:
-        return load_dotplate(os.path.join(dir,platename)+'.plate')
+        return load_dotplate(os.path.join(PLATE_DIRECTORY,platename)+'.plate')
     except IOError:
         return None

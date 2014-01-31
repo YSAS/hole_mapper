@@ -1,6 +1,7 @@
 class Fiber(object):
-    def __init__(self, name=None, cassette=None, fnum=None):
+    def __init__(self, name=None, cassette=None, fnum=None, target=None):
         """name = e.g. R3-14"""
+        self.target=target
         if name:
             if tyep(name)==Fiber:
                 self.name=name.name
