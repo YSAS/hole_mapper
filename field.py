@@ -210,20 +210,21 @@ class FieldCatalog(object):
     def usable_acquisitions(self):
         return [g for g in self.acquisitions if not g.conflicting]
 
+    @property
     def all_targets(self):
         return (self.skys+self.targets+self.guides+self.acquisitions)
 
     def holes(self):
         """ return a list of all the holes the field would like on a plate """
         try:
-            return [hole for t in self.all_targets() for hole in t.holes]
+            return [hole for t in self.all_targets for hole in t.holes]
         except AttributeError:
             log.warning('field.holes() called before processing')
             return []
 
     def drillable_dictlist(self):
         ret=[]
-        for t in (t for t in self.all_targets()
+        for t in (t for t in self.all_targets
                   if not t.conflicting and t.on_plate):
             d=t.hole.info
             d.pop('field','')
@@ -238,7 +239,7 @@ class FieldCatalog(object):
         return ret
 
     def undrillable_dictlist(self, flat=False):
-        ret=[t.info for t in self.all_targets()
+        ret=[t.info for t in self.all_targets
              if t.conflicting or not t.on_plate]
         map(lambda x: x.pop('field',''), ret)
         return ret
@@ -331,11 +332,12 @@ class Field(object):
         self.acquisitions=[g for g in drilled if g.is_acquisition]
         self.skys=[g for g in drilled if g.is_sky]
 
+    @property
     def all_targets(self):
         return (self.skys+self.targets+self.guides+self.acquisitions)
 
     @property
     def holes(self):
         """ return a list of all the holes the field has on the plate """
-        return [hole for t in self.all_targets() for hole in t.holes]
+        return [hole for t in self.all_targets for hole in t.holes]
 

@@ -18,8 +18,11 @@ HIRES_MODE='hires'
 
 
 REQUIRED_PLUGGED_SECTION_KEYS=['fiber', 'id', 'ra', 'dec', 'epoch', 'type',
-                               'priority','pm_ra','pm_dec']
-
+                               'priority','pm_ra','pm_dec','x','y','z','d']
+REQUIRED_GUIDE_SECTION_KEYS=['id', 'ra', 'dec', 'epoch', 'type',
+                             'priority','pm_ra','pm_dec','x','y','z','d']
+REQUIRED_UNUSED_SECTION_KEYS=['id', 'ra', 'dec', 'epoch', 'type',
+                              'priority','pm_ra','pm_dec','x','y','z','d']
 
 class M2FSConfig(object):
     def __init__(self, side=None, mode=None, slit=None, loel=None,
@@ -71,8 +74,8 @@ class Setup(object):
         
         ok_fibers_r=configR.pop('tetris_config') #boolean 16 tuple,fibers to use
         ok_fibers_b=configB.pop('tetris_config') #boolean 16 tuple,fibers to use
-        self.b=M2FSConfig(side='B',**configB)
-        self.r=M2FSConfig(side='R',**configR)
+        self.b_config=M2FSConfig(side='B',**configB)
+        self.r_config=M2FSConfig(side='R',**configR)
         self.name,_,_=os.path.basename(setupfile).rpartition('.')
         self.plate=get_plate(platename)
         self.field=self.plate.get_field(fieldname)
@@ -85,9 +88,8 @@ class Setup(object):
             for aw in self.assign_with:
                 aw.plate=self.plate
                 aw.field=self.plate.get_field(aw.field.name)
-                #aw.cassette_config=self.cassette_config
-        
-
+                aw.assign_with=[self]
+                aw.cassette_config=self.cassette_config
 
     @property
     def uses_r_side(self):
@@ -106,8 +108,8 @@ class Setup(object):
         addit={'assign_with':', '.join(s.name for s in self.assign_with),
                'plate':self.plate.name}
         
-        addit.update(self.r.info)
-        addit.update(self.b.info)
+        addit.update(self.r_config.info)
+        addit.update(self.b_config.info)
     
         for k in addit:
             assert k not in ret
@@ -138,14 +140,14 @@ class Setup(object):
         #TODO: Finish
         c={}
         if self.uses_b_side:
-            c.update(self.configB.info)
+            c.update(self.b_config.info)
         if self.uses_r_side:
-            c.update(self.configR.info)
+            c.update(self.r_config.info)
 
-        for k in config.keys():
-            if config[k]==None or config[k]=='None':
-                config.pop(k)
-        plistlib.writeplist(config, os.path.join(dir,filename))
+        for k,v in c.items():
+            if v in [None, 'None']:
+                c.pop(k)
+        plistlib.writePlist(c, os.path.join(dir,filename))
         
     def writemap(self, dir='./'):
         """
@@ -159,16 +161,16 @@ class Setup(object):
         records
         """
         filename='{}_{}.fibermap'.format(self.plate.name,self.name)
-        import ipdb;ipdb.set_trace()
+
         with open(os.path.join(dir, filename),'w') as fp:
     
             fp.write("[setup]\n")
 
             recs=_format_attrib_nicely(self.info)
             for r in recs:
-                fp.write(r+'\n')
+                fp.write(r)
     
-            fp.write("[assignemnts]\n")
+            fp.write("[assignments]\n")
             #Create dictlist for all fibers
             #Grab fibers
             def dicter(fiber):
@@ -177,16 +179,30 @@ class Setup(object):
                 elif f.target not in self.field.all_targets:
                     return {'fiber':fiber.name,'id':'unassigned'}
                 else:
-                    return fiber.target.dictlist
+                    return fiber.target.hole.info
             
+            #import ipdb;ipdb.set_trace()
             dl=[dicter(f) for f in self.cassette_config.fibers]
-            recs=_dictlist_to_records(dl, col_first=REQUIRED_PLUGGED_SECTION_KEYS)
+            map(lambda x: x.pop('field',''), dl)
+            recs=_dictlist_to_records(dl,
+                                      col_first=REQUIRED_PLUGGED_SECTION_KEYS)
+            for r in recs:
+                fp.write(r)
             
             fp.write("[guides]\n")
+            dl=[t.hole.info for t in self.field.guides+self.field.acquisitions]
+            map(lambda x: x.pop('field',''), dl)
+            recs=_dictlist_to_records(dl, col_first=REQUIRED_GUIDE_SECTION_KEYS)
+            for r in recs:
+                fp.write(r)
             
-#            target record for each guide/acquisition
-
             fp.write("[unused]\n")
+            dl=[t.hole.info for t in self.field.skys+self.field.targets if
+                not t.fiber]
+            map(lambda x: x.pop('field',''), dl)
+            recs=_dictlist_to_records(dl, col_first=REQUIRED_UNUSED_SECTION_KEYS)
+            for r in recs:
+                fp.write(r)
 #            target record for any targets not on plate on unassigned
 
 
@@ -486,8 +502,8 @@ def load_dotsetup(filename, load_awith=False):
         field=section_dict['field']
         plate=section_dict['plate']
         assignwith=[]
-        if load_awith:
-            setup_names=section_dict.get('assignwith','')
+        setup_names=section_dict.get('assignwith','')
+        if load_awith and setup_names:
             for name in setup_names.split(','):
                 assignwith.append(get_setup(name.strip()))
 
@@ -553,7 +569,7 @@ def get_custom_usable_cassette_func(setupname):
     try:
         loc=locals()
         globa=globals()
-        file=os.path.join(SETUP_DIRECTORY,setupname)+'.py'
+        file=os.path.join(SETUP_DIRECTORY,setupname)+'.setup.py'
         with open(file,'r') as f:
             exec(f.read(), globa, loc) #I'm a very bad person
         log.warning('Using custom usable cassette function: {} '.format(file))

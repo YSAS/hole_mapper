@@ -217,7 +217,11 @@ class Target(object):
         if self.conflicting:
             ret['conflicts']=self.conflicting_ids
 
-        ret.update(self.user)
+        for k,v in self.user.iteritems():
+            if k in ret:
+                ret['user_'+k]=v
+            else:
+                ret[k]=v
 
         return ret
 

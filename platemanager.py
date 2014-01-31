@@ -72,8 +72,6 @@ class Manager(object):
     def __init__(self):
         log.info('Started Manager')
         self.proj_coord_shift=CoordShift()
-        
-        self.setups=[]
         self.selected_setup=None
 
     def load(self, file):
@@ -83,29 +81,20 @@ class Manager(object):
         At present only .setup files are supported.
         """
         try:
-            self.setups=load_dotsetup(file, load_awith=True)
-            self.selected_setup=self.setups
+            self.selected_setup=load_dotsetup(file, load_awith=True)
+            #import ipdb;ipdb.set_trace()
             self.selected_setup.assign()
             log.info("Loaded {}")
         except IOError as e:
             log.warn(str(e))
 
-    def clear(self):
-        for s in self.setups:
-            setup.reset()
-
     def get_holes(self, holeIDs):
         ret=[h for h in self.selected_setup.plate.all_holes if h.id in holeIDs]
         return ret
-    
-    def select_setup(self, name):
-        self.selected_setup=[s for s in self.setups if s.name == name][0]
-        self.selected_setup.assign()
-
 
     def save_plug_and_config(self):
         """Write .plug and .m2fs of the loaded setup"""
-        for s in [self.selected_setup]+[self.selected_setup.assign_with]:
+        for s in [self.selected_setup]+self.selected_setup.assign_with:
             s.write(dir='./')
 
     def _draw_hole(self, hole, canvas, color=None, fcolor='White', radmult=1.0):
