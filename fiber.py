@@ -3,7 +3,7 @@ class Fiber(object):
         """name = e.g. R3-14"""
         self.target=target
         if name:
-            if tyep(name)==Fiber:
+            if type(name)==Fiber:
                 self.name=name.name
             else:
                 self.name=name
@@ -21,8 +21,24 @@ class Fiber(object):
         return int(self.name.split('-')[1])
 
     @property
+    def number128(self):
+        return self.cassette_num*16+self.number
+
+    @property
     def color(self):
         return self.name[0].lower()
+    
+    @property
+    def side(self):
+        return self.color
+    
+    @property
+    def is_r(self):
+        return self.color=='r'
+
+    @property
+    def is_b(self):
+        return self.color=='b'
 
     @property
     def cassette_num(self):
