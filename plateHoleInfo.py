@@ -114,8 +114,8 @@ class plateHoleInfo(object):
             if 'HotJupiters_1' in self.name:
                 _postProcessHJSetups(self)
 
-#            if 'Calvet' in self.name:
-#                _postProcessCalvetSetups(self)
+            if 'Calvet' in self.name:
+                _postProcessCalvetSetups(self)
 
             if 'Carnegie' in self.name:
                 _postProcessCarnegieSetups(self)
@@ -162,10 +162,21 @@ class plateHoleInfo(object):
                 _OddsOnly(self, 'Setup 2')
                 _OddsOnly(self, 'Setup 3')
                 _OddsOnly(self, 'Setup 4')
+                _OddsOnly(self, 'Setup 5')
+                _OddsOnly(self, 'Setup 6')
+                _OddsOnly(self, 'Setup 7')
+                _OddsOnly(self, 'Setup 8')
+                
                 _ROnly(self, 'Setup 1')
                 _BOnly(self, 'Setup 2')
+                
                 _ROnly(self, 'Setup 3')
                 _BOnly(self, 'Setup 4')
+                
+                _ROnly(self, 'Setup 5')
+                _BOnly(self, 'Setup 6')
+                
+                _ROnly(self, 'Setup 8')
 
             if 'Aarnio' in self.name:
                 _OddsOnly(self, 'Setup 1')
@@ -250,17 +261,8 @@ class plateHoleInfo(object):
                 
                 #Perform a crappy extraction of additional hole information
                 addit={}
-#                if rtype =='O' and len(rwords) > 9:
-#                    if 'F00' in rwords[9]:
-#                        ndx_add=1
-#                    else:
-#                        ndx_add=0
-#                    if len(rwords) > 10+ndx_add:
-#                        addit=parse_extra_data(self.name,setup_name,rwords[10+ndx_add:])
-#                        addit['priority']=int(rwords[9+ndx_add])
-#                    else:
-#                        addit={'priority':int(rwords[9+ndx_add])}
-
+                if rtype =='O' and len(rwords) > 9:
+                    addit=parse_extra_data(self.name, setup_name, rwords[9:])
                     
                 #Instantiate a hole
                 hole=Hole(float(awords[0])/SCALE,
@@ -556,17 +558,21 @@ def _postProcessCalvetSetups(plateinfo):
     """
     Drop excess targets
     """
-    for s in plateinfo.setups.itervalues():
-        ob=[h for h in s['holes'] if h.isObject()]
-        sk=[h for h in s['holes'] if h.isSky()]
+    s=plateinfo.setups['Setup 7']
+    ob=[h for h in s['holes'] if h.isObject()]
+    sk=[h for h in s['holes'] if h.isSky()]
+    if sk:
         ratio=float(len(ob))/len(sk)
-        pct_keep=float(128)/(len(ob)+len(sk))
+        pct_keep=float(123)/(len(ob)+len(sk))
         from math import floor
         no=int(floor(pct_keep*len(ob)))
         ns=int(floor(pct_keep*len(sk)))
-        ob.sort(key=lambda h: h['PRIORITY'])
-        sk.sort(key=lambda h: h['PRIORITY'])
-        s['holes']=ob[0:no]+sk[0:ns]
+    else:
+        ns=0
+        no=123
+    ob.sort(key=lambda h: h['PRIORITY'])
+    sk.sort(key=lambda h: h['PRIORITY'])
+    s['holes']=ob[0:no]+sk[0:ns]
 
 def _postProcessCarnegieSetups(plateinfo):
     """
@@ -825,6 +831,12 @@ def _postProcessNideverCassettes(plateinfo):
     plateinfo.cassette_groups['Setup 8']=[[i+k for i in ok for k in 'lh']]
 
 def parse_extra_data(name,setup, words):
+    if name=='Calvet_sum':
+        if words[0].lower()=='f':
+            return {'PRIORITY':float(words[1][:-1])}
+        else:
+            return {'PRIORITY':float(0.0)}
+    
     ret={}
     #import pdb;pdb.set_trace()
     #Carnegie
