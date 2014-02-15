@@ -114,9 +114,9 @@ class plateHoleInfo(object):
             if 'HotJupiters_1' in self.name:
                 _postProcessHJSetups(self)
 
-            if 'Calvet' in self.name:
-                _postProcessCalvetSetups(self)
- 
+#            if 'Calvet' in self.name:
+#                _postProcessCalvetSetups(self)
+
             if 'Carnegie' in self.name:
                 _postProcessCarnegieSetups(self)
                 
@@ -151,15 +151,34 @@ class plateHoleInfo(object):
                 
             if 'Kounkel_2' in self.name:
                 _postProcessKounkel2Cassettes(self)
-    
-    
+
+            if 'Calvet' in self.name:
+#                this doesn't work because hole.reset() copiest over the restriction to 'ASSIGNMENT' and the isAssigned() test just assumes the cassette is assigned if it is a string.'
+#                for h in self.setups['Setup 1']['holes']:
+#                    h['INIT_ASSIGNMENT']['CASSETTE']='R'
+#                for h in self.setups['Setup 2']['holes']:
+#                    h['INIT_ASSIGNMENT']['CASSETTE']='B'
+                _OddsOnly(self, 'Setup 1')
+                _OddsOnly(self, 'Setup 2')
+                _OddsOnly(self, 'Setup 3')
+                _OddsOnly(self, 'Setup 4')
+                _ROnly(self, 'Setup 1')
+                _BOnly(self, 'Setup 2')
+                _ROnly(self, 'Setup 3')
+                _BOnly(self, 'Setup 4')
+
+            if 'Aarnio' in self.name:
+                _OddsOnly(self, 'Setup 1')
+                _OddsOnly(self, 'Setup 2')
+
+#            import ipdb;ipdb.set_trace()
+
             for s in self.setups:
                 self.setups[s]['cassetteConfig']=self.cassettes_for_setup(s)
         else:
             self.name=os.path.basename(file)[0:-6]
             self.pfile_filename=file
             self._init_from_plate(file)
-        
 
 
     def _init_fromASC(self):
@@ -231,16 +250,16 @@ class plateHoleInfo(object):
                 
                 #Perform a crappy extraction of additional hole information
                 addit={}
-                if rtype =='O' and len(rwords) > 9:
-                    if 'F00' in rwords[9]:
-                        ndx_add=1
-                    else:
-                        ndx_add=0
-                    if len(rwords) > 10+ndx_add:
-                        addit=parse_extra_data(self.name,setup_name,rwords[10+ndx_add:])
-                        addit['priority']=int(rwords[9+ndx_add])
-                    else:
-                        addit={'priority':int(rwords[9+ndx_add])}
+#                if rtype =='O' and len(rwords) > 9:
+#                    if 'F00' in rwords[9]:
+#                        ndx_add=1
+#                    else:
+#                        ndx_add=0
+#                    if len(rwords) > 10+ndx_add:
+#                        addit=parse_extra_data(self.name,setup_name,rwords[10+ndx_add:])
+#                        addit['priority']=int(rwords[9+ndx_add])
+#                    else:
+#                        addit={'priority':int(rwords[9+ndx_add])}
 
                     
                 #Instantiate a hole
@@ -875,3 +894,42 @@ def parse_extra_data(name,setup, words):
         ret['MAGNITUDE']=nanfloat(l[2])
 
     return ret
+
+def _OddsOnly(plateinfo, setup):
+    for c in plateinfo.cassettes[setup].itervalues():
+        if 'l' in c.name:
+            c.usable=[1,3,5,7]
+        else:
+            c.usable=[9,11,13,15]
+
+def _ROnly(plateinfo, setup):
+    for c in plateinfo.cassettes[setup].itervalues():
+        if 'B' in c.name:
+            c.usable=[]
+    plateinfo.cassette_groups[setup]=[Cassette.red_cassette_names()]
+
+def _BOnly(plateinfo, setup):
+    for c in  plateinfo.cassettes[setup].itervalues():
+        if 'R' in c.name:
+            c.usable=[]
+    plateinfo.cassette_groups[setup]=[Cassette.blue_cassette_names()]
+
+def _SetDeadFibers(plateinfo):
+    dead=( ('R1l',(2,)),
+           ('R8h',(9,)),
+           ('R2h',(9,)),
+           ('R7h',(11, 12)),
+           ('B4l',(5,)),
+           ('B4h',(15,)),
+           ('B6l',(2,4)))
+#           b8-3, 6-13,5-7,4-4 treat as ok
+#           r8-3, 8-8, treat as ok
+    for cname, fnums in dead:
+        for fnum in fnums:
+            for cassettes in plateinfo.cassettes.itervalues():
+                try:
+                    cassettes[cname].usable.remove(fnum)
+                except Exception:
+                    pass
+
+
