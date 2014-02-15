@@ -171,8 +171,8 @@ class plateHoleInfo(object):
                 _OddsOnly(self, 'Setup 1')
                 _OddsOnly(self, 'Setup 2')
 
-#            import ipdb;ipdb.set_trace()
-
+            _SetDeadFibers(self)
+            
             for s in self.setups:
                 self.setups[s]['cassetteConfig']=self.cassettes_for_setup(s)
         else:
@@ -924,9 +924,10 @@ def _SetDeadFibers(plateinfo):
            ('B6l',(2,4)))
 #           b8-3, 6-13,5-7,4-4 treat as ok
 #           r8-3, 8-8, treat as ok
-    for cname, fnums in dead:
-        for fnum in fnums:
-            for cassettes in plateinfo.cassettes.itervalues():
+
+    for cassettes in plateinfo.cassettes.itervalues():
+        for cname, fnums in dead:
+            for fnum in fnums:
                 try:
                     cassettes[cname].usable.remove(fnum)
                 except Exception:
