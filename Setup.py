@@ -4,6 +4,18 @@ Created on Jan 19, 2010
 @author: one
 '''
 
+def new_setup(platename='',setup_name='',):
+    #Current setup dict
+    return {
+        'plate':platename,
+        'setup':setup_name,
+        'unused_holes':[], #bit of a misnomer, mechanical & guide would be more apt
+        'holes':[],
+        'assignwithholes':[], #list of holes not in setup but to be assigned
+        'cassettes':{} #dict of cassettes
+        }
+
+
 class Setup(object):
     '''
     classdocs
@@ -56,22 +68,6 @@ class Setup(object):
                 raise Exception('Hole exists in annother channel')
  
         self.dict[channel].add(hole)
-
-    def getFiberForHole(self, hole):
-
-        fiber='None'
-        for group in self.groups:
-
-            for i, h in enumerate(group['holes']):
-                if h==hole:
-                    fiber=group['fiber_group']
-                    fiber=fiber[0:-2]+"%02i"%(int(fiber[-2:])+i)
-                    break
-            if fiber != 'None':
-                break
-        
-        return fiber
-
         
     def addGuiderHole(self, hole):
         """ Adds a guider hole to the setup """

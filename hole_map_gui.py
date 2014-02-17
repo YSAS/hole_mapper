@@ -1,9 +1,14 @@
+#!/usr/bin/env python2.7
 import Tkinter
 import BetterCanvas
 import ImageCanvas
 import Plate
 import tkMessageBox
 import os
+
+#mainloop
+#meat: plate.loadHoles then self.show
+#self.plate.regionify(active_setup=self.getActiveSetup())
 
 class HoleInfoDialog:
         
@@ -36,8 +41,8 @@ class HoleInfoDialog:
 
             info=self.getHoleInfo(id)
             
-            lbl_str=' '.join(['ID:',id,'Type:',info['TYPE'],'Galaxy ID:',
-                               info['GALAXYID'],'other info'])
+            lbl_str=' '.join(['ID:',id,'Type:',info['TYPE'],'Targ ID:',
+                               info['ID'],'other info'])
             Tkinter.Label(self.dialog, text=lbl_str).grid(row=i,column=0)
             
             Tkinter.Button(self.dialog,text='Select',command=getattr(self,'cb'+id)).grid(row=i,column=1)
@@ -58,9 +63,9 @@ class HoleInfoDialog:
         Tkinter.Label(self.dialog, text='Type: '+info['TYPE']).pack(anchor='w')
         if info['TYPE'] in 'OSGA':
 
-            Tkinter.Label(self.dialog, text='Galaxy ID: '+info['GALAXYID']).pack(anchor='w')
-            Tkinter.Label(self.dialog, text='RA: %i %i %2.3f'%info['RA']).pack(anchor='w')
-            Tkinter.Label(self.dialog, text='Dec: %i %i %2.3f'%info['DEC']).pack(anchor='w')
+            Tkinter.Label(self.dialog, text='ID: '+info['ID']).pack(anchor='w')
+            Tkinter.Label(self.dialog, text='RA: '+info['RA']).pack(anchor='w')
+            Tkinter.Label(self.dialog, text='Dec: '+info['DEC']).pack(anchor='w')
             if info['TYPE'] not in 'S':
                 Tkinter.Label(self.dialog, text='Mag: %f'%info['MAGNITUDE']).pack(anchor='w')
                 Tkinter.Label(self.dialog, text='Color: %f'%info['COLOR']).pack(anchor='w')
@@ -81,7 +86,8 @@ class HoleInfoDialog:
         
 
     def defocusCallback(self, event):
-        self.ok()
+        pass
+        #self.ok()
     
     def ok(self):
         self.save()
@@ -153,7 +159,7 @@ class App(Tkinter.Tk):
                        command=lambda:self.makeImage(channel='armB')).pack()
         Tkinter.Button(frame, text="Load Holes", command=self.load).pack()
         Tkinter.Button(frame, text="Regionify", command=self.makeRegions).pack()
-        Tkinter.Button(frame, text="Write Map", command=self.writeMap).pack()
+        Tkinter.Button(frame, text="Gen .plate", command=self.genPlate).pack()
         self.coordshft_str=Tkinter.StringVar(value='CShift On')
         Tkinter.Button(frame, textvariable=self.coordshft_str, command=self.toggleCoord).pack()
 
@@ -167,9 +173,25 @@ class App(Tkinter.Tk):
         Tkinter.Label(lframe, text='Setup #:').grid(row=0,column=0)
         entry=Tkinter.Entry(lframe, validate='focusout', width=2, 
                       invcmd=lambda:tkMessageBox.showerror('Bad Setup','Not a valid setup.'),
-                      vcmd=lambda:self.plate.isValidSetup(self.getActiveSetup()), 
+                      vcmd=lambda:self.plate.isValidSetup(self.setup_str.get()),
                       textvariable=self.setup_str)
         entry.grid(row=0,column=1)
+        
+        #Assignwith input
+        self.assignwith_str=Tkinter.StringVar(value='')
+        
+        lframe=Tkinter.Frame(frame)
+        lframe.pack()
+        
+        Tkinter.Label(lframe, text='Setup #s:').grid(row=0,column=0)
+        entry=Tkinter.Entry(lframe, validate='focusout', width=2,
+                            invcmd=lambda:tkMessageBox.showerror(
+                                        'Much Bad.','No regionwith. Mix Improper.'),
+                            vcmd=lambda:self.plate.isValidAssignwith(
+                                        self.get_assign_with_list()),
+                            textvariable=self.assignwith_str)
+        entry.grid(row=0,column=1)
+        
         #entry.bind("<Return>",self.show)
    
         #Coordinate shift input
@@ -228,7 +250,13 @@ class App(Tkinter.Tk):
         Tkinter.Label(frame2, textvariable=self.file_str).pack(anchor='w')
         
         self.testinit()
-
+    
+    def get_assign_with_list(self):
+        if self.assignwith_str.get():
+            return self.assignwith_str.get().replace(' ','').split(',')
+        else:
+            return []
+    
     def toggleCoord(self):
         self.plate.toggleCoordShift()
         if self.plate.doCoordShift:
@@ -247,7 +275,7 @@ class App(Tkinter.Tk):
         self.proj_win.bind("<Button-1>",self.startMove)
         self.proj_win.bind("<ButtonRelease-1>",self.stopMove)
         self.proj_win.bind("<B1-Motion>", self.Move)
-        print '.'+self.proj_win.winfo_screen()+'.'
+        #print '.'+self.proj_win.winfo_screen()+'.'
         
         self.proj_can=BetterCanvas.BetterCanvas(self.proj_win, 768,768, 1.00, 1.00, bg='Black')
         self.proj_can.place(x=-3,y=-3)
@@ -265,14 +293,14 @@ class App(Tkinter.Tk):
             
 
     def startMove(self,event):
-        print '.'+self.proj_win.winfo_screen()+'.'
+        #print '.'+self.proj_win.winfo_screen()+'.'
         self.moving={'stat':True,'xs':event.x_root,'ys':event.y_root,
                      'xi':self.proj_win.winfo_rootx(),
                      'yi':self.proj_win.winfo_rooty()}
         
     
     def stopMove(self,event):
-        print '.'+self.proj_win.winfo_screen()+'.'
+        #print '.'+self.proj_win.winfo_screen()+'.'
         self.moving['stat']=False    
     
     def canvasclick(self, event):
@@ -330,8 +358,12 @@ class App(Tkinter.Tk):
 
 
     def makeRegions(self):
-        self.plate.regionify(active_setup=self.getActiveSetup())
+        self.plate.regionify(setup_number=self.setup_str.get(),
+                             awith=self.get_assign_with_list())
         self.show()
+
+    def genPlate(self):
+        self.plate.plateHoleInfo.write_platefile()
 
 
     @staticmethod
@@ -347,19 +379,15 @@ class App(Tkinter.Tk):
         from tkFileDialog import askopenfilename
 
         dir=App.getPath(('hole_mapper','plates'))
-        file=askopenfilename(initialdir=dir, filetypes=[('asc files', '.asc')])
+        file=askopenfilename(initialdir=dir,
+                             filetypes=[('asc files', '.asc'),
+                             ('plate files', '.plate')])
         file=os.path.normpath(file)
         print file
         if file:
-            self.plate.loadHoles(file)
+            self.plate.load(file)
             self.file_str.set(os.path.basename(file))
             self.show()
-        
-    def writeMap(self):
-        dir=App.getPath(('hole_mapper',self.plate.plate_name))
-        if not os.path.exists(dir):
-            os.makedirs(dir)
-        self.plate.writeMapFile(dir, self.getActiveSetup())
         
     def makeImage(self,channel='all'):
         #The image canvas for drawing the plate to a file
