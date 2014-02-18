@@ -1,10 +1,3 @@
-'''
-Created on Dec 12, 2009
-
-@author: one
-'''
-#from Hole import *
-
 import operator
 import os.path
 from logger import getLogger
@@ -15,12 +8,13 @@ from graphcollide import build_overlap_graph_cartesian
 from holesxy import get_plate_holes
 from target import Target
 from hole import Hole
+from errors import ConstraintError
 log=getLogger('plateplanner.foo')
 
 
-COLOR_SEQUENCE=['red','blue','pink','green','black','teal','purple','orange']
+COLOR_SEQUENCE=['red','blue','purple','green','black','teal','pink','orange']
 
-MIN_GUIDES=2
+MIN_GUIDES=3
 MIN_ACQUISITIONS=3
 
 PLATEHOLE_REQUIRED_COLS=['id','type','x','y','z','d']
@@ -118,11 +112,8 @@ class Manager(object):
 
     def load(self, file):
         """ 
-        Routine to a file
-
-        At present only .field files are supported.
+        load .field file(s)
         """
-        
         if not os.path.isfile(file):
             files=[os.path.join(dirpath, f)
                    for dirpath, dirnames, files in os.walk(file)
@@ -141,6 +132,16 @@ class Manager(object):
         
         except IOError as e:
             log.warn(str(e))
+
+    def get_field(self, name):
+        try:
+            return [f for f in self.fields if f.name == name][0]
+        except IndexError:
+            return None
+
+    def reset(self):
+        for f in self.fields:
+            f.reset()
 
     def clear(self):
         self.fields=[]
@@ -189,22 +190,26 @@ class Manager(object):
             for h in f.holes():
                 fcolor=c if h.target.conflicting else 'White'
                 if h.target.conflicting !=None:
-                    log.warn('{} conflicts with {}'.format(
-                                         h.target, h.target.conflicting_ids))
+#                    log.warn('{} conflicts with {}'.format(
+#                                         h.target, h.target.conflicting_ids))
                     if show_conflicts:
                         self._drawHole(h, canvas, color=c, fcolor=fcolor)
                 else:
                     self._drawHole(h, canvas, color=c, fcolor=fcolor)
     
-    def select_fields(self,field_names):
+    def select_fields(self, field_names):
+        old=set([f.name for f in self.selected_fields])
+#        if not set(field_names).issuperset(old):
+#
+        self.reset()
         ndxs=[i for i,f in enumerate(self.fields) if f.name in field_names]
         self.selected_fields=[self.fields[i] for i in ndxs]
         
         #Determine the conflicts
         targs = [t for f in self.selected_fields
                    for t in f.get_drillable_targets() ]
-        holes=([h for t in targs for h in t.holes] +
-               [h for t in self.plate_holes for h in t.holes])
+        holes=[t.hole for t in targs] + [t.hole for t in self.plate_holes]
+               
         self._determine_conflicts(holes)
     
         #TODO: Verify that enough guides and acquistions can be plugged
@@ -214,60 +219,82 @@ class Manager(object):
 
         x=[h.x for h in holes]
         y=[h.y for h in holes]
-        d=[h.d for h in holes]
+        d=[h.conflict_d for h in holes]
         
         #Nothing can conflict with guides or acquisitions
         coll_graph=build_overlap_graph_cartesian(x,y,d)
 
         #Take care of Guides & Acquisitions
-        keep=[]
+        to_keep=[]
         discard=[]
-        import ipdb
+        
         #Guides
         for f in self.selected_fields:
             #sort guides according to number of collisions
             #take all with no collisions and as many with collisions needed
-            #until have at least two
+            #until have at least min required
 
-#onc154 ngc2264_a:gui12
-#ngc2264_a:gui10 ONC_a:ali1
-
-#            ipdb.set_trace()
             #get guide hole indicies & number of collisions
             hndxs=[(i,len(coll_graph.collisions(i)))
-                   for i in range(len(holes)) if holes[i].target.is_guide and holes[i].target.field==f]
-#            ipdb.set_trace()
-            #sum up collisions for the holes for each guide
-            tmp=[]
-            for g in f.guides:
-                hole_ndxs=[]
-                total_collisions=0
-                for i,nc in ((i, nc) for i,nc in hndxs if holes[i] in g.holes):
-                    hole_ndxs.append(i)
-                    total_collisions+=nc
-                tmp.append((hole_ndxs,total_collisions))
-#            ipdb.set_trace()
-            tmp.sort(key=lambda x: x[1])
+                   for i,h in enumerate(holes)
+                   if h.target.is_guide and h.target.field==f]
+
+            #Sort by number of conflicts
+            hndxs.sort(key=lambda x: x[1])
             
             #Figure out which guides to keep
-            no_coll=[]
-            with_coll=[]
-            while tmp:
-                ndxs, tc=tmp.pop(0)
-                if tc:
-                    with_coll.append(ndxs)
-                else:
-                    no_coll.append(ndxs)
-#            ipdb.set_trace()
-            keep+=no_coll
+            no_coll=[]#[i for i,ncoll in hndxs if not ncoll]
+            with_coll=[]#[i for i,ncoll in hndxs if ncoll]
+            while hndxs:
+                ndx, ncoll=hndxs.pop(0)
+                if ncoll: with_coll.append(ndx)
+                else: no_coll.append(ndx)
             
-            if len(no_coll) <MIN_GUIDES:
-                keep+=with_coll[:MIN_GUIDES-len(keep)]
-                discard+=with_coll[MIN_GUIDES-len(keep):]
+            #Keep all those without collisions
+            keep=no_coll
+            
+            #Keep those with collisions if don't have enough
+            if len(keep) < MIN_GUIDES:
+                #Keep min guides, we can't keep the guide if it conflicts
+                # with a target in a field with keep_all set
+                while with_coll:
+                    i=with_coll.pop(0)
+                    #See if we must drop the guide
+                    drop_guide=False
+                    for j in coll_graph.collisions(i):
+                        drop_guide|=(holes[j].target.field.keep_all and
+                                     (holes[j].target.is_sky or
+                                      holes[j].target.is_target))
+                        if drop_guide:
+                            break
+                    #Deal with the outcome
+                    if drop_guide:
+                        discard.append(i)
+                    else:
+                        keep.append(i)
+                        if len(keep) >=MIN_GUIDES:
+                            discard+=with_coll
+                            break
             else:
                 discard+=with_coll
-#        ipdb.set_trace()
-        #Now Acquisitions
+            
+            if len(keep) < MIN_GUIDES:
+                raise ConstraintError("Can't keep enough guides for {} due to collisions with undroppable targets".format(f.name))
+    
+            #Keep the guides from the field
+            to_keep+=keep
+
+        foo_guides=[h.target for h in holes if h.target.is_guide]
+        foo_processed=[holes[i].target for i in to_keep+discard]
+        
+        assert len(set(foo_guides))==len(foo_guides)
+        assert len(set(foo_processed))==len(foo_processed)
+        
+        assert len(foo_processed)==len(foo_guides)
+        for t in foo_processed:
+            assert t in foo_guides
+        
+        #Acquisitions
         for f in self.selected_fields:
             #sort acquisitions according to number of collisions
             #take all with no collisions and as many with collisions needed
@@ -275,9 +302,8 @@ class Manager(object):
 
             #get guide hole indicies & number of collisions
             hndxs=[(i,len(coll_graph.collisions(i)))
-                   for i in range(len(holes))
-                   if holes[i].target.is_acquisition and
-                   holes[i].target.field==f]
+                   for i,h in enumerate(holes)
+                   if h.target.is_acquisition and h.target.field==f]
             
             
             hndxs.sort(key=lambda x: x[1])
@@ -286,70 +312,86 @@ class Manager(object):
             no_coll=[]
             with_coll=[]
             while hndxs:
-                ndx, tc=hndxs.pop(0)
-                if tc:
-                    with_coll.append([ndx])
-                else:
-                    no_coll.append([ndx])
+                ndx, ncoll=hndxs.pop(0)
+                if ncoll: with_coll.append(ndx)
+                else: no_coll.append(ndx)
         
-            keep+=no_coll
+            #Keep acquisitions without collisions
+            keep=no_coll
             
-            if len(no_coll) <MIN_ACQUISITIONS:
-                keep+=with_coll[:MIN_ACQUISITIONS-len(keep)]
-                discard+=with_coll[MIN_ACQUISITIONS-len(keep):]
+            if len(keep) < MIN_ACQUISITIONS:
+                #Keep min acquisitions, we can't keep them if it conflicts
+                # with a target in a field with keep_all set
+                while with_coll:
+                    i=with_coll.pop(0)
+                    #See if we must drop it
+                    drop=False
+                    for j in coll_graph.collisions(i):
+                        drop|=(holes[j].target.field.keep_all and
+                               (holes[j].target.is_sky or
+                                holes[j].target.is_target))
+                        if drop:
+                            break
+                    #Deal with the outcome
+                    if drop:
+                        discard.append(i)
+                    else:
+                        keep.append(i)
+                        if len(keep) >= MIN_ACQUISITIONS:
+                            discard+=with_coll
+                            break
             else:
                 discard+=with_coll
+                            
+            if len(keep) < MIN_ACQUISITIONS:
+                raise ConstraintError("Can't keep enough guides for {} due to collisions with undroppable targets".format(f.name))
+            
+            #Keep the guides from the field
+            to_keep+=keep
     
         #Update the graph & flag the targets that had conflicts
-        for to_drop in discard:
-            conflictors=[]
-            for ndx in to_drop:
-                #If you conflict with one hole in a guide,
-                # you conflict with them all
-                conflictors+=coll_graph.drop(ndx)
+        for ndx in discard:
+            conflictors=coll_graph.drop(ndx)
             holes[ndx].target.conflicting=[holes[i].target for i in conflictors]
                 
-        for to_keep in keep:
-            for ndx in to_keep:
-                dropped=coll_graph.drop_conflicting_with(ndx)
-                discard.append(dropped)
-                for d in dropped:
-                    holes[d].target.conflicting=holes[ndx]
+        for ndx in to_keep:
+            dropped=coll_graph.drop_conflicting_with(ndx)
+            discard.extend(dropped)
+            for d in dropped:
+                holes[d].target.conflicting=holes[ndx].target
 
 #        ipdb.set_trace()
 
-        #Now finally dump the processed things from holes
-        discard=[i for l in discard+keep for i in l]
+        #Now repeat the process using only sky and targets
+        discard+=to_keep
         holes=[h for i, h in enumerate(holes) if i not in discard]
         x=[h.x for h in holes]
         y=[h.y for h in holes]
-        d=[h.d for h in holes]
+        d=[h.conflict_d for h in holes]
 
         assert len([h for h in holes
                     if h.target.is_guide or h.target.is_acquisition])==0
         
-        #Now rebuild the graph deal with science targets
-        coll_graph=build_overlap_graph_cartesian(x,y,d,overlap_pct_r_ok=0.9)
+        #Rebuild the graph allowing partial overlap
+        coll_graph=build_overlap_graph_cartesian(x, y, d, overlap_pct_r_ok=0.9)
 
     
-        #priorityies must first be redistributed onto the same scale
-        #must keeps > wants> filler guides and acq should generally have
-        # lowest priority
-        #
+        #priorities must first be redistributed onto the same scale
+        #must keeps > wants> filler  guide and acquisitions don't matter
         #Go though collision graph and flag all the targets with issues
         #import ipdb;ipdb.set_trace()
         
-        while not coll_graph.is_disconnected:
+        while not coll_graph.is_disconnected: #Edges are holes too close together
         
             coll_ndx = coll_graph.get_colliding_node()
             coll_targ=holes[coll_ndx].target
             
-            if coll_targ.is_standard:
-                #Drop the standard
+            if coll_targ.is_standard: #Drop the standard star hole
                 conflicts=coll_graph.drop(coll_ndx)
-                conflicts=set([holes[i].target for i in conflicts])
+                conflicts=[holes[i].target for i in conflicts]
                 holes[coll_ndx].target.conflicting=conflicts
             elif coll_targ.is_sky or coll_targ.is_target:
+                #Get conflicting holes
                 collwith_ndxs=coll_graph.collisions(coll_ndx)
                 conflicts=set([holes[i].target for i in collwith_ndxs])
                 if coll_targ.priority < max(t.priority for t in conflicts):
@@ -362,8 +404,9 @@ class Manager(object):
                     for i in dropped:
                         holes[i].target.conflicting=holes[coll_ndx].target
             else:
-                log.warn('Collision with {}'.format(coll_targ))
-                
+                raise Exception(' impossible collision')
+#                log.warn('Collision with {}'.format(coll_targ))
+
 
     def plate_drillable_dictlist(self):
         ret=[]

@@ -10,8 +10,9 @@ from target import GUIDEREF_TYPE, GUIDE_TYPE, ACQUISITION_TYPE, SH_TYPE
 from graphcollide import build_overlap_graph_cartesian
 from dimensions import PLATE_TARGET_RADIUS_LIMIT
 from readerswriters import _parse_header_row, _parse_record_row
+from errors import ConstraintError
 import numpy as np
-
+import re
 
 REQUIRED_FIELD_KEYS=['ra', 'dec', 'epoch', 'id', 'type', 'priority']
 FIELD_KEYS=REQUIRED_FIELD_KEYS+['pm_ra','pm_dec']
@@ -26,8 +27,8 @@ class FieldCatalog(object):
         """sh should be a target"""
         
         self.file=file
-        self.name=name
-        self.obsdate=obsdate
+        self.field_name=name
+        self._obsdate=obsdate
         self.sh=sh if sh else Target(type='C')
         self.user=user if user else {}
         self.guides=guides if guides else []
@@ -37,8 +38,24 @@ class FieldCatalog(object):
         self.standards=standards if standards else []
         
         self.holesxy_info=None
-        
+        self.keep_all=False
         self._processed=False
+    
+    @property
+    def obsdate(self):
+        return self._obsdate
+    
+    @obsdate.setter
+    def obsdate(self, value):
+        self._processed=False
+        self._obsdate=value
+    
+    @property
+    def name(self):
+        if self.field_name:
+            return self.field_name
+        else:
+            return self.sh.id
 
     def ra(self):
         print 'Not correcting field ra with PM'
@@ -64,6 +81,7 @@ class FieldCatalog(object):
         else:
             raise ValueError('Target {} of unknown type'.format(targ))
 
+        targ.field=self
 
     def process(self):
         """
@@ -120,12 +138,19 @@ class FieldCatalog(object):
                 ret[k]=str(v)
         return ret
 
+    def reset(self):
+        self._drillable_targets=None
+        for t in self.all_targets:
+            t.conflicting=None
+
     def get_drillable_targets(self):
         """
         Return all targets (S,T,G,A) in the catalog that can be drilled
         parial overlaps between S-T, S-S, & T-T allowed
         """
         try:
+            if not self._drillable_targets:
+                raise AttributeError
             return self._drillable_targets
         except AttributeError:
             pass
@@ -135,10 +160,9 @@ class FieldCatalog(object):
         
         
         #Get data needed for collision graph
-        holes=self.holes()+[self.sh.hole]
+        holes=[t.hole for t in self.all_targets]+[self.sh.hole]
         x=[h.x for h in holes]
         y=[h.y for h in holes]
-        d=[h.d for h in holes]
         
         #First exclude anything not actually on the plate
         exclude,=np.where(np.array(x)**2+np.array(y)**2 >
@@ -150,15 +174,14 @@ class FieldCatalog(object):
         holes=[h for h in holes if not h.target.conflicting]
         x=[h.x for h in holes]
         y=[h.y for h in holes]
-        d=[h.d for h in holes]
+        d=[h.conflict_d for h in holes]
 
 
         #Per Mario:
         #No overlap with guides/acquisitions/sh
         coll_graph=build_overlap_graph_cartesian(x,y,d, overlap_pct_r_ok=0.0)
         #Drop everything conflicting with the sh, guides or acquisitions
-        ndxs=[i for i in range(len(holes))
-              if holes[i].target.type in
+        ndxs=[i for i, h in enumerate(holes) if h.target.type in
               [GUIDE_TYPE, ACQUISITION_TYPE, SH_TYPE]]
               
         to_drop=[]
@@ -168,32 +191,34 @@ class FieldCatalog(object):
             for i in dropped:
                 holes[i].target.conflicting=holes[n].target
         
-        #Drop the shack hartman
+        #Remove Sahck-Hartman from further consideration
         to_drop+=[len(holes)-1]
 
-        holes[:]=[h for i,h in enumerate(holes) if i not in to_drop]
+        holes=[h for i,h in enumerate(holes) if i not in to_drop]
         x=[h.x for h in holes]
         y=[h.y for h in holes]
-        d=[h.d for h in holes]
-        #Now do it again but allowing some overlap
-        coll_graph=build_overlap_graph_cartesian(x,y,d, overlap_pct_r_ok=0.9)
-
+        d=[h.conflict_d for h in holes]
         pri=[h.target.priority for h in holes]
-        keep,drop=coll_graph.crappy_min_vertex_cover_cut(weights=pri,
-                                                         retdrop=True)
+
+        #Now do it again but allowing some overlap
+        coll_graph=build_overlap_graph_cartesian(x, y, d, overlap_pct_r_ok=0.9)
+
+
+        keep, drop=coll_graph.crappy_min_vertex_cover_cut(weights=pri,
+                                                          retdrop=True)
         
         #Now go through and figure out which targets are(not) usable
         drillable=[holes[i].target for i in keep]
         undrillable=[holes[i].target for i in drop]
         
         #determine cause of conflict
-        for d,t in zip(drop,undrillable):
+        for d, t in zip(drop, undrillable):
             t.conflicting=[holes[i].target for i in coll_graph.collisions(d)]
-        
-        drillable=list(set(drillable))
+
+        assert len(set(drillable))==len(drillable)
+
         #undrillable=set(undrillable)
-
-
+    
         self._drillable_targets=drillable
 
         return self._drillable_targets
@@ -238,6 +263,10 @@ class FieldCatalog(object):
                     ret.append(d)
         return ret
 
+    @property
+    def n_conflicts(self):
+        return len([t.info for t in self.skys+self.targets if t.conflicting])
+
     def undrillable_dictlist(self, flat=False):
         ret=[t.info for t in self.all_targets
              if t.conflicting or not t.on_plate]
@@ -252,23 +281,28 @@ def load_dotfield(file):
     """
     returns FieldCatalog() or raises error if file has issues.
     """
-
-    ret=FieldCatalog(file=os.path.basename(file))
+    
+    field_cat=FieldCatalog(file=os.path.basename(file))
 
     try:
         lines=open(file,'r').readlines()
     except IOError as e:
         raise e
 
+    #Clean up the lines
     lines=[l.strip() for l in lines]
 
     have_name=False
 
-#    try:
+
+    #Go through all lines with soemthing in them
     for l in (l for l in lines if l):
+    
+        #Skip comments
         if l[0] =='#':
             continue
         elif l[0] not in '+-0123456789' and not l.lower().startswith('ra'):
+        
             try:
                 k,_,v=l.partition('=')
                 k=k.strip().lower()
@@ -277,33 +311,36 @@ def load_dotfield(file):
                 v=v.strip()
                 assert v != ''
             except Exception as e:
-                raise Exception('Bad key=value formatting: {}'.format(str(e)))
+                raise IOError('Failed on line '
+                        '{}: {}\n  Bad key=value formatting:{}'.format(
+                        lines.index(l), l ,str(e)))
 
             if k=='obsdate':
-                ret.obsdate=datetime(*map(int, v.split()))
+                field_cat.obsdate=datetime(*map(int,re.split('\W+', v)))
             elif k=='name':
-                ret.name=v
+                field_cat.field_name=v
+            elif k=='keep_all':
+                field_cat.keep_all=True if v.lower()!='false' else False
             else:
-                ret.user[k]=v
+                field_cat.user[k]=v
+                
         elif l.lower().startswith('ra'):
-            keys=_parse_header_row(l.lower(), REQUIRED=REQUIRED_FIELD_KEYS)
-            user_keys=[k for k in keys if k not in FIELD_KEYS]
+            try:
+                keys=_parse_header_row(l.lower(), REQUIRED=REQUIRED_FIELD_KEYS)
+                user_keys=[k for k in keys if k not in FIELD_KEYS]
+            except Exception as e:
+                raise IOError('Failed on line {}: {}\n  {}'.format(
+                               lines.index(l), l ,str(e)))
         else:
-            #import ipdb;ipdb.set_trace()
-            rec=_parse_record_row(l, keys, user_keys,
-                                  REQUIRED=REQUIRED_FIELD_RECORD_ENTRIES)
-            targ=Target(**rec)
-            ret.add_target(targ)
-            targ.field=ret
-#    except Exception as e:
-#        raise IOError('Failed on line '
-#                        '{}: {}\n  Error:{}'.format(lines.index(l),l,str(e)))
-    #Use the s-h (or field center id if none) as the field name if one wasn't
-    # defined
-    if not ret.name:
-        ret.name=ret.sh.id
-    #import ipdb;ipdb.set_trace()
-    return ret
+            try:
+                rec=_parse_record_row(l, keys, user_keys,
+                                      REQUIRED=REQUIRED_FIELD_RECORD_ENTRIES)
+                field_cat.add_target(Target(**rec))
+            except Exception as e:
+                raise IOError('Failed on line {}: {}\n  {}'.format(
+                               lines.index(l), l ,str(e)))
+
+    return field_cat
 
 
 class Field(object):

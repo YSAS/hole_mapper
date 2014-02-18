@@ -30,6 +30,13 @@ class Hole(object):
         return math.hypot(self.x-x,self.y-y)
 
     @property
+    def conflict_d(self):
+        if self.target and self.target.is_guide:
+            return dimensions.GUIDE_EXCLUSION_D
+        else:
+            return self.d
+
+    @property
     def position(self):
         return self.x, self.y
 
