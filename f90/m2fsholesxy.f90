@@ -467,11 +467,13 @@
       ng = 0
       do i=1,nstar
         rr = dsqrt(xm(i)**2 + ym(i)**2)
-        if(rr.le.rmax.and.(type(i).eq.'G'.or.type(i).eq.'g')) then
+        if(type(i).eq.'G'.or.type(i).eq.'g') then
           ng = ng + 1
-          call guiderefoffsets(xm,ym,zm,sizem,type,nmax,nstar,i,ng,1,fieldrot)
-          call guiderefoffsets(xm,ym,zm,sizem,type,nmax,nstar,i,ng,2,fieldrot)
-          call guiderefoffsets(xm,ym,zm,sizem,type,nmax,nstar,i,ng,3,fieldrot)
+!          if(rr.le.rmax) then
+            call guiderefoffsets(xm,ym,zm,sizem,type,nmax,nstar,i,ng,1,fieldrot)
+            call guiderefoffsets(xm,ym,zm,sizem,type,nmax,nstar,i,ng,2,fieldrot)
+            call guiderefoffsets(xm,ym,zm,sizem,type,nmax,nstar,i,ng,3,fieldrot)
+!          end if
         end if
       end do
       nstar = nstar + ng*3
