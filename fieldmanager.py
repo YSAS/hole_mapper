@@ -168,9 +168,9 @@ class Manager(object):
             canvas.drawCircle(pos, rad, outline=color, fill=fcolor)
         else:
             if canvas.find_withtag(hashtag):
-                log.info("drawing dupe in dark green @ {} IDs: {}".format(
-                    pos, str(hash(hole))))
-                fcolor='DarkGreen'
+#                log.info("drawing dupe in dark green @ {} IDs: {}".format(
+#                    pos, str(hash(hole))))
+#                fcolor='DarkGreen'
             canvas.drawCircle(pos, rad,
                               outline=color, fill=fcolor, tags=('hole',hashtag),
                               activefill='Green', activeoutline='Green',
