@@ -86,7 +86,8 @@ class CollisionGraph(object):
                 assert e in self._graph
                 assert i in self._graph[e]
 
-    def crappy_min_vertex_cover_cut(self, weights=None, ID='graph', retdrop=False):
+    def crappy_min_vertex_cover_cut(self, weights=None, ID='graph',
+                                    retdrop=False):
         """
         Takes the number of nodes in the graph and a dict of lists
         keys into dict and node ids and the lists contain the ids of nodes

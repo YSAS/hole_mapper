@@ -9,18 +9,21 @@ import operator
 import os.path
 from logger import getLogger
 from dimensions import PLATE_RADIUS, SH_RADIUS
-from setup import load_dotsetup
+from setup import get_all_setups
 from graphcollide import build_overlap_graph_cartesian
 from holesxy import get_plate_holes
 import math
 from hole import Hole
 import numpy as np
+from assign import assign
+
 log=getLogger('plateplanner.platemanager')
 
 
-COLOR_SEQUENCE=['red','blue','pink','green','black','teal','purple','orange']
-GUIDE_COLOR_SEQUENCE=['green','purple','orange','yellow']
-
+GUIDE_COLOR_SEQUENCE=['deeppink','seagreen','black','teal','purple','green4'
+                      'maroon', 'peachpuff4', 'navy', 'orange', 'saddlebrown']
+def guide_color(i):
+    return GUIDE_COLOR_SEQUENCE[i % len(GUIDE_COLOR_SEQUENCE)]
 
 LABEL_MAX_Y=.7*PLATE_RADIUS
 MIN_LABEL_Y_SEP=0.05*PLATE_RADIUS #must be < 2*LABEL_MAX_Y/16
@@ -35,8 +38,6 @@ def distribute(x, min_x, max_x, min_sep):
     """
     return np.linspace(min_x, max_x, len(x))
 
-
-#deltara=np.rad2deg*arccos(cos(180*np.deg2rad/3600)*sec(dec)**2 - tan(dec)**2)
 
 class CoordShift(object):
     def __init__(self, D=64.0, R=50.68, rm=13.21875, a=0.03):
@@ -72,29 +73,23 @@ class Manager(object):
     def __init__(self):
         log.info('Started Manager')
         self.proj_coord_shift=CoordShift()
-        self.selected_setup=None
+        self.selected_setups=None
 
-    def load(self, file):
-        """ 
-        Routine to a file
-
-        At present only .setup files are supported.
-        """
-        try:
-            self.selected_setup=load_dotsetup(file, load_awith=True)
-            #import ipdb;ipdb.set_trace()
-            self.selected_setup.assign()
-            log.info("Loaded {}")
-        except IOError as e:
-            log.warn(str(e))
+    def pick_setups(self, setup_names):
+        setups=get_all_setups()
+        self.selected_setups=[s for s in setups if s.name in setup_names]
+    
+        #Assign setups
+        assign(self.selected_setups)
 
     def get_holes(self, holeIDs):
-        ret=[h for h in self.selected_setup.plate.all_holes if h.id in holeIDs]
+        ret=[h for s in self.selected_setups for h in s.plate.all_holes
+             if h.id in holeIDs]
         return ret
 
     def save_plug_and_config(self):
         """Write .plug and .m2fs of the loaded setup"""
-        for s in [self.selected_setup]+self.selected_setup.assign_with:
+        for s in self.selected_setups:
             s.write(dir='./')
 
     def _draw_hole(self, hole, canvas, color=None, fcolor='White', radmult=1.0):
@@ -113,70 +108,64 @@ class Manager(object):
                           disabledfill='Orange', disabledoutline='Orange')
 
     def draw(self, canvas):
-        setup=self.selected_setup
         
         #Make a circle of appropriate size in the window
         canvas.drawCircle( (0,0) , PLATE_RADIUS)
         canvas.drawCircle( (0,0) , SH_RADIUS)
         
-        self._draw_with_assignements(setup, canvas)
+        setup=self.selected_setups[0]
         
-        #Guides an Acquisitions
-        for t in setup.field.guides+setup.field.acquisitions:
-            self._draw_hole(t.hole, canvas, color='Yellow',fcolor='Yellow')
+        self._draw_with_assignements(setup, canvas)
         
         #Standards
         for t in setup.plate.plate_holes:
-            self._draw_hole(t.hole, canvas, color='Magenta',fcolor='Magenta')
-        
+            self._draw_hole(t.hole, canvas, color='Magenta', fcolor='Magenta')
+    
+        #Guides an Acquisitions
+        for i,s in enumerate(self.selected_setups):
+            for t in s.field.guides+s.field.acquisitions:
+                self._draw_hole(t.hole, canvas, color=guide_color(i),
+                                fcolor=guide_color(i))
+
         #Draw holes for everything else
         for h in self.inactive_holes(showing_b=True, showing_r=True):
             self._draw_hole(h, canvas)
 
     def draw_image(self, canvas, channel='all',radmult=.75):
-            #the active setup
-            setup=self.selected_setup
-            
-            plate_name=setup.name
+        
+            #What to show
+            show_b=True
+            show_r=True
+            if channel == 'b': show_r=False
+            if channel == 'r': show_b=False
+        
+            #Draw the setup names
+            for i, setup in enumerate(self.selected_setups):
+                canvas.drawText((0,PROJ_PLATE_LABEL_Y-(i)*0.05*PLATE_RADIUS),
+                                setup.name, color=guide_color(i),center=0)
 
-            #Draw the plate name and active setup
-            canvas.drawText((0,PROJ_PLATE_LABEL_Y), setup.name,
-                            color=GUIDE_COLOR_SEQUENCE[0],center=0)
-            for i,aw in enumerate(setup.assign_with):
-                canvas.drawText((0,PROJ_PLATE_LABEL_Y-(i+1)*0.05*PLATE_RADIUS),
-                                aw.name,
-                                color=GUIDE_COLOR_SEQUENCE[i+1],center=0)
+            #Assignments
+            self._draw_with_assignements(self.selected_setups[0], canvas,
+                                         radmult=radmult, lblcolor='white',
+                                         show_b=show_b, show_r=show_r)
+            
+            #Guides an Acquisitions
+            for setup in self.selected_setups:
+                for t in setup.field.guides+setup.field.acquisitions:
+                    self._draw_hole(t.hole, canvas, radmult=radmult,
+                                    color=guide_color(i), fcolor=guide_color(i))
 
             #Shack Hartman
             self._draw_hole(Hole(x=0,y=0,d=2*SH_RADIUS), canvas,
-                            color='Magenta',fcolor='Magenta',
-                            radmult=radmult)
+                            color='Magenta',fcolor='Magenta', radmult=radmult)
 
-            #Assignments
-            self._draw_with_assignements(self.selected_setup, canvas,
-                                         radmult=radmult, lblcolor='white')
-            
-            #Guides an Acquisitions
-            for t in setup.field.guides+setup.field.acquisitions:
-                self._draw_hole(t.hole, canvas, radmult=radmult,
-                                color=GUIDE_COLOR_SEQUENCE[0],
-                                fcolor=GUIDE_COLOR_SEQUENCE[0])
-
-
-            for i,aw in enumerate(setup.assign_with):
-                for t in aw.field.guides+aw.field.acquisitions:
-                    self._draw_hole(t.hole, canvas, radmult=radmult,
-                                    color=GUIDE_COLOR_SEQUENCE[i+1],
-                                    fcolor=GUIDE_COLOR_SEQUENCE[i+1])
-
-            #Standards
+            #Standards & thumbscres, etc
             for t in setup.plate.plate_holes:
-                self._draw_hole(t.hole, canvas,
-                                color='Magenta',fcolor='Magenta',
-                                radmult=radmult)
+                self._draw_hole(t.hole, canvas, color='Magenta',
+                                fcolor='Magenta', radmult=radmult)
 
             #Draw little white dots where all the other holes are
-            for h in self.inactive_holes(showing_b=True, showing_r=True):
+            for h in self.inactive_holes(showing_b=show_b, showing_r=show_r):
                 pos=self.proj_coord_shift.shift(h.position)
                 canvas.drawSquare(pos, h.d/6.0, fill='White', outline='White')
 
@@ -186,39 +175,35 @@ class Manager(object):
         
         #Compile all active holes
         active_holes=[]
+        setup=self.selected_setups[0]
         
         #Get the assigned targets
         if showing_b:
-            targ=self.selected_setup.cassette_config.assigned_targets(side='b')
+            targ=setup.cassette_config.assigned_targets(side='b')
             active_holes.extend([t.hole for t in targ])
         if showing_r:
-            targ=self.selected_setup.cassette_config.assigned_targets(side='r')
+            targ=setup.cassette_config.assigned_targets(side='r')
             active_holes.extend([t.hole for t in targ])
         
         #Get the guide and acquisition
-        targ=(self.selected_setup.field.guides+
-              self.selected_setup.field.acquisitions)
+        targ=[t for s in self.selected_setups
+                for t in s.field.guides + s.field.acquisitions]
         active_holes.extend([t.hole for t in targ])
         
-        for aw in self.selected_setup.assign_with:
-            targ=aw.field.guides+aw.field.acquisitions
-            active_holes.extend([t.hole for t in targ])
-        
         #Get the plate holes
-        targ=self.selected_setup.plate.plate_holes
+        targ=setup.plate.plate_holes
         active_holes.extend([t.hole for t in targ])
         
         #Find all the inactive holes
-        all_holes=self.selected_setup.plate.all_holes
+        all_holes=setup.plate.all_holes
         
-
         return [h for h in all_holes if h not in active_holes]
 
     def _draw_with_assignements(self, setup, canvas, radmult=1.0,
-                                lblcolor='black'):
+                                lblcolor='black', show_b=True, show_r=True):
         """Does not draw holes for color if not selected"""
-        drawred=True
-        drawblue=True
+        drawred=show_r
+        drawblue=show_b
         
         #List of cassette labels and first hole positions
         labeldata=[]

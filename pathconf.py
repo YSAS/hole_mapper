@@ -1,6 +1,8 @@
 import os.path
 
-DEAD_FIBER_FILE='/Users/one/Desktop/testing/example.deadfibers'
-PLATE_DIRECTORY='/Users/one/Desktop/testing/'
-CONFIGDEF_DIRECTORY='/Users/one/Desktop/testing/'
-SETUP_DIRECTORY='/Users/one/Desktop/testing/'
+
+PLATE_DIRECTORY='./testing/plates/'
+CONFIGDEF_DIRECTORY='./testing/configs/'
+SETUP_DIRECTORY='./testing/setups/'
+
+DEAD_FIBER_FILE=CONFIGDEF_DIRECTORY+'deadfibers.txt'

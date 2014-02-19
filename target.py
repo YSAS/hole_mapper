@@ -226,6 +226,30 @@ class Target(object):
         return ret
 
     @property
+    def dict(self):
+        """Does not include hole info"""
+        ret={'id':self.id,
+             'ra':self.ra.sexstr,
+             'dec':self.dec.sexstr,
+             'epoch':'{:6.1f}'.format(self.epoch),
+             'priority':'{:.2f}'.format(self.priority),
+             'type':self.type}
+        if self.fiber:
+            ret['fiber']=self.fiber.name
+        if self.hole:
+            ret.update(self.hole.holeinfo)
+        if self.conflicting:
+            ret['conflicts']=self.conflicting_ids
+
+        for k,v in self.user.iteritems():
+            if k in ret:
+                ret['user_'+k]=v
+            else:
+                ret[k]=v
+
+        return ret
+
+    @property
     def is_standard(self):
         return self.type==STANDARD_TYPE
 
@@ -260,7 +284,9 @@ class Target(object):
         Return number indicating if hole should be assigned a fiber sooner
         or later (lower)
         """
-        if len(self._usable_cassette_names)==1:
+        if len(self._usable_cassette_names)==0:
+            return -1
+        elif len(self._usable_cassette_names)==1:
             return 0.0 #Don't care, we've already been assigned to a cassette
         else:
             #TODO: Should this be normalized by the number of usable cassettes
@@ -270,7 +296,9 @@ class Target(object):
     @property
     def nearest_usable_cassette(self):
         """Return name of nearest usable cassette """
-
+        if not self._usable_cassette_names:
+            return None
+        
         usable=[(c, self._cassette_distances[c])
                 for c in self._usable_cassette_names]
                 
@@ -315,6 +343,10 @@ class Target(object):
             return cassette.name in self._preset_usable_cassette_names
         else:
             return True
+
+    def set_possible_cassettes(self, cnames):
+        self._preset_usable_cassette_names=set(cnames)
+        self._usable_cassette_names=self._preset_usable_cassette_names.copy()
 
     def update_possible_cassettes_by_name(self, cassette_names):
         """

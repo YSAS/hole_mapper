@@ -257,7 +257,7 @@ class App(Tkinter.Tk):
             self.manager.load(file)
 
     def field_info_window(self):
-        print self
+    
         new=Tkinter.Toplevel(self)
         
         cols=('RA', 'Dec', 'nT+S', 'nConflict')
@@ -273,6 +273,7 @@ class App(Tkinter.Tk):
         tree.bind('<Button-2>', self.field_settings)
         tree.bind('<ButtonRelease-1>', func=self.select_fields)
         tree.pack()
+        tree.focus()
     #    tree.tag_configure('ttk', background='yellow')
     #    tree.tag_bind('ttk', '<1>', itemClicked); # the item clicked can be found via tree.focus()
 

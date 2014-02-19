@@ -7,6 +7,7 @@ import argparse
 import platemanager
 from dimensions import PLATE_RADIUS
 from ttkcalendar import date_time_picker
+from setup import get_all_setups
 
 from logger import getLogger
 log=getLogger('plateplanner')
@@ -103,10 +104,11 @@ class App(Tkinter.Tk):
         Tkinter.Tk.__init__(self, parent)
         self.parent = parent
         self.manager=platemanager.Manager()
-        self.initialize_main()
-        self.initialize_projector()
+        self._initialize_main()
+        self._initialize_projector()
+        self.setup_info_window()
     
-    def initialize_projector(self):
+    def _initialize_projector(self):
         # create a second window and make it cover the entire projector screen
         self.proj_win=Tkinter.Toplevel(self.parent)
         self.proj_win.overrideredirect(1)
@@ -120,7 +122,6 @@ class App(Tkinter.Tk):
         self.proj_can=BetterCanvas.BetterCanvas(self.proj_win, 768, 768,
                                                 PLATE_RADIUS, PLATE_RADIUS,
                                                 bg='Black')
-        
         self.proj_can.place(x=-3,y=-3)
 
     def _start_proj_win_move(self,event):
@@ -139,7 +140,7 @@ class App(Tkinter.Tk):
             ynew=self._proj_moving['yi']+dy
             self.proj_win.geometry("768x768+%i+%i"%(xnew,ynew))
 
-    def initialize_main(self):
+    def _initialize_main(self):
         
         #Basic window stuff
         swid=120
@@ -167,10 +168,8 @@ class App(Tkinter.Tk):
         self.canvas.bind("<Button-1>", self.canvasclick)
 
         #Buttons
-        Tkinter.Button(frame, text="Load setup",
-                       command=self.load_setup).pack()
-        Tkinter.Button(frame, text="Select Fields",
-                       command=self.field_info_window).pack()
+        Tkinter.Button(frame, text="Open Picker",
+                       command=self.setup_info_window).pack()
         Tkinter.Button(frame, text="Make plug",
                        command=self.make_plug).pack()
         Tkinter.Button(frame, text="Toggle Conflicts",
@@ -211,41 +210,27 @@ class App(Tkinter.Tk):
         self.manager.draw(self.canvas)
         self.manager.draw_image(self.proj_can)
 
-    def load_setup(self):
-        from tkFileDialog import askopenfilename
-
-        file=askopenfilename(initialdir='./',
-                             filetypes=[('setup files', '.setup')])
-        file=os.path.normpath(file)
-        print file
-        if file:
-            self.manager.load(file)
-        self.show()
-
-    def field_info_window(self):
-        print self
+    def setup_info_window(self):
+    
         new=Tkinter.Toplevel(self)
-        cols=('RA', 'Dec', 'nT+S', 'nConflict', 'Plate')
+        
+        cols=('Nneeded', 'Nusable')
         tree = ttk.Treeview(new, columns=cols)
         
         tree.heading('#0',text='Name')
         for c in cols:
             tree.heading(c,text=c)
         
-        for f in self.manager.fields:
-            tree.insert('', 'end', f.name, text=f.name,
-                        values=(f.sh.ra.sexstr,
-                                f.sh.dec.sexstr,
-                                len(f.targets)+len(f.skys),
-                                0,''),
-                        tags=())
-        tree.bind(sequence='<<TreeviewSelect>>', func=self.select_fields)
+        for setup in get_all_setups():
+            tree.insert('', 'end', setup.name, text=setup.name, tags=(),
+                        values=(setup.n_needed_fibers, setup.n_usable_fibers))
+        tree.bind(sequence='<<TreeviewSelect>>', func=self.pick_setups)
         tree.pack()
         tree.focus()
 
-    def select_fields(self, event):
+    def pick_setups(self, event):
         log.info('Selecting {}'.format(event.widget.selection()))
-        self.manager.select_fields(event.widget.selection())
+        self.manager.pick_setups(event.widget.selection())
         self.show()
 
     def make_plug(self):

@@ -4,6 +4,7 @@ from collections import defaultdict
 from logger import getLogger
 from fiber import Fiber
 import logging
+import re
 log=getLogger('cassettes')
 log.setLevel(logging.INFO)
 
@@ -22,21 +23,22 @@ def rangify(data):
     return ', '.join(str_list)
 
 def _get_fiber_staus():
-    """ returns a dict
-        
-        {cassettename:8-tuple of booleans with True being good}
-        """
+    """
+    returns a dict
+    
+    {cassettename:8-tuple of booleans with True being good}
+    """
     default={n:[True]*8 for n in CASSETTE_NAMES}
     with open(DEAD_FIBER_FILE,'r') as fp:
-        lines=fp.readlines()
-    lines=[l.strip() for l in lines]
+        lines=[l.strip() for l in fp.readlines()]
+
     lines=[l for l in lines if l and not l.startswith('#')]
     for l in lines:
         cass,_,deads=l.partition(' ')
         assert (len(cass)==2 and
-                cass[0].upper() in 'RB'
-                and cass[1] in '12345678')
-        deads=map(int,deads.split(','))
+                cass[0].upper() in 'RB' and
+                cass[1] in '12345678')
+        deads=map(int, re.split('\W+',deads))
         for d in (d-1 for d in deads if d>0 and d<9):
             default[cass.upper()+'l'][d]=False
         for d in (d-9 for d in deads if d>8 and d<17):
@@ -329,14 +331,6 @@ class CassetteConfig(object):
         for c in self:
             c.map_fibers(remap=remap)
 
-    def condense(self):
-        _condense_cassette_assignments([c for c in self if c.on_left])
-        _condense_cassette_assignments([c for c in self if c.on_right])
-
-    def rejigger(self):
-        _rejigger_cassette_assignments([c for c in self if c.on_left])
-        _rejigger_cassette_assignments([c for c in self if c.on_right])
-
     def assigned_targets(self, side=None):
         targets=[]
         if side==None or side.lower()=='b':
@@ -351,103 +345,4 @@ class CassetteConfig(object):
     def fibers(self):
         return [f for c in self for f in c.fibers.values()]
 
-
-def _condense_cassette_assignments(cassettes):
-    #Grab cassettes with available fibers
-    non_full=[c for c in cassettes if c.n_avail >0 and c.used>0]
-              
-    to_check=list(non_full)
-    to_check.sort(key= lambda x: x.n_avail)
-    
-    while to_check:
-        
-        trial=to_check.pop()
-        
-        #Try to reassign all holes to non full cassettes
-        targets=list(trial.targets)
-        for t in targets:
-            #If hole can't be assigned then screw it
-            if not t.is_assignable:
-                break
-            #Try assigning the hole to another tetris
-            recomp_non_full=False
-            for c in non_full:
-                if t.is_assignable(cassette=c):
-                    trial.unassign(t)
-                    c.assign(t)
-                    recomp_non_full=True
-                    break
-            if recomp_non_full:
-                #Redetermine what is full
-                recomp_non_full=False
-                non_full=[c for c in non_full if c.n_avail>0]
-    
-        #If we have emptied the cassette then don't add anything to it
-        if trial.used == 0:
-            try:
-                non_full.remove(trial)
-            except ValueError,e:
-                #it is possible that trial filled up, was dropped from non_full
-                # or something like that
-                pass
-        
-        #Update sort of to check
-        to_check.sort(key= lambda x: x.n_avail)
-
-def _rejigger_cassette_assignments(cassettes):
-    """Go through the cassettes swapping holes to eliminate
-    verticle excursions
-    """
-    cassettes.sort(key=lambda c: c.pos[1])
-#    import ipdb;ipdb.set_trace()
-    for i in range(len(cassettes)-1):
-        cassette=cassettes[i]
-        higer_cassettes=cassettes[i:]
-
-        swappable_cassette_targets=[t for t in cassette.targets
-                                    if t.is_assignable]
-
-#        if not swappable_cassette_targets:
-#            import ipdb;ipdb.set_trace()
-
-        swappable_higher_targets=[t for c in higer_cassettes
-                                    for t in c.targets
-                                    if t.is_assignable(cassette=cassette)]
-        
-        if not swappable_higher_targets:
-#            import ipdb;ipdb.set_trace()
-            continue
-        
-        targets=swappable_cassette_targets+swappable_higher_targets
-        targets.sort(key=operator.attrgetter('hole.y'))
-        
-        #Find index of lowest target not in the cassette
-        sort_ndxs=[targets.index(t) for t in swappable_cassette_targets]
-        first_higher_ndx=len(sort_ndxs)
-        for i in range(len(sort_ndxs)):
-            if i not in sort_ndxs:
-                first_higher_ndx=i
-                break
-        
-        #For targets not at start of sorted list
-        for i in sort_ndxs:
-            if i > first_higher_ndx:
-                low_target=targets[i]
-                #attempt exchange with lower holes
-                for j in range(first_higher_ndx, i):
-                    #nb high cassette might be same
-                    high_cassette=[c for c in cassettes
-                                   if c.name==targets[j].assigned_cassette][0]
-                    if high_cassette==cassette:
-                        continue
-#                    import ipdb;ipdb.set_trace()
-                    if (targets[j].is_assignable(cassette=cassette) and
-                        low_target.is_assignable(cassette=high_cassette)):
-                        #Unassign
-                        high_cassette.unassign(targets[j])
-                        cassette.unassign(low_target)
-                        #Assign
-                        high_cassette.assign(low_target)
-                        cassette.assign(targets[j])
-                        break
 
