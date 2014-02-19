@@ -562,22 +562,15 @@ def _postProcessCalvetSetups(plateinfo):
     for sname in plateinfo.setups:
     
         s=plateinfo.setups[sname]
-        nholes=len([h for h in s['holes'] if h.isObject() or h.isSky()])
+        holes=s['holes']
+        nholes=len(holes)
         if nholes > 128-5:
-            ob=[h for h in s['holes'] if h.isObject()]
-            sk=[h for h in s['holes'] if h.isSky()]
-            if sk:
-                ratio=float(len(ob))/len(sk)
-                pct_keep=float(123)/(len(ob)+len(sk))
-                from math import floor
-                no=int(floor(pct_keep*len(ob)))
-                ns=int(floor(pct_keep*len(sk)))
-            else:
-                ns=0
-                no=123
-            ob.sort(key=lambda h: h['PRIORITY'])
-            sk.sort(key=lambda h: h['PRIORITY'])
-            s['holes']=ob[0:no]+sk[0:ns]
+            import random
+            ndxs=[]
+            rands=[random.randint(0,nholes-1) for i in range(1000)]
+            [ndxs.append(i) for i in rands if i not in ndxs]
+            ndxs=ndxs[0:128-5]
+            s['holes']=[holes[i] for i in ndxs]
 
 def _postProcessCarnegieSetups(plateinfo):
     """
