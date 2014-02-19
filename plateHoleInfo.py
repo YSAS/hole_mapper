@@ -114,7 +114,7 @@ class plateHoleInfo(object):
             if 'HotJupiters_1' in self.name:
                 _postProcessHJSetups(self)
 
-            if 'Calvet' in self.name:
+            if 'Calvet1' in self.name:
                 _postProcessCalvetSetups(self)
 
             if 'Carnegie' in self.name:
@@ -140,8 +140,9 @@ class plateHoleInfo(object):
             if 'HotJupiters_1' in self.name:
                 _postProcessHJCassettes(self)
 
-#            if 'Calvet' in self.name:
-#                _postProcessCalvetCassettes(self)
+            if 'Calvet1' in self.name:
+                _OddsOnly(self, 'Setup 3')
+                _OddsOnly(self, 'Setup 4')
 
             if 'Outer_LMC_1' in self.name:
                 _postProcessNideverCassettes(self)
@@ -152,31 +153,31 @@ class plateHoleInfo(object):
             if 'Kounkel_2' in self.name:
                 _postProcessKounkel2Cassettes(self)
 
-            if 'Calvet' in self.name:
-#                this doesn't work because hole.reset() copiest over the restriction to 'ASSIGNMENT' and the isAssigned() test just assumes the cassette is assigned if it is a string.'
-#                for h in self.setups['Setup 1']['holes']:
-#                    h['INIT_ASSIGNMENT']['CASSETTE']='R'
-#                for h in self.setups['Setup 2']['holes']:
-#                    h['INIT_ASSIGNMENT']['CASSETTE']='B'
-                _OddsOnly(self, 'Setup 1')
-                _OddsOnly(self, 'Setup 2')
-                _OddsOnly(self, 'Setup 3')
-                _OddsOnly(self, 'Setup 4')
-                _OddsOnly(self, 'Setup 5')
-                _OddsOnly(self, 'Setup 6')
-                _OddsOnly(self, 'Setup 7')
-                _OddsOnly(self, 'Setup 8')
-                
-                _ROnly(self, 'Setup 1')
-                _BOnly(self, 'Setup 2')
-                
-                _ROnly(self, 'Setup 3')
-                _BOnly(self, 'Setup 4')
-                
-                _ROnly(self, 'Setup 5')
-                _BOnly(self, 'Setup 6')
-                
-                _ROnly(self, 'Setup 8')
+#            if 'Calvet' in self.name:
+##                this doesn't work because hole.reset() copiest over the restriction to 'ASSIGNMENT' and the isAssigned() test just assumes the cassette is assigned if it is a string.'
+##                for h in self.setups['Setup 1']['holes']:
+##                    h['INIT_ASSIGNMENT']['CASSETTE']='R'
+##                for h in self.setups['Setup 2']['holes']:
+##                    h['INIT_ASSIGNMENT']['CASSETTE']='B'
+#                _OddsOnly(self, 'Setup 1')
+#                _OddsOnly(self, 'Setup 2')
+#                _OddsOnly(self, 'Setup 3')
+#                _OddsOnly(self, 'Setup 4')
+#                _OddsOnly(self, 'Setup 5')
+#                _OddsOnly(self, 'Setup 6')
+#                _OddsOnly(self, 'Setup 7')
+#                _OddsOnly(self, 'Setup 8')
+#                
+#                _ROnly(self, 'Setup 1')
+#                _BOnly(self, 'Setup 2')
+#                
+#                _ROnly(self, 'Setup 3')
+#                _BOnly(self, 'Setup 4')
+#                
+#                _ROnly(self, 'Setup 5')
+#                _BOnly(self, 'Setup 6')
+#                
+#                _ROnly(self, 'Setup 8')
 
             if 'Aarnio' in self.name:
                 _OddsOnly(self, 'Setup 1')
@@ -558,21 +559,25 @@ def _postProcessCalvetSetups(plateinfo):
     """
     Drop excess targets
     """
-    s=plateinfo.setups['Setup 7']
-    ob=[h for h in s['holes'] if h.isObject()]
-    sk=[h for h in s['holes'] if h.isSky()]
-    if sk:
-        ratio=float(len(ob))/len(sk)
-        pct_keep=float(123)/(len(ob)+len(sk))
-        from math import floor
-        no=int(floor(pct_keep*len(ob)))
-        ns=int(floor(pct_keep*len(sk)))
-    else:
-        ns=0
-        no=123
-    ob.sort(key=lambda h: h['PRIORITY'])
-    sk.sort(key=lambda h: h['PRIORITY'])
-    s['holes']=ob[0:no]+sk[0:ns]
+    for sname in plateinfo.setups:
+    
+        s=plateinfo.setups[sname]
+        nholes=len([h for h in s['holes'] if h.isObject() or h.isSky()])
+        if nholes > 128-5:
+            ob=[h for h in s['holes'] if h.isObject()]
+            sk=[h for h in s['holes'] if h.isSky()]
+            if sk:
+                ratio=float(len(ob))/len(sk)
+                pct_keep=float(123)/(len(ob)+len(sk))
+                from math import floor
+                no=int(floor(pct_keep*len(ob)))
+                ns=int(floor(pct_keep*len(sk)))
+            else:
+                ns=0
+                no=123
+            ob.sort(key=lambda h: h['PRIORITY'])
+            sk.sort(key=lambda h: h['PRIORITY'])
+            s['holes']=ob[0:no]+sk[0:ns]
 
 def _postProcessCarnegieSetups(plateinfo):
     """
