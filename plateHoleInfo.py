@@ -120,7 +120,7 @@ class plateHoleInfo(object):
             if 'Carnegie' in self.name:
                 _postProcessCarnegieSetups(self)
                 
-            if 'Kounkel_2' in self.name:
+            if 'Kounkel_redo' in self.name:
                 _postProcessKounkel2Setups(self)
 
             #set of cassettes with same color & slit in future this
@@ -150,8 +150,8 @@ class plateHoleInfo(object):
             if 'Vasily' in self.name:
                 _postProcessVasilyCassettes(self)
                 
-            if 'Kounkel_2' in self.name:
-                _postProcessKounkel2Cassettes(self)
+#            if 'Kounkel_2' in self.name:
+#                _postProcessKounkel2Cassettes(self)
 
 #            if 'Calvet' in self.name:
 ##                this doesn't work because hole.reset() copiest over the restriction to 'ASSIGNMENT' and the isAssigned() test just assumes the cassette is assigned if it is a string.'
@@ -182,6 +182,8 @@ class plateHoleInfo(object):
             if 'Aarnio' in self.name:
                 _OddsOnly(self, 'Setup 1')
                 _OddsOnly(self, 'Setup 2')
+                _OddsOnly(self, 'Setup 3')
+                _OddsOnly(self, 'Setup 4')
 
             _SetDeadFibers(self)
             
@@ -601,9 +603,10 @@ def _postProcessKounkel2Setups(plateinfo):
     """
     Drop excess targets
     """
-    h=plateinfo.setups['Setup 2']['holes']
-    h.sort(key=lambda h: h['PRIORITY'],reverse=True)
-    plateinfo.setups['Setup 2']['holes']=h[0:128]
+    pass
+#    h=plateinfo.setups['Setup 2']['holes']
+#    h.sort(key=lambda h: h['MAGNITUDE'])
+#    plateinfo.setups['Setup 2']['holes']=h[0:256-9]
 
 def _postProcessIanCassettes(plateinfo):
     """
@@ -834,7 +837,17 @@ def parse_extra_data(name,setup, words):
             return {'PRIORITY':float(words[1][:-1])}
         else:
             return {'PRIORITY':float(0.0)}
-    
+
+    if name=='Kounkel_redo_Sum':
+        if words[0].lower()=='f':
+            try:
+                val=float(words[3].split('_')[0])
+            except ValueError:
+                val=99.0
+            return {'MAGNITUDE':val}
+        else:
+            return {'MAGNITUDE':99.}
+
     ret={}
     #import pdb;pdb.set_trace()
     #Carnegie
