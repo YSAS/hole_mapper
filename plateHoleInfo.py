@@ -123,6 +123,9 @@ class plateHoleInfo(object):
             if 'Kounkel_redo' in self.name:
                 _postProcessKounkel2Setups(self)
 
+            if 'Simon' in self.name:
+                _postProcessSimonSetups(self)
+
             #set of cassettes with same color & slit in future this
             # will come from plate file
             #h & l are used to divide the physical cassettes into a high-numbered
@@ -178,6 +181,9 @@ class plateHoleInfo(object):
 #                _BOnly(self, 'Setup 6')
 #                
 #                _ROnly(self, 'Setup 8')
+
+            if 'Simon' in self.name:
+                _postProcessSimonCassettes(self)
 
             if 'Aarnio' in self.name:
                 _OddsOnly(self, 'Setup 1')
@@ -264,7 +270,7 @@ class plateHoleInfo(object):
                 
                 #Perform a crappy extraction of additional hole information
                 addit={}
-                if rtype =='O' and len(rwords) > 9:
+                if rtype in 'OS' and len(rwords) > 9:
                     addit=parse_extra_data(self.name, setup_name, rwords[9:])
                     
                 #Instantiate a hole
@@ -283,6 +289,7 @@ class plateHoleInfo(object):
 
                 #Enforce holes exist only once
                 if hole in self.holeSet:
+                    #import ipdb;ipdb.set_trace()
                     print "Duplicate hole: {}".format(hole)
                     for h in self.holeSet:
                         if h.hash==hole.hash:
@@ -299,6 +306,7 @@ class plateHoleInfo(object):
                 if rtype in ('O', 'S'):
                     targets.append(hole)
                 else:
+                    i#mport ipdb;ipdb.set_trace()
                     other.append(hole)
             
             #other holes go into unused, bit of a misnomer
@@ -557,6 +565,19 @@ def _postProcessHJSetups(plateinfo):
     #update the setups
     plateinfo.setups=new_setups
 
+
+def _postProcessSimonSetups(plateinfo):
+    """
+    Take the 1 setup and duplicate it
+    """
+    import copy
+    h=plateinfo.setups['Setup 1']['holes']
+    h.sort(key=lambda h: h['PRIORITY'], reverse=True)
+    plateinfo.setups['Setup 2']=copy.deepcopy(plateinfo.setups['Setup 1'])
+    plateinfo.setups['Setup 1']['holes']=plateinfo.setups['Setup 1']['holes'][:63]
+    plateinfo.setups['Setup 2']['holes']=plateinfo.setups['Setup 2']['holes'][:64]
+
+
 def _postProcessCalvetSetups(plateinfo):
     """
     Drop excess targets
@@ -613,17 +634,25 @@ def _postProcessSimonCassettes(plateinfo):
     Take the 2 setups for Nov13 Bailey plate and break them into the
     6 real setups
     """
+    #[3,4,13,14] [5,6,15,16] for B6
+    #[1,6,11,16]
     for c in plateinfo.cassettes['Setup 1'].values():
-        if 'l' in c.name:
-            if 'R8' in c.name:
-                c.usable=[1]
+        if 'B6' in c.name:
+            if 'l' in c.name:
+                c.usable=[5,6]
             else:
-                c.usable=[1,8]
+                c.usable=[15,16]
         else:
-            if 'R8' in c.name:
-                c.usable=[9,16]
+            if 'l' in c.name:
+                c.usable=[3,4]
             else:
-                c.usable=[15]
+                c.usable=[13,14]
+    for c in plateinfo.cassettes['Setup 2'].values():
+
+        if 'l' in c.name:
+            c.usable=[1,6]
+        else:
+            c.usable=[11,16]
 
 def _postProcessIanCassettes(plateinfo):
     """
@@ -865,6 +894,9 @@ def parse_extra_data(name,setup, words):
         else:
             return {'MAGNITUDE':99.}
 
+    if 'Simon' in name:
+        if words[0].lower()=='f':
+            return {'priority':float(words[1]), 'ID':words[2]}
     ret={}
     #import pdb;pdb.set_trace()
     #Carnegie
@@ -954,15 +986,17 @@ def _BOnly(plateinfo, setup):
             c.usable=[]
     plateinfo.cassette_groups[setup]=[Cassette.blue_cassette_names()]
 
+
+
 def _SetDeadFibers(plateinfo):
     dead=( ('R1l',(2,)),
            ('R8h',(9,)),
            ('R2h',(9,)),
            ('R7h',(11, 12)),
-           ('B4l',(5,)),
+           ('B4l',(4,5)),
            ('B4h',(15,)),
            ('B6l',(2,4)))
-#           b8-3, 6-13,5-7,4-4 treat as ok
+#           b8-3, 6-13, 5-7
 #           r8-3, 8-8, treat as ok
 
     for cassettes in plateinfo.cassettes.itervalues():
