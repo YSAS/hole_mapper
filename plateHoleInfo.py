@@ -575,7 +575,7 @@ def _postProcessSimonSetups(plateinfo):
     h.sort(key=lambda h: h['PRIORITY'], reverse=True)
     plateinfo.setups['Setup 2']=copy.deepcopy(plateinfo.setups['Setup 1'])
     plateinfo.setups['Setup 1']['holes']=plateinfo.setups['Setup 1']['holes'][:63]
-    plateinfo.setups['Setup 2']['holes']=plateinfo.setups['Setup 2']['holes'][:64]
+    plateinfo.setups['Setup 2']['holes']=plateinfo.setups['Setup 2']['holes'][:63]
 
 
 def _postProcessCalvetSetups(plateinfo):
@@ -1006,5 +1006,7 @@ def _SetDeadFibers(plateinfo):
                     cassettes[cname].usable.remove(fnum)
                 except Exception:
                     pass
+
+                    
 
 
