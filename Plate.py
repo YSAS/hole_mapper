@@ -494,6 +494,8 @@ class Plate(object):
 #                #once
 #                print "drawing dupe in Dark Green @ (%f,%f) ID:%i"%tuple(tmp)
                 fcolor='DarkGreen'
+            if hole['FIBER']!='':
+                fcolor=color
             canvas.drawCircle( pos, hole.radius*radmult, 
                                outline=color, fill=fcolor, tags=('hole',hashtag),
                                activefill='Green',activeoutline='Green',
@@ -539,20 +541,20 @@ class Plate(object):
             
             inactiveHoles=self.holeSet.difference(setup['unused_holes'])
             inactiveHoles.difference_update(setup['holes'])
-            
+#            import ipdb;ipdb.set_trace()
             inactiveHoles.add(self.plateHoleInfo.standard['hole'])
             inactiveHoles.add(self.plateHoleInfo.sh_hole)
             
-            #Draw the holes that aren't in the current setup
+#            #Draw the holes that aren't in the current setup
             for h in inactiveHoles:
-                self.drawHole(h, canvas)
-            
+                self.drawHole(h, canvas,radmult=.2)
+
             #If holes in setup have been grouped then draw the groups
             # otherwise draw them according to their channel
-            if 'cassetteConfig' in setup:
-                self._draw_with_assignements(setup, channel, canvas)
-            else:
-                self._draw_without_assignements(setup, channel, canvas)
+#            if 'cassetteConfig' in setup:
+#                self._draw_with_assignements(setup, channel, canvas)
+#            else:
+            self._draw_without_assignements(setup, channel, canvas)
             
             #Draw the guide and acquisition holes in color
             for h in setup['unused_holes']:

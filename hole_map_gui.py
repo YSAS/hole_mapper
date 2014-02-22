@@ -5,6 +5,7 @@ import ImageCanvas
 import Plate
 import tkMessageBox
 import os
+import Cassette
 
 #mainloop
 #meat: plate.loadHoles then self.show
@@ -20,9 +21,14 @@ class HoleInfoDialog:
         self.getFiberForHole=lambda a:plate.getFiberForHole(a, setup)
         self.getChannelForHole=lambda a:plate.getChannelForHole(a, setup)
         
+        self.plate=plate
+        self.setup=setup
+        
         if len(holeIDs) > 1:
             self.initializeSelection(holeIDs)
         else:
+            
+            self.hole=plate.getHole(holeIDs[0])
             self.initializeSingle(holeIDs[0])
             
     def initializeSelection(self, holeIDs):
@@ -73,6 +79,12 @@ class HoleInfoDialog:
             Tkinter.Label(self.dialog, text='Setup Specific Information').pack()
             Tkinter.Label(self.dialog, text="Channel: "+self.getChannelForHole(holeID)).pack(anchor='w')
             Tkinter.Label(self.dialog, text="Assigned Fiber: "+self.getFiberForHole(holeID)).pack(anchor='w')
+        if info['TYPE'] in 'OS':
+            self.fib_field=Tkinter.StringVar(value='')
+            Tkinter.Entry(self.dialog, width=6,
+                          textvariable=self.fib_field).pack()
+        else:
+            self.fib_field=None
 
         Tkinter.Button(self.dialog,text='Done',command=self.ok).pack()
 
@@ -97,7 +109,13 @@ class HoleInfoDialog:
         self.resetHoles()
 
     def save(self):
-        pass    
+        if self.fib_field != None:
+            fib=self.fib_field.get().upper()
+            h=self.hole
+            h['FIBER']=fib
+            cassettes=self.plate.setups[self.setup]['cassetteConfig']
+            cassettes[Cassette.fiber2cassettename(h['FIBER'])].assign_hole(h)
+    
     
     def close(self):   
         self.resetHoles()

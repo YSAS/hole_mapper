@@ -559,18 +559,7 @@ def _postProcessCalvetSetups(plateinfo):
     """
     Drop excess targets
     """
-    for sname in plateinfo.setups:
-    
-        s=plateinfo.setups[sname]
-        holes=s['holes']
-        nholes=len(holes)
-        if nholes > 128-5:
-            import random
-            ndxs=[]
-            rands=[random.randint(0,nholes-1) for i in range(1000)]
-            [ndxs.append(i) for i in rands if i not in ndxs]
-            ndxs=ndxs[0:128-5]
-            s['holes']=[holes[i] for i in ndxs]
+    pass
 
 def _postProcessCarnegieSetups(plateinfo):
     """
