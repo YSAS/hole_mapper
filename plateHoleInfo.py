@@ -608,6 +608,23 @@ def _postProcessKounkel2Setups(plateinfo):
 #    h.sort(key=lambda h: h['MAGNITUDE'])
 #    plateinfo.setups['Setup 2']['holes']=h[0:256-9]
 
+def _postProcessSimonCassettes(plateinfo):
+    """
+    Take the 2 setups for Nov13 Bailey plate and break them into the
+    6 real setups
+    """
+    for c in plateinfo.cassettes['Setup 1'].values():
+        if 'l' in c.name:
+            if 'R8' in c.name:
+                c.usable=[1]
+            else:
+                c.usable=[1,8]
+        else:
+            if 'R8' in c.name:
+                c.usable=[9,16]
+            else:
+                c.usable=[15]
+
 def _postProcessIanCassettes(plateinfo):
     """
     Take the 2 setups for Nov13 Bailey plate and break them into the

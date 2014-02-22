@@ -394,6 +394,8 @@ class Plate(object):
                 group=cassette_groups[i % len(cassette_groups)]
                 h.assign_possible_cassette(group)
 
+        fail=False
+        
         #While there are holes w/o an assigned cassette (groups don't count)
         while len(unassigned_skys) > 0:
             #Update cassette availability for each hole (a cassette may have filled)
@@ -405,11 +407,16 @@ class Plate(object):
                                     c.n_avail() >0]
                 if len(possible_cassettes)<1:
                     print 'Could not find a suitable cassette for {}'.format(h)
+                    fail=True
+                    break
                     import pdb;pdb.set_trace()
                 #Set the cassetes that are usable for the hole
                 #  no_add is true so we keep the distribution of sky fibers
                 h.assign_possible_cassette(possible_cassettes,
                                            update_with_intersection=True)
+
+            if fail==True:
+                break
 
             #Sort holes by their distance from cassettes
             unassigned_skys.sort(key=lambda h: h.plug_priority())
@@ -424,7 +431,7 @@ class Plate(object):
         holes_to_assign=unassigned_objs
 
         #While there are holes w/o an assigned cassette (groups don't count)
-        while len(holes_to_assign) > 0:
+        while len(holes_to_assign) > 0 and not fail:
             #Update cassette availability for each hole (a cassette may have filled)
             for h in holes_to_assign:
                 #Get cassettes with correct slit and free fibers
@@ -434,11 +441,16 @@ class Plate(object):
                                     c.n_avail() >0]
                 if len(possible_cassettes)<1:
                     print 'Could not find a suitable cassette for {}'.format(h)
+                    fail=True
+                    break
                     import pdb;pdb.set_trace()
                 #Set the cassetes that are usable for the hole
                 #  no_add is true so we keep the distribution of sky fibers
                 h.assign_possible_cassette(possible_cassettes,
                                            update_with_intersection=True)
+            
+            if fail==True:
+                break
 
             #Sort holes by their distance from cassettes
             holes_to_assign.sort(key=lambda h: h.plug_priority())
