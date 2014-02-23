@@ -561,7 +561,8 @@ class Plate(object):
             
             #If holes in setup have been grouped then draw the groups
             # otherwise draw them according to their channel
-            if 'cassetteConfig' in setup:
+            nassigned=sum([c.used for c in setup['cassetteConfig'].values()])
+            if nassigned:
                 self._draw_with_assignements(setup, channel, canvas)
             else:
                 self._draw_without_assignements(setup, channel, canvas)
