@@ -574,8 +574,8 @@ def _postProcessSimonSetups(plateinfo):
     h=plateinfo.setups['Setup 1']['holes']
     h.sort(key=lambda h: h['PRIORITY'], reverse=True)
     plateinfo.setups['Setup 2']=copy.deepcopy(plateinfo.setups['Setup 1'])
-    plateinfo.setups['Setup 1']['holes']=plateinfo.setups['Setup 1']['holes'][:63]
-    plateinfo.setups['Setup 2']['holes']=plateinfo.setups['Setup 2']['holes'][:63]
+#    plateinfo.setups['Setup 1']['holes']=plateinfo.setups['Setup 1']['holes'][:63]
+#    plateinfo.setups['Setup 2']['holes']=plateinfo.setups['Setup 2']['holes'][:63]
 
 
 def _postProcessCalvetSetups(plateinfo):
@@ -642,6 +642,16 @@ def _postProcessSimonCassettes(plateinfo):
                 c.usable=[5,6]
             else:
                 c.usable=[15,16]
+        elif 'R8' in c.name:
+            if 'l' in c.name:
+                c.usable=[4,5]
+            else:
+                c.usable=[13,14]
+        elif 'B7':
+            if 'l' in c.name:
+                c.usable=[3,4]
+            else:
+                c.usable=[14,15]
         else:
             if 'l' in c.name:
                 c.usable=[3,4]
@@ -990,6 +1000,7 @@ def _BOnly(plateinfo, setup):
 
 def _SetDeadFibers(plateinfo):
     dead=( ('R1l',(2,)),
+           ('R8l',(3,)),
            ('R8h',(9,)),
            ('R2h',(9,)),
            ('R7h',(11, 12)),
