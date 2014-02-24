@@ -956,6 +956,7 @@ def _BOnly(plateinfo, setup):
 
 def _SetDeadFibers(plateinfo):
     dead=( ('R1l',(2,)),
+           ('R8l',(3,)),
            ('R8h',(9,)),
            ('R2h',(9,)),
            ('R7h',(11, 12)),
