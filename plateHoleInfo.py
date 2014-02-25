@@ -184,6 +184,8 @@ class plateHoleInfo(object):
                 _OddsOnly(self, 'Setup 2')
                 _OddsOnly(self, 'Setup 3')
                 _OddsOnly(self, 'Setup 4')
+                _OddsOnly(self, 'Setup 5')
+                _OddsOnly(self, 'Setup 6')
 
             _SetDeadFibers(self)
             
