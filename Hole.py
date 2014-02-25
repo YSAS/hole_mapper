@@ -57,7 +57,7 @@ class Hole(dict):
         self['EPOCH']=float(ep)
         self['MATTFIB']=str(mattfib)
         self['SLIT']=int(slit)
-        self['PRIORITY']=int(priority)
+        self['PRIORITY']=float(priority)
         self['FIBER']=str(fiber)
         self['SETUP']=extra.pop('setup','')
         if fiber:

@@ -166,6 +166,7 @@ class Plate(object):
             raise Exception('Invalid holeID')
         ret={'RA':hole.ra_string(),'DEC':hole.de_string(),
              'ID':hole['ID'],'MAGNITUDE':hole['MAGNITUDE'],
+             'PRIORITY':hole['PRIORITY'],
              'COLOR':hole['COLOR'],'TYPE':hole['TYPE'],
              'SETUPS':self.getSetupsUsingHole(hole),'HOLEID':holeID,
              'IDSTR':hole.idstr,'CUSTOM':hole['CUSTOM']}

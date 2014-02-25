@@ -4,6 +4,7 @@ import Cassette
 import Setup
 import os.path
 import math
+import copy
 from m2fs.plate.plate import PlateConfigParser
 
 SCALE=14.25
@@ -114,7 +115,7 @@ class plateHoleInfo(object):
             if 'HotJupiters_1' in self.name:
                 _postProcessHJSetups(self)
 
-            if 'Calvet1' in self.name:
+            if 'Calvet' in self.name:
                 _postProcessCalvetSetups(self)
 
             if 'Carnegie' in self.name:
@@ -140,9 +141,9 @@ class plateHoleInfo(object):
             if 'HotJupiters_1' in self.name:
                 _postProcessHJCassettes(self)
 
-            if 'Calvet1' in self.name:
-                _OddsOnly(self, 'Setup 3')
-                _OddsOnly(self, 'Setup 4')
+#            if 'Calvet1' in self.name:
+#                _OddsOnly(self, 'Setup 3')
+#                _OddsOnly(self, 'Setup 4')
 
             if 'Outer_LMC_1' in self.name:
                 _postProcessNideverCassettes(self)
@@ -153,31 +154,30 @@ class plateHoleInfo(object):
 #            if 'Kounkel_2' in self.name:
 #                _postProcessKounkel2Cassettes(self)
 
-#            if 'Calvet' in self.name:
-##                this doesn't work because hole.reset() copiest over the restriction to 'ASSIGNMENT' and the isAssigned() test just assumes the cassette is assigned if it is a string.'
-##                for h in self.setups['Setup 1']['holes']:
-##                    h['INIT_ASSIGNMENT']['CASSETTE']='R'
-##                for h in self.setups['Setup 2']['holes']:
-##                    h['INIT_ASSIGNMENT']['CASSETTE']='B'
-#                _OddsOnly(self, 'Setup 1')
-#                _OddsOnly(self, 'Setup 2')
-#                _OddsOnly(self, 'Setup 3')
-#                _OddsOnly(self, 'Setup 4')
-#                _OddsOnly(self, 'Setup 5')
-#                _OddsOnly(self, 'Setup 6')
-#                _OddsOnly(self, 'Setup 7')
-#                _OddsOnly(self, 'Setup 8')
-#                
-#                _ROnly(self, 'Setup 1')
-#                _BOnly(self, 'Setup 2')
-#                
-#                _ROnly(self, 'Setup 3')
-#                _BOnly(self, 'Setup 4')
-#                
-#                _ROnly(self, 'Setup 5')
-#                _BOnly(self, 'Setup 6')
-#                
-#                _ROnly(self, 'Setup 8')
+            if 'Calvet' in self.name:
+#                this doesn't work because hole.reset() copiest over the restriction to 'ASSIGNMENT' and the isAssigned() test just assumes the cassette is assigned if it is a string.'
+#                for h in self.setups['Setup 1']['holes']:
+#                    h['INIT_ASSIGNMENT']['CASSETTE']='R'
+#                for h in self.setups['Setup 2']['holes']:
+#                    h['INIT_ASSIGNMENT']['CASSETTE']='B'
+                _OddsOnly(self, 'Setup 1')
+                _OddsOnly(self, 'Setup 2')
+                _OddsOnly(self, 'Setup 3')
+                _OddsOnly(self, 'Setup 4')
+                _OddsOnly(self, 'Setup 5')
+                _OddsOnly(self, 'Setup 6')
+                
+                _OddsOnly(self, 'Setup 9')
+                
+                _ROnly(self, 'Setup 1')
+                _BOnly(self, 'Setup 2')
+                
+                _ROnly(self, 'Setup 3')
+                _BOnly(self, 'Setup 4')
+                
+                _ROnly(self, 'Setup 5')
+                _BOnly(self, 'Setup 6')
+                
 
             if 'Aarnio' in self.name:
                 _OddsOnly(self, 'Setup 1')
@@ -532,8 +532,7 @@ def _postProcessHJSetups(plateinfo):
     ppool=[h for h in holes if h.get('subclass','')=='']
     #lo res target pool
     lpool=[h for h in holes if h.get('subclass','')=='Extra']
-
-    import copy
+    
     for k in ['Setup 1','Setup 2','Setup 3']:
         new_setups[k]=copy.copy(setups['Setup 1'])
         new_setups[k]['setup']=k
@@ -563,18 +562,18 @@ def _postProcessCalvetSetups(plateinfo):
     """
     Drop excess targets
     """
-    for sname in plateinfo.setups:
+    #Create setup 9 from 7&8
     
-        s=plateinfo.setups[sname]
-        holes=s['holes']
-        nholes=len(holes)
-        if nholes > 128-5:
-            import random
-            ndxs=[]
-            rands=[random.randint(0,nholes-1) for i in range(1000)]
-            [ndxs.append(i) for i in rands if i not in ndxs]
-            ndxs=ndxs[0:128-5]
-            s['holes']=[holes[i] for i in ndxs]
+#    holes=plateinfo.setups['Setup 7']+plateinfo.setups['Setup 8']
+
+    setup9=copy.copy(plateinfo.setups['Setup 7'])
+    holes=plateinfo.setups['Setup 7']['holes']+plateinfo.setups['Setup 8']['holes']
+    
+    sholes=[h for h in holes if h.isSky()]
+    oholes=[h for h in holes if h.isObject()]
+    oholes.sort(key=lambda h: h['PRIORITY'],reverse=True)
+    setup9['holes']=oholes[:nGoodOdd()-len(sholes)]+sholes
+    plateinfo.setups['Setup 9']=setup9
 
 def _postProcessCarnegieSetups(plateinfo):
     """
@@ -850,12 +849,13 @@ def _postProcessNideverCassettes(plateinfo):
             c.usable=[]
     plateinfo.cassette_groups['Setup 8']=[[i+k for i in ok for k in 'lh']]
 
-def parse_extra_data(name,setup, words):
-    if name=='Calvet_sum':
+def parse_extra_data(name, setup, words):
+#    import ipdb;ipdb.set_trace()
+    if name=='Calvet_Sum':
         if words[0].lower()=='f':
-            return {'PRIORITY':float(words[1][:-1])}
+            return {'priority':float(words[1][:-1])}
         else:
-            return {'PRIORITY':float(0.0)}
+            return {'priority':float(0.0)}
 
     if name=='Kounkel_redo_Sum':
         if words[0].lower()=='f':
@@ -955,6 +955,9 @@ def _BOnly(plateinfo, setup):
         if 'R' in c.name:
             c.usable=[]
     plateinfo.cassette_groups[setup]=[Cassette.blue_cassette_names()]
+
+def nGoodOdd():
+    return 128-6
 
 def _SetDeadFibers(plateinfo):
     dead=( ('R1l',(2,)),

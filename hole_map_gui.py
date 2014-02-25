@@ -66,6 +66,7 @@ class HoleInfoDialog:
             Tkinter.Label(self.dialog, text='ID: '+info['ID']).pack(anchor='w')
             Tkinter.Label(self.dialog, text='RA: '+info['RA']).pack(anchor='w')
             Tkinter.Label(self.dialog, text='Dec: '+info['DEC']).pack(anchor='w')
+            Tkinter.Label(self.dialog, text='Pri: '+str(info['PRIORITY'])).pack(anchor='w')
             if info['TYPE'] not in 'S':
                 Tkinter.Label(self.dialog, text='Mag: %f'%info['MAGNITUDE']).pack(anchor='w')
                 Tkinter.Label(self.dialog, text='Color: %f'%info['COLOR']).pack(anchor='w')
