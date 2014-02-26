@@ -117,4 +117,4 @@ def get_plate(platename):
     try:
         return load_dotplate(os.path.join(PLATE_DIRECTORY,platename)+'.plate')
     except IOError:
-        return None
+        raise ValueError("Unknown plate '{}'.".format(platename))

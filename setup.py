@@ -46,7 +46,7 @@ def _load_setups():
         _KNOWN_SETUPS.update({s.name:s for s in load_dotsetup(f)})
 
 
-def get_setup(setupname, load_awith=False):
+def get_setup(setupname):
     try:
         setup_def=_KNOWN_SETUPS[setupname]
     except KeyError:
@@ -57,14 +57,26 @@ def get_setup(setupname, load_awith=False):
             raise ValueError('Could not find setup {}'.format(setupname))
 
     #Create setup from setupdef
-    config=get_config(setup_def.configname)
+    try:
+        config=get_config(setup_def.configname)
+    except ValueError as e:
+        raise e
 
-    return Setup(setup_def, config)
+    try:
+        plate=get_plate(setup_def.platename)
+    except ValueError as e:
+        raise e
 
+    return Setup(setup_def, plate, config)
+
+def get_setups_for_plate(platename):
+    _load_setups()
+    return [name for name, sdef in _KNOWN_SETUPS.items()
+            if sdef.platename==platename]
 
 def get_all_setups():
+    _load_setups()
     return [get_setup(name) for name in _KNOWN_SETUPS]
-
 
 class SetupDefinition(object):
     def __init__(self, file, platename, fieldname, configname, assign_to,
@@ -86,7 +98,7 @@ class SetupDefinition(object):
 
 
 class Setup(object):
-    def __init__(self, setupdef, config):
+    def __init__(self, setupdef, plate, config):
     
         self.file=setupdef.file
         
@@ -95,10 +107,9 @@ class Setup(object):
         self.config=config
         
         self.assign_to=setupdef.assign_to
-        
-        #Fetch plate
-        self.plate=get_plate(setupdef.platename)
-        
+
+        self.plate=plate
+
         #Fetch Field from plate
         self.field=self.plate.get_field(setupdef.fieldname)
         
