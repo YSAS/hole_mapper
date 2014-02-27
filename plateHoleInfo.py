@@ -124,6 +124,9 @@ class plateHoleInfo(object):
             if 'Kounkel_redo' in self.name:
                 _postProcessKounkel2Setups(self)
 
+            if 'sextanscentercrater' in self.name:
+                _postProcessSextansCraterSetups(self)
+
             #set of cassettes with same color & slit in future this
             # will come from plate file
             #h & l are used to divide the physical cassettes into a high-numbered
@@ -557,6 +560,14 @@ def _postProcessHJSetups(plateinfo):
 
     #update the setups
     plateinfo.setups=new_setups
+
+def _postProcessSextansCraterSetups(plateinfo):
+    pool=(plateinfo.setups['Setup 1']['holes']+
+          plateinfo.setups['Setup 2']['holes']+
+          plateinfo.setups['Setup 3']['holes'])
+    plateinfo.setups['Setup 1']['holes']=[h for i,h in enumerate(pool) if i%3==0]
+    plateinfo.setups['Setup 2']['holes']=[h for i,h in enumerate(pool) if i%3==1]
+    plateinfo.setups['Setup 3']['holes']=[h for i,h in enumerate(pool) if i%3==2]
 
 def _postProcessCalvetSetups(plateinfo):
     """
