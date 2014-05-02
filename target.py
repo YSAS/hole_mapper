@@ -46,9 +46,9 @@ class Target(object):
         self.type=kwargs.pop('type','')
         self.field=kwargs.pop('field',None)
         
-        if self.type==STANDARD_TYPE:
-            self.id='STANDARD'
-        elif self.type==FIDUCIAL_TYPE:
+#        if self.type==STANDARD_TYPE and self.id='':
+#            self.id='STANDARD'
+        if self.type==FIDUCIAL_TYPE:
             self.id='FIDHOLE'
         elif self.type==THUMBSCREW_TYPE:
             self.id='THUMBSCREW'
