@@ -5,12 +5,13 @@ from m2fsholesxy import m2fsholesxyplate as m2hxyplate
 
 CLAY_LONGITUDE=sexconvert(70,42,06.00,dtype=float) #70 42 06.00 in decimal degrees
 CLAY_LATITUDE=sexconvert(-29,00,12.00,dtype=float) #-29 00 12.00 in decimal degrees
-CLAY_ELEVATION=2282.0 #2282.0 meters
+CLAY_ELEVATION=2282.0 #meters
 
 def compute_hole_positions(field_ra,field_dec,field_epoch, date,
                            ras,decs,epochs,targ_types,
-                           fieldrot=180.0, longitude=CLAY_LONGITUDE,
-                           latitude=CLAY_LATITUDE, elevation=CLAY_ELEVATION):
+                           longitude=CLAY_LONGITUDE,
+                           latitude=CLAY_LATITUDE,
+                           elevation=CLAY_ELEVATION):
     """
     Compute x,y,z,r for the holes on a plate
     
@@ -30,6 +31,7 @@ def compute_hole_positions(field_ra,field_dec,field_epoch, date,
             airmass
     """
 
+    fieldrot=180.0 if field_dec <= latitude else 0.0
 
     if not len(ras):
         raise ValueError('Must specify stars')
@@ -51,9 +53,16 @@ def compute_hole_positions(field_ra,field_dec,field_epoch, date,
     #All coordinates are now in decimal degrees
 
     #Call the fortran code
+#    TODO: Remove hack fix in m2fsholes xy.f90
+# change         if(type.ne.'F'.and.type.ne.'T') then
+# to         if(type.ne.'F'.and.type.ne.'B') and recompile
+    typestars[typestars=='T']='O'
     x,y,z,d,type_out, st,ha,az,el,airmass,nout = m2hxy(ut, utdate, latitude,
           longitude, elevation, rafield, decfield, epochfield, fieldrot,
           rastars, decstars, epochstars, typestars)
+    typestars[typestars=='O']='T'
+    type_out[type_out=='O']='T'
+
 
     class retobj(object):
         pass

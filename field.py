@@ -102,7 +102,7 @@ class FieldCatalog(object):
         
         pos, guideref, info=holesxy.compute_hole_positions(self.sh.ra.float,
                                 self.sh.dec.float, self.sh.epoch,self.obsdate,
-                                ras, decs, epochs, targ_types, fieldrot=180.0)
+                                ras, decs, epochs, targ_types)
         
         #Store the info
         for i,t in enumerate(targs):
