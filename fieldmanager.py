@@ -38,7 +38,8 @@ def write_dotplate(name, plate_holes, fields, dir='./'):
         #Write the [Plate] section
         fp.write("[Plate]\n")
 
-        for r in _format_attrib_nicely({'name':name}):
+        for r in _format_attrib_nicely({'name':name,
+                       'fields':', '.join([f.name for f in fields])}):
             fp.write(r)
 
         #Write out mechanical holes
@@ -182,6 +183,14 @@ class Manager(object):
         canvas.drawCircle( (0,0) , PLATE_RADIUS)
         canvas.drawCircle( (0,0) , SH_RADIUS)
         
+        #Draw Plate holes
+        for t in self.plate_holes:
+            if show_conflicts and t.conflicting:
+                self._drawHole(t.hole, canvas, color='black', fcolor='black')
+            elif not t.conflicting:
+                self._drawHole(t.hole, canvas, color='black')
+    
+        #Draw fields
         for i,f in enumerate(self.selected_fields):
             if not f.is_processed:
                 f.process()
