@@ -445,3 +445,19 @@ class Manager(object):
         write_dotplate(name, ph, self.selected_fields)
         write_drill(name, ph, self.selected_fields)
 
+        import numpy as np
+        import matplotlib.pyplot as plt
+        f=[f for f in self.selected_fields if f.name in ['Crater2', 'Crater2v1']][0]
+        targ=[t for t in f.get_drillable_targets() if t.is_target]
+        i=np.array([t.user['imag'] for t in targ], dtype=float)
+        g=np.array([t.user['gmag'] for t in targ], dtype=float)
+        atarg=[t for t in f.all_targets if t.is_target]
+        ai=np.array([t.user['imag'] for t in atarg], dtype=float)
+        ag=np.array([t.user['gmag'] for t in atarg], dtype=float)
+        plt.plot(ag-ai,ai,'r.')
+        plt.plot(g-i,i,'g.')
+        plt.ylim(27,16.5)
+        plt.xlim(-1,2.4)
+        plt.show(block=False)
+#        import ipdb;ipdb.set_trace()
+

@@ -78,6 +78,12 @@ class Target(object):
             self.additional_holes=[]
     
         self.user=kwargs.pop('user',{})
+        
+        try:
+            if self.priority >0.5:
+                self.priority+=6.0/float(self.user['imag'])
+        except Exception:
+            pass
 
         self._conflicting=set()
         
