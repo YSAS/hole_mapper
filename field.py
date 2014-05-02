@@ -201,7 +201,7 @@ class FieldCatalog(object):
         pri=[h.target.priority for h in holes]
 
         #Now do it again but allowing some overlap
-        coll_graph=build_overlap_graph_cartesian(x, y, d, overlap_pct_r_ok=0.9)
+        coll_graph=build_overlap_graph_cartesian(x, y, d, overlap_pct_r_ok=-0.05)
 
 
         keep, drop=coll_graph.crappy_min_vertex_cover_cut(weights=pri,
