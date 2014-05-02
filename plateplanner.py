@@ -302,6 +302,7 @@ class App(Tkinter.Tk):
         w=PopupWindow(self, get=str, query="Plate Name?")
         self.wait_window(w.top)
         self.manager.save_selected_as_plate(w.value)
+        self.canvas.postscript(file=w.value+'.eps', colormode='color')
 
 
 class PopupWindow(object):
