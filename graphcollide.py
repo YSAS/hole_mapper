@@ -116,45 +116,111 @@ class CollisionGraph(object):
         
         single_drop_count=0
         multi_drop_count=0
-        try:
-            while len(edgegraph) > 0:
-                node,edge_set=edgegraph.popitem(last=False)
-                #Case one, a pair of conflicting targets
-                if len(edge_set)==1 and len(edgegraph[edge_set[0]])==1:
-                    assert node in edgegraph[edge_set[0]]
-                    #Drop the lower ranked of node and edges[node][0]
-                    # and remove them from the graph
-                    single_drop_count+=1
-                    nodes.remove(node if weights[node] < weights[edge_set[0]]
-                                      else edge_set[0])
+#        try:
+        dropped=[]
+        while len(edgegraph) > 0:
+            node,edge_set=edgegraph.popitem(last=False)
+            #Case one, a pair of conflicting targets
+            if len(edge_set)==1 and len(edgegraph[edge_set[0]])==1:
+                assert node in edgegraph[edge_set[0]]
+                #Drop the lower ranked of node and edges[node][0]
+                # and remove them from the graph
+                single_drop_count+=1
+                
+                if weights[node] < weights[edge_set[0]]:
+                    to_drop=node
                     edgegraph.pop(edge_set[0])
-                #Case 2, a set of 3 or more conflicting targets
                 else:
-                    if len(edge_set)>1:
-                        multi_drop_count+=1
-                        nodes.remove(node)
-                        for node2 in edge_set:
-                            if len(edgegraph[node2]) == 1:
-                                edgegraph.pop(node2)
-                            else:
-                                edgegraph[node2].remove(node)
-                    else: #this is an end node
-                        edgegraph[node]=edge_set
-        except Exception, e:
-            print str(e)
-            import ipdb;ipdb.set_trace()
+                    to_drop=edge_set[0]
+                    edge_set=edgegraph.pop(edge_set[0])
+            
+                #Drop the node
+                nodes.remove(to_drop)
+                dropped.append((to_drop, edge_set))
+
         
-        if multi_drop_count >0:
-            print "Warning: Dropped {} multi-overlapping stars in {}".format(
-                        multi_drop_count,ID)
-        
-        
-        
+            #Case 2, a set of 3 or more conflicting targets
+            else:
+                multi_drop_count+=1
+                #Node is connected to multiple others drop
+                #Want a weighted minimum vertex cover.
+                #instead go for a greedy variant
+                #drop lowest weighted node with most connections
+                
+                edgegraph[node]=edge_set
+                to_drop=self._walk_return_dropnode(edgegraph, node,
+                                                   edge_set, weights)
+                
+                edge_set=edgegraph.pop(to_drop)
+
+                #Drop the node
+                nodes.remove(to_drop)
+                dropped.append((to_drop, edge_set))
+                
+                #Cull all the node's edges from the graph
+                for node2 in edge_set:
+                    if len(edgegraph[node2]) == 1:
+                        edgegraph.pop(node2)
+                    else:
+                        edgegraph[node2].remove(to_drop)
+
+#        except Exception, e:
+#            print str(e)
+#            import ipdb;ipdb.set_trace()
+
+        #Make sure we weren't overzelous
+        if dropped:
+            #Sort dropped by weight and try to add them back
+            dropped=[(d, weights[d[0]]) for d in dropped]
+            dropped.sort(key=lambda x:x[1], reverse=True)
+            dropped=[d[0] for d in dropped]
+            
+            for node, edges in dropped:
+                #None of edges are in nodes
+                if not len([n for n in edges if n in nodes]):
+                    print "Added back a node"
+                    nodes.append(node)
+
+#        if multi_drop_count >0:
+#            print "Warning: Dropped {} multi-overlapping stars in {}".format(
+#                        multi_drop_count,ID)
+#        
+
         if retdrop:
             drop=[i for i in range(self._nnodes) if i not in nodes]
-            return nodes,drop
+            return nodes, drop
         else:
             return nodes
+
+    def _walk_return_dropnode(self, edgegraph, start, edges, weights):
+        """walk the graph connected to start and return the node having min
+            weight and most edges of min weights"""
+        visited=[]
+        to_visit=set(edges)
+        cur=start
+        minw=weights[start]
+        rank=len(edges)
+        to_drop=start
+        while to_visit:
+            current=to_visit.pop()
+            try:
+                current_edges=edgegraph[current]
+            except KeyError:
+                import ipdb;ipdb.set_trace()
+            visited.append(current)
+            
+            #add new points to to_visit
+            to_visit.update([e for e in current_edges if e not in visited])
+
+            #Select the current node for removal if lower weight or same weight
+            # and more connections
+            if weights[current] < minw:
+                minw=weights[current]
+                to_drop=current
+            elif weights[current]==minw and len(current_edges)> rank:
+                to_drop=current
+
+        return to_drop
 
     def drop(self, node):
         """ Remove node from graph, return all nodes that conflicted with it """
