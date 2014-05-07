@@ -109,6 +109,8 @@ class Manager(object):
         for i in range(len(mech.x)):
             t=Target(type=mech.type[i])
             t.hole=Hole(mech.x[i],mech.y[i],mech.z[i],mech.d[i],t)
+            if t.is_standard:
+                t.id='STANDARD'
             self.plate_holes.append(t)
 
     def load(self, file):
