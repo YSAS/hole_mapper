@@ -9,7 +9,7 @@ from target import Target,ConflictDummy
 from target import GUIDEREF_TYPE, GUIDE_TYPE, ACQUISITION_TYPE, SH_TYPE
 from graphcollide import build_overlap_graph_cartesian
 from dimensions import PLATE_TARGET_RADIUS_LIMIT
-from readerswriters import _parse_header_row, _parse_record_row
+from readerswriters import _parse_header_row, _parse_record_row, _dictlist_to_records
 from errors import ConstraintError
 import numpy as np
 import re
@@ -121,6 +121,16 @@ class FieldCatalog(object):
 
     def get_info_dict(self):
         """ return a dictionary of field information """
+
+        sh_dict=self.sh.info
+        sh_dict.pop('field', None)
+        sh_dict.pop('type', None)
+        sh_dict.pop('dec', None)
+        sh_dict.pop('ra', None)
+        sh_dict.pop('priority', None)
+        sh_rec=_dictlist_to_records([sh_dict],
+                                    ['id','epoch','pm_ra','pm_dec'])
+
         ret={'name':self.name,
              'file':self.file,
              'obsdate':str(self.obsdate),
@@ -129,7 +139,9 @@ class FieldCatalog(object):
                                              self.holesxy_info.el),
              '(ha, st)':'{:3f} {:3f}'.format(self.holesxy_info.ha,
                                              self.holesxy_info.st),
-             'airmass':'{:2f}'.format(self.holesxy_info.airmass)}
+             'airmass':'{:2f}'.format(self.holesxy_info.airmass),
+             'sh_hdr':sh_rec[0][:-1], #remove the /n
+             'sh_rec':sh_rec[1][:-1]}
 
         for k,v in self.user.iteritems():
             if k in ret:
