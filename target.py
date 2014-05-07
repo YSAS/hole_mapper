@@ -39,8 +39,8 @@ class Target(object):
         self.ra=RA(kwargs.pop('ra',0.0))
         self.dec=Dec(kwargs.pop('dec',0.0))
         self.epoch=float(kwargs.pop('epoch',2000.0))
-        self.pm_ra=kwargs.pop('pm_ra',0.0)
-        self.pm_dec=kwargs.pop('pm_dec',0.0)
+        self.pm_ra=float(kwargs.pop('pm_ra',0.0))
+        self.pm_dec=float(kwargs.pop('pm_dec',0.0))
         self.id=kwargs.pop('id','')
         self.priority=float(kwargs.pop('priority',0.0))
         self.type=kwargs.pop('type','')
@@ -213,6 +213,8 @@ class Target(object):
         ret={'id':self.id,
              'ra':self.ra.sexstr,
              'dec':self.dec.sexstr,
+             'pm_ra':'{:7.4f}'.format(self.pm_ra),
+             'pm_dec':'{:7.4f}'.format(self.pm_dec),
              'epoch':'{:6.1f}'.format(self.epoch),
              'priority':'{:.2f}'.format(self.priority),
              'type':self.type}

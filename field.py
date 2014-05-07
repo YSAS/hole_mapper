@@ -1,5 +1,6 @@
 from collections import defaultdict
 import os
+from astropy.time import Time
 from jbastro.astroLib import sexconvert
 from datetime import datetime
 import holesxy
@@ -93,15 +94,34 @@ class FieldCatalog(object):
         ras=[t.ra.float for t in targs]
         decs=[t.dec.float for t in targs]
         
-        #TODO: Update ra & dec with proper motions here
+        pmra=[t.pm_ra for t in targs]
+        pmdec=[t.pm_dec for t in targs]
+        
+
+        #compute  time delta for each tar
+        obtime=Time(self.obsdate,scale='utc')
+        delta=[obtime-Time('J{}'.format(t.epoch) if t.epoch!=1950 else
+                           'B{}'.format(t.epoch), scale='utc') for t in targs]
+        
+        for i in range(len(targs)):
+            conversion=delta[i].value/365.0/3600.0
+            ras[i]+=pmra[i]*conversion
+            decs[i]+=pmdec[i]*conversion
+        
+        
+        #Correct sh pm
+        shdelta=obtime-Time('J{}'.format(t.epoch) if self.sh.epoch!=1950 else
+                            'B{}'.format(t.epoch), scale='utc')
+        field_ra=self.sh.ra.float+self.sh.pm_ra*shdelta.value/365.0/3600.0
+        field_dec=self.sh.dec.float+self.sh.pm_dec*shdelta.value/365.0/3600.0
         
         epochs=[t.epoch for t in targs]
         targ_types=[t.type for t in targs]
         
         guide_ndxs=[i for i,t in enumerate(targ_types) if t=='G']
         
-        pos, guideref, info=holesxy.compute_hole_positions(self.sh.ra.float,
-                                self.sh.dec.float, self.sh.epoch,self.obsdate,
+        pos, guideref, info=holesxy.compute_hole_positions(field_ra,
+                                field_dec, self.sh.epoch, self.obsdate,
                                 ras, decs, epochs, targ_types)
         
         #Store the info
