@@ -15,7 +15,7 @@ def _defdict(dic,default='-'):
 
 def _format_attrib_nicely(itemdict):
     items=[item for item in itemdict.iteritems() ]
-    key_col_wid=max([len(k[1]) for k in items])+6
+    key_col_wid=max([len(k) for k,v in items])+6
     
     items.sort(key=lambda x:x[0])
     
