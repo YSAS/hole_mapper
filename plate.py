@@ -36,6 +36,10 @@ class Plate(object):
         return ([h for f in self.fields for h in f.holes]+
                 [h for t in self.plate_holes for h in t.holes])
 
+    @property
+    def file_version(self):
+        return '1.0'
+
 def load_dotplate(filename):
 
     #Read file
