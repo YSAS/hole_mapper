@@ -122,15 +122,13 @@ class Setup(object):
         self.field=self.plate.get_field(setupdef.fieldname)
         
         #Fetch cassettes
-        self.cassette_config=CassetteConfig(usableR=config.r.active_fibers,
-                                            usableB=config.b.active_fibers)
+        self.cassette_config=CassetteConfig(usable=config)
 
     def reset(self):
         self.config=get_config(self.config.name)
         for t in self.field.skys+self.field.targets:
             t.reset_assignment()
-        self.cassette_config=CassetteConfig(usableR=self.config.r.active_fibers,
-                                            usableB=self.config.b.active_fibers)
+        self.cassette_config=CassetteConfig(usable=self.config)
 
     @property
     def info(self):
@@ -172,7 +170,7 @@ class Setup(object):
     def n_usable_fibers(self):
         """number of fibers usable when instrument configured for this setup"""
         #TODO: Implement
-        return 256
+        return self.cassette_config.n_r_usable+self.cassette_config.n_b_usable
 
     @property
     def n_needed_fibers(self):

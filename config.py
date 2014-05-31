@@ -54,6 +54,13 @@ def _config_dict_from_dotsetup_dict(section_dict, side):
     
     get_key= lambda d, key, side : d.get(key+side, d.get(key, None))
     
+    
+    def get_active_fibers_key(d, n, side):
+        return d.get('active_fibers{}{}'.format(n,side),
+                     d.get('active_fibers{}'.format(n),
+                           d.get('active_fibers{}'.format(side),
+                                 d.get('active_fibers', None))))
+    
     conf_name=get_key(section_dict, 'config', side)
     if conf_name:
         return get_config(conf_name, side)
@@ -63,7 +70,14 @@ def _config_dict_from_dotsetup_dict(section_dict, side):
             'binning':get_key(section_dict, 'binning',side),
             'filter':get_key(section_dict, 'filter',side),
             'slit':get_key(section_dict, 'slit',side),
-            'active_fibers':get_key(section_dict, 'active_fibers',side),
+            'active_fibers1':get_active_fibers_key(section_dict,1,side),
+            'active_fibers2':get_active_fibers_key(section_dict,2,side),
+            'active_fibers3':get_active_fibers_key(section_dict,3,side),
+            'active_fibers4':get_active_fibers_key(section_dict,4,side),
+            'active_fibers5':get_active_fibers_key(section_dict,5,side),
+            'active_fibers6':get_active_fibers_key(section_dict,5,side),
+            'active_fibers7':get_active_fibers_key(section_dict,7,side),
+            'active_fibers8':get_active_fibers_key(section_dict,8,side),
             'n_amps':get_key(section_dict, 'n_amps',side),
             'speed':get_key(section_dict, 'speed',side)}
     
@@ -73,8 +87,22 @@ def _config_dict_from_dotsetup_dict(section_dict, side):
     else:
         config['loel']=get_key(section_dict, 'loel', side)
 
-    config['active_fibers']=tuple(map(lambda x: bool(int(x)),
-                                      config['active_fibers'].split(',')))
+    config['active_fibers1']=tuple(map(lambda x: bool(int(x)),
+                                       config['active_fibers1'].split(',')))
+    config['active_fibers2']=tuple(map(lambda x: bool(int(x)),
+                                       config['active_fibers2'].split(',')))
+    config['active_fibers3']=tuple(map(lambda x: bool(int(x)),
+                                       config['active_fibers3'].split(',')))
+    config['active_fibers4']=tuple(map(lambda x: bool(int(x)),
+                                       config['active_fibers4'].split(',')))
+    config['active_fibers5']=tuple(map(lambda x: bool(int(x)),
+                                       config['active_fibers5'].split(',')))
+    config['active_fibers6']=tuple(map(lambda x: bool(int(x)),
+                                       config['active_fibers6'].split(',')))
+    config['active_fibers7']=tuple(map(lambda x: bool(int(x)),
+                                       config['active_fibers7'].split(',')))
+    config['active_fibers8']=tuple(map(lambda x: bool(int(x)),
+                                       config['active_fibers8'].split(',')))
 
     return config
 
@@ -93,7 +121,14 @@ class M2FSConfig(object):
 
 class M2FSArmConfig(object):
     def __init__(self, mode=None, slit=None, loel=None,
-                 hiaz=None, hiel=None, active_fibers=None,
+                 hiaz=None, hiel=None, active_fibers1=None,
+                 active_fibers2=None,
+                 active_fibers3=None,
+                 active_fibers4=None,
+                 active_fibers5=None,
+                 active_fibers6=None,
+                 active_fibers7=None,
+                 active_fibers8=None,
                  binning=None, filter=None, n_amps=None, speed=None):
         
         self.mode=mode.lower()
@@ -113,8 +148,15 @@ class M2FSArmConfig(object):
         self.speed=speed
         self.n_amps=n_amps
         
-        self.active_fibers=active_fibers
-        
+        self.active_fibers={1:tuple(map(bool,active_fibers1)),
+                            2:tuple(map(bool,active_fibers2)),
+                            3:tuple(map(bool,active_fibers3)),
+                            4:tuple(map(bool,active_fibers4)),
+                            5:tuple(map(bool,active_fibers5)),
+                            6:tuple(map(bool,active_fibers6)),
+                            7:tuple(map(bool,active_fibers7)),
+                            8:tuple(map(bool,active_fibers8))}
+
         lowerfilt=[f.lower() for f in KNOWN_FILTERS]
         try:
             ndx=lowerfilt.index(filter.lower())

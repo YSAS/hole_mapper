@@ -89,7 +89,7 @@ def _configure_possible_cassettes_names(setups):
         _log.info('Assigning > 2')
         for s in setups[1:]:
             if (s.config.r.active_fibers != setups[0].config.r.active_fibers or
-                s.config.r.active_fibers != setups[0].config.r.active_fibers):
+                s.config.b.active_fibers != setups[0].config.b.active_fibers):
                 raise AssignmentConstraintError("Setups do not all use the "
                                                 "same set of active fibers")
         

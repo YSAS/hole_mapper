@@ -270,29 +270,27 @@ class Cassette(object):
 
 class CassetteConfig(object):
     """ A set of M2FS cassettes"""
-    def __init__(self, usable=None, usableR=None, usableB=None):
-        if usable:
-            assert len(usable)==16
-            assert not usableR
-            assert not usableB
-            usableR=usableB=usable
-        else:
-            if not usableR:
-                usableR=(True,)*16
-            if not usableB:
-                usableB=(True,)*16
-
-        assert len(usableR)==16
-        assert len(usableB)==16
-
+    def __init__(self, usable):
+        """
+        usable must be an object with attributes .r.active_fibers &
+        .b.active_fibers active_fibers must be a dict with keys 1-8 and values 
+        boolean tuples of length 16
+        """
         fiber_stat=_get_fiber_staus()
+        
+        usableR=usable.r.active_fibers
+        usableB=usable.b.active_fibers
         
         self._cassettes=[]
         for name in RED_CASSETTE_NAMES:
-            use=[i+1 for i in range(8) if usableR[i] and fiber_stat[name][i]]
+            offset=0 if name[2].lower()=='l' else 8
+            use=[i+1 for i in range(8)
+                 if usableR[int(name[1])][i+offset] and fiber_stat[name][i]]
             self._cassettes.append(Cassette(name, use))
         for name in BLUE_CASSETTE_NAMES:
-            use=[i+1 for i in range(8) if usableB[i] and fiber_stat[name][i]]
+            offset=0 if name[2].lower()=='l' else 8
+            use=[i+1 for i in range(8)
+                 if usableB[int(name[1])][i+offset] and fiber_stat[name][i]]
             self._cassettes.append(Cassette(name, use))
 
 
