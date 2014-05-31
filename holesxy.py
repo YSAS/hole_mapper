@@ -1,7 +1,5 @@
 import numpy as np
 from jbastro.astroLib import sexconvert
-from m2fsholesxy import m2fsholesxy as m2hxy
-from m2fsholesxy import m2fsholesxyplate as m2hxyplate
 
 CLAY_LONGITUDE=sexconvert(70,42,06.00,dtype=float) #70 42 06.00 in decimal degrees
 CLAY_LATITUDE=sexconvert(-29,00,12.00,dtype=float) #-29 00 12.00 in decimal degrees
@@ -57,6 +55,7 @@ def compute_hole_positions(field_ra,field_dec,field_epoch, date,
 # change         if(type.ne.'F'.and.type.ne.'T') then
 # to         if(type.ne.'F'.and.type.ne.'B') and recompile
     typestars[typestars=='T']='O'
+    from m2fsholesxy import m2fsholesxy as m2hxy
     x,y,z,d,type_out, st,ha,az,el,airmass,nout = m2hxy(ut, utdate, latitude,
           longitude, elevation, rafield, decfield, epochfield, fieldrot,
           rastars, decstars, epochstars, typestars)
@@ -156,6 +155,7 @@ def get_plate_holes(fieldrot=180.0):
 #    nstar=len(rastars)
 #
 #    #Call the fortran code
+#    from m2fsholesxy import m2fsholesxyplate as m2hxyplate
 #    x,y,z,d,type_out = m2hxyplate(rafield, decfield, epochfield, fieldrot,
 #                                  rastars, decstars, epochstars)
 
@@ -194,6 +194,7 @@ def get_plate_holes(fieldrot=180.0):
 #    nstar=len(rastars)
 #
 #    #Call the fortran code
+#    from m2fsholesxy import m2fsholesxyplate as m2hxyplate
 #    x,y,z,r,type_out = m2hxyplate(rafield, decfield, epochfield, fieldrot,
 #                                  rastars, decstars, epochstars)
 #
