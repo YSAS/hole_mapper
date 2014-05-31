@@ -392,7 +392,7 @@ def _filter_for_pluggability(targets):
 #    try:
 #        loc=locals()
 #        globa=globals()
-#        file=os.path.join(SETUP_DIRECTORY,setupname)+'.setup.py'
+#        file=os.path.join(SETUP_DIRECTORY(),setupname)+'.setup.py'
 #        with open(file,'r') as f:
 #            exec(f.read(), globa, loc) #I'm a very bad person
 #        _log.warning('Using custom usable cassette function: {} '.format(file))

@@ -7,10 +7,10 @@ from copy import deepcopy
 
 KNOWN_SLITS=['180','125','95','75','58','45']
 KNOWN_FILTERS=['BK7', 'Mgb_O69',' CalRT_O41','HotJupiter','Mgb_Rev2', 'IanR',
-              'Halpha_Li', 'IanR_O77_80']
+              'Halpha_Li', 'IanR_O77_80','Mgb-Rev2']
 
 def _load_configs():
-    setupfiles=glob(CONFIGDEF_DIRECTORY+'*.configdef')
+    setupfiles=glob(CONFIGDEF_DIRECTORY()+'*.configdef')
     for f in setupfiles:
         cfg=load_dotconfigdef(f)
         _KNOWN_CONFIGS[cfg.name]=cfg
@@ -21,17 +21,19 @@ def load_dotconfigdef(filename):
     #Read file
     with open(filename,'r') as fp:
         lines=[l.strip() for l in fp.readlines()]
+    try:
+        section_dict={}
+        for l in (l for l in lines if l and l[0]!='#'):
+            k,v=l.split('=')
+            assert k.strip() not in section_dict
+            assert v.strip()
+            section_dict[k.strip()]=v.strip()
 
-    section_dict={}
-    for l in (l for l in lines if l and l[0]!='#'):
-        k,v=l.split('=')
-        assert k.strip() not in section_dict
-        assert v.strip()
-        section_dict[k.strip()]=v.strip()
-
-    name=os.path.basename(filename)[:-10]
-    configR=M2FSArmConfig(**_config_dict_from_dotsetup_dict(section_dict,'R'))
-    configB=M2FSArmConfig(**_config_dict_from_dotsetup_dict(section_dict,'B'))
+        name=os.path.basename(filename)[:-10]
+        configR=M2FSArmConfig(**_config_dict_from_dotsetup_dict(section_dict,'R'))
+        configB=M2FSArmConfig(**_config_dict_from_dotsetup_dict(section_dict,'B'))
+    except (ValueError, AssertionError) as e:
+        raise ValueError('Bad config {}: {}'.format(filename,str(e)))
 
     return M2FSConfig(name, configR, configB)
 

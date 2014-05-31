@@ -29,7 +29,7 @@ def _get_fiber_staus():
     {cassettename:8-tuple of booleans with True being good}
     """
     default={n:[True]*8 for n in CASSETTE_NAMES}
-    with open(DEAD_FIBER_FILE,'r') as fp:
+    with open(DEAD_FIBER_FILE(),'r') as fp:
         lines=[l.strip() for l in fp.readlines()]
 
     lines=[l for l in lines if l and not l.startswith('#')]

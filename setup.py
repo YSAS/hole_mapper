@@ -4,7 +4,7 @@ from glob import glob
 from plate import get_plate
 from cassettes import CassetteConfig
 from cassettes import CASSETTE_NAMES, RED_CASSETTE_NAMES, BLUE_CASSETTE_NAMES
-from pathconf import CONFIGDEF_DIRECTORY, SETUP_DIRECTORY
+from pathconf import SETUP_DIRECTORY
 from readerswriters import _dictlist_to_records, _format_attrib_nicely
 from logger import getLogger
 from config import get_config
@@ -47,7 +47,7 @@ def load_dotsetup(file):
 
 
 def _load_setups():
-    setupfiles=glob(SETUP_DIRECTORY+'*.setup')
+    setupfiles=glob(SETUP_DIRECTORY()+'*.setup')
     for f in setupfiles:
         try:
             _KNOWN_SETUPS.update({s.name:s for s in load_dotsetup(f)})
@@ -171,9 +171,8 @@ class Setup(object):
 
     @property
     def n_needed_fibers(self):
-        """number of fibers usable when instrument configured for this setup"""
-        #TODO: Implement
-        return 256
+        """number of fibers desired by the setup's field"""
+        return len(self.field.skys)+len(self.field.targets)
 
     def writemap(self, dir='./'):
         """
