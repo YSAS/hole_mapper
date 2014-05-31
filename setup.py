@@ -135,7 +135,8 @@ class Setup(object):
     @property
     def info(self):
         ret=self.field.info.copy()
-    
+        ret.pop('name',None)
+#        import ipdb;ipdb.set_trace()
         addit={'assign_with':', '.join(s.name for s in self.assign_with),
                'plate':self.plate.name, 'config':self.config.name,
                'name':self.name}
@@ -146,6 +147,10 @@ class Setup(object):
         ret.update(addit)
         
         return ret
+    
+    @property
+    def assign_with(self):
+        return []
     
     @property
     def uses_b_side(self):
@@ -235,7 +240,8 @@ class Setup(object):
     def write(self,dir='./'):
         """ Call to write the outputs after calling assign"""
         self.writemap(dir=dir)
-        self.config.write_plist(self.name+'m2fs', dir=dir)
+        filename=os.path.join(dir,self.name+'.m2fs').replace(':','.')
+        self.config.write_plist(filename)
     
 #        for s in self.assign_with:
 #            s.writemap(dir=dir)

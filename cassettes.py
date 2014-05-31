@@ -311,6 +311,10 @@ class CassetteConfig(object):
         return [c for c in self if c.name == name][0]
 
     @property
+    def n_available(self):
+        return sum(c.n_avail for c in self)
+
+    @property
     def n_r_usable(self):
         return sum(len(c.usable) for c in self if c.name in RED_CASSETTE_NAMES)
 

@@ -16,6 +16,7 @@ import math
 from hole import Hole
 import numpy as np
 from assign import assign
+from pathconf import OUTPUT_DIR
 
 log=getLogger('plateplanner.platemanager')
 
@@ -90,7 +91,7 @@ class Manager(object):
     def save_plug_and_config(self):
         """Write .plug and .m2fs of the loaded setup"""
         for s in self.selected_setups:
-            s.write(dir='./')
+            s.write(dir=OUTPUT_DIR())
 
     def _draw_hole(self, hole, canvas, color=None, fcolor='White', radmult=1.0):
         

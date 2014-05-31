@@ -188,6 +188,36 @@ def _assign_fibers(setups):
 
     unassignable=[]
 
+    #This is a bit of a hack, which works when not assigning with things
+    #If more targets & skys drilled than have usable fibers, then sort by
+    #priority and discard the lowest
+    #This doesn't respect min sky settings in the pathological case of assigning
+    # multiple setups with each other
+
+    #Frist drop skys
+    if cassettes.n_available< len(unassigned_skys)+len(unassigned_objs):
+        n_skip=len(unassigned_skys)+len(unassigned_objs)-cassettes.n_available
+        #respect priorities
+        unassigned_skys.sort(key=lambda x:x.priority,reverse=True)
+        nbefore=len(unassigned_skys)
+        unassignable+=unassigned_skys[-n_skip:]
+        unassigned_skys=unassigned_skys[:-n_skip]
+        nafter=len(unassigned_skys)
+        _log.warn('Skipping {} of {} '.format(nbefore-nafter,nbefore)+
+                  'sky fibers because there are too many things to plug')
+
+    #Then drop targets if still needed
+    if cassettes.n_available< len(unassigned_skys)+len(unassigned_objs):
+        n_skip=len(unassigned_skys)+len(unassigned_objs)-cassettes.n_available
+        #respect priorities
+        unassigned_objs.sort(key=lambda x:x.priority,reverse=True)
+        nbefore=len(unassigned_objs)
+        unassignable+=unassigned_objs[-n_skip:]
+        unassigned_objs=unassigned_objs[:-n_skip]
+        nafter=len(unassigned_objs)
+        _log.warn('Skipping {} of {} '.format(nbefore-nafter,nbefore)+
+                  'targets fibers because there are too many things to plug')
+
     #assign targets first
     while unassigned_objs:
         #Update cassette availability for each hole (a cassette may have filled)
@@ -206,7 +236,8 @@ def _assign_fibers(setups):
             cassettes.assign(t, t.nearest_usable_cassette)
         else:
             unassignable.append(t)
-            _log.warn('No suitable cassette for {}'.format(t))
+#            import ipdb;ipdb.set_trace()
+            _log.warn('No suitable cassette for targ {}'.format(t))
 
     #Assign skys second
     while unassigned_skys:
@@ -226,7 +257,7 @@ def _assign_fibers(setups):
             cassettes.assign(t, t.nearest_usable_cassette)
         else:
             unassignable.append(t)
-            _log.warn('No suitable cassette for {}'.format(t))
+            _log.warn('No suitable cassette for sky {}'.format(t))
 
 
     ####As many targets as possible have now been assigned to a cassette####

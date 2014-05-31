@@ -1,6 +1,6 @@
 import os.path
 
-ROOT='./'
+ROOT='./plates/'
 
 def PLATE_DIRECTORY():
     return os.path.join(ROOT,'plates')+os.sep
@@ -13,3 +13,6 @@ def SETUP_DIRECTORY():
 
 def DEAD_FIBER_FILE():
     return os.path.join(CONFIGDEF_DIRECTORY(),'deadfibers.txt')
+
+def OUTPUT_DIR():
+    return os.path.join(ROOT,'output')
