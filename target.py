@@ -367,6 +367,7 @@ class Target(object):
         try:
             assert len(self._usable_cassette_names)>0
         except AssertionError:
+            print('updating possible_cassettes to zero.')
             import ipdb;ipdb.set_trace()
 
 

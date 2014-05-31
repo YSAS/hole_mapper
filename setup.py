@@ -29,22 +29,30 @@ def load_dotsetup(file):
         cp.readfp(fp)
     
     setupdefs=[]
-    
-    for section in cp.sections():
-        section_dict=dict(cp.items(section))
-        setupdefs.append(SetupDefinition(file, section_dict.pop('plate'),
-                                         section_dict.pop('field'),
-                                         section_dict.pop('config'),
-                                         section_dict.pop('assign_to'),
-                                         extra=section_dict))
+
+    try:
+        for section in cp.sections():
+            section_dict=dict(cp.items(section))
+            setupdefs.append(SetupDefinition(file, section_dict.pop('plate'),
+                                             section_dict.pop('field'),
+                                             section_dict.pop('config'),
+                                             section_dict.pop('assign_to'),
+                                             extra=section_dict))
+    except KeyError as e:
+        err='File {}: Key {} missing from setup {}'.format(file, e.message,
+                                                           section)
+        log.error(err)
+        raise IOError(err)
     return setupdefs
 
 
 def _load_setups():
     setupfiles=glob(SETUP_DIRECTORY+'*.setup')
     for f in setupfiles:
-        _KNOWN_SETUPS.update({s.name:s for s in load_dotsetup(f)})
-
+        try:
+            _KNOWN_SETUPS.update({s.name:s for s in load_dotsetup(f)})
+        except IOError:
+            pass
 
 def get_setup(setupname):
     try:

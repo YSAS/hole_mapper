@@ -147,7 +147,10 @@ def _parse_record_row(rec, keys, user_keys, REQUIRED=[]):
     vals=rec.split()
     
     #Number of values in the row must match the number of keys
-    assert len(vals)==len(keys)
+    try:
+        assert len(vals)==len(keys)
+    except AssertionError:
+        raise ValueError('Parse fail: {}::{}::{}'.format(rec,keys,user_keys))
     
     #Create the dictionary
     rdict={keys[i].lower():vals[i] for i in range(len(keys))
