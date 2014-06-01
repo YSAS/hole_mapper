@@ -193,30 +193,54 @@ def _assign_fibers(setups):
     #priority and discard the lowest
     #This doesn't respect min sky settings in the pathological case of assigning
     # multiple setups with each other
+#    import ipdb;ipdb.set_trace()
 
-    #Frist drop skys
-    if cassettes.n_available< len(unassigned_skys)+len(unassigned_objs):
-        n_skip=len(unassigned_skys)+len(unassigned_objs)-cassettes.n_available
-        #respect priorities
-        unassigned_skys.sort(key=lambda x:x.priority,reverse=True)
-        nbefore=len(unassigned_skys)
-        unassignable+=unassigned_skys[-n_skip:]
-        unassigned_skys=unassigned_skys[:-n_skip]
-        nafter=len(unassigned_skys)
-        _log.warn('Skipping {} of {} '.format(nbefore-nafter,nbefore)+
-                  'sky fibers because there are too many things to plug')
+    n_skip=len(unassigned_skys)+len(unassigned_objs)-cassettes.n_available
+    
+    #First drop skys
+    if n_skip > 0:
+        for s in setups:
+            skys=[sk for sk in unassigned_skys if sk in s.field.skys]
+            #Drop as many as we can while respecting minsky
+            todrop=max(min(len(skys)-s.minsky, n_skip),0)
+            #respect priorities
+            skys.sort(key=lambda x:x.priority)
+            
+            unassignable+=skys[:todrop]
+            for sk in skys[:todrop]:
+                try:
+                    unassigned_skys.remove(sk)
+                except ValueError:
+                    pass
+            _log.warn('Dropping {} of {} skys in {} '.format(todrop, len(skys),
+                                                       s.name)+
+                      'because there are too many things to plug.')
+            n_skip-=todrop
+            if n_skip <1:
+                break
 
     #Then drop targets if still needed
-    if cassettes.n_available< len(unassigned_skys)+len(unassigned_objs):
-        n_skip=len(unassigned_skys)+len(unassigned_objs)-cassettes.n_available
-        #respect priorities
-        unassigned_objs.sort(key=lambda x:x.priority,reverse=True)
-        nbefore=len(unassigned_objs)
-        unassignable+=unassigned_objs[-n_skip:]
-        unassigned_objs=unassigned_objs[:-n_skip]
-        nafter=len(unassigned_objs)
-        _log.warn('Skipping {} of {} '.format(nbefore-nafter,nbefore)+
-                  'targets fibers because there are too many things to plug')
+    if n_skip > 0:
+        for s in setups:
+            objs=[t for t in unassigned_objs if t in s.field.targets]
+            #Drop as many as we must
+            todrop=n_skip
+            #respect priorities
+            objs.sort(key=lambda x:x.priority)
+            
+            unassignable+=objs[:todrop]
+            for t in objs[:todrop]:
+                try:
+                    unassigned_objs.remove(t)
+                except ValueError:
+                    pass
+            _log.warn('Dropping {} of {} targets in {} '.format(todrop,
+                                                               len(objs),
+                                                               s.name)+
+                      'because there are too many things to plug.')
+            n_skip-=todrop
+            if n_skip <1:
+                break
 
     #assign targets first
     while unassigned_objs:

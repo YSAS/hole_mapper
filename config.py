@@ -30,8 +30,10 @@ def load_dotconfigdef(filename):
             section_dict[k.strip()]=v.strip()
 
         name=os.path.basename(filename)[:-10]
-        configR=M2FSArmConfig(**_config_dict_from_dotsetup_dict(section_dict,'R'))
-        configB=M2FSArmConfig(**_config_dict_from_dotsetup_dict(section_dict,'B'))
+        kwords=_config_dict_from_dotsetup_dict(section_dict,'R')
+        configR=M2FSArmConfig('R', **kwords)
+        kwords=_config_dict_from_dotsetup_dict(section_dict,'B')
+        configB=M2FSArmConfig('B', **kwords)
     except (ValueError, AssertionError) as e:
         raise ValueError('Bad config {}: {}'.format(filename,str(e)))
 
@@ -120,7 +122,7 @@ class M2FSConfig(object):
 
 
 class M2FSArmConfig(object):
-    def __init__(self, mode=None, slit=None, loel=None,
+    def __init__(self, side, mode=None, slit=None, loel=None,
                  hiaz=None, hiel=None, active_fibers1=None,
                  active_fibers2=None,
                  active_fibers3=None,
@@ -130,6 +132,8 @@ class M2FSArmConfig(object):
                  active_fibers7=None,
                  active_fibers8=None,
                  binning=None, filter=None, n_amps=None, speed=None):
+        
+        self.side=side.upper()
         
         self.mode=mode.lower()
         if self.mode not in ['hires', 'lores']:

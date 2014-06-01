@@ -146,7 +146,7 @@ class App(Tkinter.Tk):
         #Basic window stuff
         swid=120
         bhei=55
-        whei=735
+        whei=935
         chei=whei-bhei
         wwid=chei+swid
         self.geometry("%ix%i"%(wwid,whei))
@@ -162,8 +162,8 @@ class App(Tkinter.Tk):
 
         #The canvas for drawing the plate        
         self.canvas=BetterCanvas.BetterCanvas(self, chei, chei,
-                                              1.01*PLATE_RADIUS,
-                                              1.01*PLATE_RADIUS,
+                                              1.05*PLATE_RADIUS,
+                                              1.05*PLATE_RADIUS,
                                               bg='White')
         self.canvas.place(x=swid,y=0)
         self.canvas.bind("<Button-1>", self.canvasclick)
@@ -235,7 +235,7 @@ class App(Tkinter.Tk):
         self.show()
 
     def make_plug(self):
-        self.manager.save_plug_and_config()
+        self.manager.save_plug_and_config(self.canvas)
 
 
 class PopupWindow(object):

@@ -88,10 +88,16 @@ class Manager(object):
              if h.id in holeIDs]
         return ret
 
-    def save_plug_and_config(self):
-        """Write .plug and .m2fs of the loaded setup"""
+    def save_plug_and_config(self, canvas=None):
+        """Write .plug and .m2fs of the loaded setup
+        saves an eps of the canvas if passed
+        """
         for s in self.selected_setups:
             s.write(dir=OUTPUT_DIR())
+        if canvas:
+            fname='_'.join([s.name for s in self.selected_setups])
+            file=os.path.join(OUTPUT_DIR(),fname+'.eps').replace(':','-')
+            canvas.postscript(file=file, colormode='color')
 
     def _draw_hole(self, hole, canvas, color=None, fcolor='White', radmult=1.0):
         
@@ -113,6 +119,10 @@ class Manager(object):
         #Make a circle of appropriate size in the window
         canvas.drawCircle( (0,0) , PLATE_RADIUS)
         canvas.drawCircle( (0,0) , SH_RADIUS)
+        
+        for i, setup in enumerate(self.selected_setups):
+            canvas.drawText((0,PROJ_PLATE_LABEL_Y-(i)*0.05*PLATE_RADIUS),
+                            setup.name, color=guide_color(i),center=0)
         
         setup=self.selected_setups[0]
         

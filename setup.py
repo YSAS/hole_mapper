@@ -117,6 +117,8 @@ class Setup(object):
         self.assign_to=setupdef.assign_to
 
         self.plate=plate
+        
+        self.setupdef=setupdef
 
         #Fetch Field from plate
         self.field=self.plate.get_field(setupdef.fieldname)
@@ -129,6 +131,10 @@ class Setup(object):
         for t in self.field.skys+self.field.targets:
             t.reset_assignment()
         self.cassette_config=CassetteConfig(usable=self.config)
+
+    @property
+    def minsky(self):
+        return int(self.field.info.get('minsky',0))
 
     @property
     def info(self):
@@ -191,9 +197,8 @@ class Setup(object):
         header
         records
         """
-        filename='{}.fibermap'.format(self.name)
-
-        with open(os.path.join(dir, filename),'w') as fp:
+        filename=os.path.join(dir, '{}.fibermap'.format(self.name)).replace(':','-')
+        with open(filename,'w') as fp:
     
             fp.write("[setup]\n")
 
@@ -238,7 +243,7 @@ class Setup(object):
     def write(self,dir='./'):
         """ Call to write the outputs after calling assign"""
         self.writemap(dir=dir)
-        filename=os.path.join(dir,self.name+'.m2fs').replace(':','.')
+        filename=os.path.join(dir,self.name+'.m2fs').replace(':','-')
         self.config.write_plist(filename)
     
 #        for s in self.assign_with:
