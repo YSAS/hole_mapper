@@ -1,8 +1,9 @@
 from target import Target
 from field import Field
 import os.path
-
+from logger import getLogger
 from pathconf import PLATE_DIRECTORY
+from glob import glob
 
 from readerswriters import _parse_header_row, _parse_record_row
 
@@ -16,7 +17,10 @@ REQUIRED_STANDARDS_SECTION_KEYS=['ra', 'dec', 'epoch', 'id', 'type', 'priority',
 REQUIRED_PLATE_RECORD_ENTRIES=['ra', 'dec', 'epoch', 'id', 'type', 'priority',
                                'pm_ra','pm_dec','x','y','z']
 
+_log=getLogger('plate')
 
+class PlateError(Exception):
+    pass
 
 class Plate(object):
     def __init__(self, info_dict, plate_holes, fields):
@@ -58,67 +62,88 @@ def load_dotplate(filename):
         if l[0] =='[':
             #Check formatting
             if not l.endswith(']') or not l[1:-1]:
-                raise Exception('Bad section name '
-                                'l{}: {}'.format(lines.index(l),l))
+                err='{} - Bad section name l{}: {}'.format(
+                      os.path.basename(filename), lines.index(l), l)
+                raise PlateError(err)
             curr_section=l[1:-1].lower()
             sections[curr_section]={'lines':[]}
         else:
             if curr_section==None:
-                raise Exception('Section must start with []')
+                err='{} - Section must start with []'
+                raise PlateError(err.format(os.path.basename(filename)))
             sections[curr_section]['lines'].append(l)
 
-    #Process sections
-    for sec_name, sec in sections.items():
-        if '=' in sec['lines'][0]:
-            #Section is key value pairs
-            d={}
-            for l in sec['lines']:
-                k,v=l.split('=')
-                d[k.strip()]=v.strip()
-            sec['processed']=d
-        else:
-            #Section is dictlist records
-            if 'undrilled' in sec_name:
-                req=REQUIRED_UNDRILLED_SECTION_KEYS
-            elif 'plateholes' == sec_name:
-                req=REQUIRED_PLATEHOLE_SECTION_KEYS
-            elif 'standards' in sec_name:
-                req=REQUIRED_STANDARDS_SECTION_KEYS
+    try:
+        #Process sections
+        for sec_name, sec in sections.items():
+            if '=' in sec['lines'][0]:
+                #Section is key value pairs
+                d={}
+                for l in sec['lines']:
+                    k,v=l.split('=')
+                    d[k.strip()]=v.strip()
+                sec['processed']=d
             else:
-                req=REQUIRED_DRILLED_SECTION_KEYS
+                #Section is dictlist records
+                if 'undrilled' in sec_name:
+                    req=REQUIRED_UNDRILLED_SECTION_KEYS
+                elif 'plateholes' == sec_name:
+                    req=REQUIRED_PLATEHOLE_SECTION_KEYS
+                elif 'standards' in sec_name:
+                    req=REQUIRED_STANDARDS_SECTION_KEYS
+                else:
+                    req=REQUIRED_DRILLED_SECTION_KEYS
 
-            keys=_parse_header_row(sec['lines'][0], REQUIRED=req)
-            user_keys=[k for k in keys if k not in req]
+                keys=_parse_header_row(sec['lines'][0], REQUIRED=req)
+                user_keys=[k for k in keys if k not in req]
 
-            dicts=[]
-            for l in sec['lines'][1:]:
-                #TODO: Check for required values?
-                dicts.append(_parse_record_row(l, keys, user_keys))
-            sec['processed']=dicts
-    
-    #Create the plate
-    
-    #Plateholes
-    plate_holes=[Target(**r) for r in sections['plateholes']['processed']]
+                dicts=[]
+                for l in sec['lines'][1:]:
+                    #TODO: Check for required values?
+                    dicts.append(_parse_record_row(l, keys, user_keys))
+                sec['processed']=dicts
+        
+        #Create the plate
+        
+        #Plateholes
+        plate_holes=[Target(**r) for r in sections['plateholes']['processed']]
 
-    #Fields
-    fields=[]
-    field_sec_names=[k for k in sections if 'field' in k and ':' not in k]
-    for fsec in field_sec_names:
-        field_dict=sections[fsec]['processed']
-        undrilled=map(lambda x: Target(**x),
-                      sections[fsec+':undrilled']['processed'])
-        drilled=map(lambda x: Target(**x),
-                    sections[fsec+':drilled']['processed'])
-        standards=map(lambda x: Target(**x),
-                    sections[fsec+':standards']['processed'])
-        fields.append(Field(field_dict, drilled, undrilled, standards))
+        #Fields
+        fields=[]
+        field_sec_names=[k for k in sections if 'field' in k and ':' not in k]
+        for fsec in field_sec_names:
+            field_dict=sections[fsec]['processed']
+            undrilled=map(lambda x: Target(**x),
+                          sections[fsec+':undrilled']['processed'])
+            drilled=map(lambda x: Target(**x),
+                        sections[fsec+':drilled']['processed'])
+            standards=map(lambda x: Target(**x),
+                        sections[fsec+':standards']['processed'])
+            fields.append(Field(field_dict, drilled, undrilled, standards))
 
-    #Finally the plate
-    return Plate(sections['plate']['processed'], plate_holes, fields)
+        #Finally the plate
+        return Plate(sections['plate']['processed'], plate_holes, fields)
+
+    except Exception as e:
+        raise PlateError(str(e))
 
 def get_plate(platename):
     try:
         return load_dotplate(os.path.join(PLATE_DIRECTORY(),platename)+'.plate')
     except IOError:
         raise ValueError("Unknown plate '{}'.".format(platename))
+
+def get_all_plate_names():
+    """ dict of plate names to files"""
+    ret={}
+    _log.info('Looking for plates in {}'.format(PLATE_DIRECTORY()))
+    files=glob(PLATE_DIRECTORY()+'*.plate')
+    print files, os.getcwd()
+    for file in files:
+        if os.path.basename(file).lower() not in ['none.plate', 'sample.plate']:
+            try:
+                p=load_dotplate(file)
+                ret[p.name]=file
+            except (IOError, PlateError) as e:
+                _log.warn('Skipped {} due to {}'.format(file,str(e)))
+    return ret

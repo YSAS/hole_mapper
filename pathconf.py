@@ -16,3 +16,6 @@ def DEAD_FIBER_FILE():
 
 def OUTPUT_DIR():
     return os.path.join(ROOT,'output')
+
+def PLUGMAP_DIRECTORY():
+    return OUTPUT_DIR()

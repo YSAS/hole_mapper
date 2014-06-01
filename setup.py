@@ -8,6 +8,7 @@ from pathconf import SETUP_DIRECTORY
 from readerswriters import _dictlist_to_records, _format_attrib_nicely
 from logger import getLogger
 from config import get_config
+from assign import assign
 
 log = getLogger('setup')
 
@@ -77,7 +78,7 @@ def get_setup(setupname):
 
     return Setup(setup_def, plate, config)
 
-def get_setups_for_plate(platename):
+def get_setup_names_for_plate(platename):
     _load_setups()
     return [name for name, sdef in _KNOWN_SETUPS.items()
             if sdef.platename==platename]
@@ -131,7 +132,7 @@ class Setup(object):
         for t in self.field.skys+self.field.targets:
             t.reset_assignment()
         self.cassette_config=CassetteConfig(usable=self.config)
-
+        
     @property
     def minsky(self):
         return int(self.field.info.get('minsky',0))
@@ -216,6 +217,22 @@ class Setup(object):
                     return {'fiber':fiber.name,'id':'unassigned'}
                 else:
                     return fiber.target.dict
+
+            def dicter2(fiber):
+                """ convert a fiber assignment into a dictlist record """
+                if not fiber.target:
+                    return {'fiber':fiber.name,'id':'unplugged'}
+                elif fiber.target not in self.field.all_targets:
+                    return {'fiber':fiber.name,'id':'unassigned'}
+                else:
+                    return fiber.target.dict
+
+            #verify bug wasn't a problem
+            bug=[dicter(f)==dicter2(f) for f in self.cassette_config.fibers]
+            try:
+                assert sum(bug)==len(bug)
+            except AssertionError:
+                import ipdb;ipdb.set_trace()
 
             #Grab fibers
             dl=[dicter(f) for f in self.cassette_config.fibers]
