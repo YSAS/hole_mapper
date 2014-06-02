@@ -2,7 +2,7 @@ from ConfigParser import RawConfigParser
 import os.path
 from glob import glob
 from plate import get_plate
-from cassettes import CassetteConfig
+from cassettes import CassetteConfig, DEAD_FIBERS
 from cassettes import CASSETTE_NAMES, RED_CASSETTE_NAMES, BLUE_CASSETTE_NAMES
 from pathconf import SETUP_DIRECTORY
 from readerswriters import _dictlist_to_records, _format_attrib_nicely
@@ -207,6 +207,7 @@ class Setup(object):
             d=self.info
             import datetime
             d['mapdate']=str(datetime.datetime.now())
+            d['deadfibers']=', '.join(DEAD_FIBERS())
             for r in _format_attrib_nicely(d):
                 fp.write(r)
     

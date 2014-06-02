@@ -22,6 +22,21 @@ def rangify(data):
             str_list.append('%d' % ilist[0])
     return ', '.join(str_list)
 
+def DEAD_FIBERS():
+    with open(DEAD_FIBER_FILE(),'r') as fp:
+        lines=[l.strip() for l in fp.readlines()]
+
+    dead=[]
+    for l in (l for l in lines if l and not l.startswith('#')):
+        cass,_,deads=l.partition(' ')
+        assert (len(cass)==2 and
+                cass[0].upper() in 'RB' and
+                cass[1] in '12345678')
+        deads=map(int, re.split('\W+',deads))
+        for d in (d for d in deads if d>0 and d<17):
+            dead.append('{}-{:02}'.format(cass,d))
+    return tuple(dead)
+
 def _get_fiber_staus():
     """
     returns a dict
@@ -345,6 +360,9 @@ class CassetteConfig(object):
 
     @property
     def fibers(self):
-        return [f for c in self for f in c.fibers.values()]
+        ret=[f for c in self for f in c.fibers.values()]
+        import ipdb;ipdb.set_trace()
+        ret.sort(key=lambda x:x.name)
+        return ret
 
 
