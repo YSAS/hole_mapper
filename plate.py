@@ -138,7 +138,6 @@ def get_all_plate_names():
     ret={}
     _log.info('Looking for plates in {}'.format(PLATE_DIRECTORY()))
     files=glob(PLATE_DIRECTORY()+'*.plate')
-    print files, os.getcwd()
     for file in files:
         if os.path.basename(file).lower() not in ['none.plate', 'sample.plate']:
             try:

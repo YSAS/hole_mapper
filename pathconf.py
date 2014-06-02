@@ -15,7 +15,7 @@ def DEAD_FIBER_FILE():
     return os.path.join(CONFIGDEF_DIRECTORY(),'deadfibers.txt')
 
 def OUTPUT_DIR():
-    return os.path.join(ROOT,'output')
+    return os.path.join(ROOT,'output')+os.sep
 
-def PLUGMAP_DIRECTORY():
+def FIBERMAP_DIRECTORY():
     return OUTPUT_DIR()

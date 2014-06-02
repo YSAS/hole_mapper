@@ -166,9 +166,9 @@ def _parse_record_row(rec, keys, user_keys, REQUIRED=[]):
         assert k in rdict
     
     #Enforce cannonical RA & DEC format
-    if 'ra' in keys:
+    if 'ra' in rdict:
         rdict['ra'] = sexconvert(rdict['ra'],dtype=float,ra=True)
-    if 'dec' in keys:
+    if 'dec' in rdict:
         rdict['dec'] = sexconvert(rdict['dec'],dtype=float)
     
     #Set a priority if one isn't set
@@ -179,7 +179,7 @@ def _parse_record_row(rec, keys, user_keys, REQUIRED=[]):
     if 'id' in keys and 'id' not in rdict:
         rdict['id'] = _generate_default_id(rdict)
 
-    if 'type' in keys:
+    if 'type' in rdict:
         #Force type to be upper case
         rdict['type']=rdict['type'].upper()
     

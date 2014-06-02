@@ -5,6 +5,7 @@ from cassettes import CASSETTE_POSITIONS
 from hole import Hole
 import operator
 from logger import getLogger
+from fiber import Fiber
 
 log=getLogger('target')
 

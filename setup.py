@@ -140,7 +140,8 @@ class Setup(object):
     @property
     def info(self):
         ret=self.field.info.copy()
-        ret.pop('name',None)
+        ret['field']=ret.pop('name')
+        ret['fieldfile']=ret.pop('file')
 #        import ipdb;ipdb.set_trace()
         addit={'assign_with':', '.join(s.name for s in self.assign_with),
                'plate':self.plate.name, 'config':self.config.name,
@@ -203,7 +204,10 @@ class Setup(object):
     
             fp.write("[setup]\n")
 
-            for r in _format_attrib_nicely(self.info):
+            d=self.info
+            import datetime
+            d['mapdate']=str(datetime.datetime.now())
+            for r in _format_attrib_nicely(d):
                 fp.write(r)
     
             #Fibers assigned and unassigned
@@ -211,28 +215,12 @@ class Setup(object):
 
             def dicter(fiber):
                 """ convert a fiber assignment into a dictlist record """
-                if not f.target:
-                    return {'fiber':fiber.name,'id':'unplugged'}
-                elif f.target not in self.field.all_targets:
-                    return {'fiber':fiber.name,'id':'unassigned'}
-                else:
-                    return fiber.target.dict
-
-            def dicter2(fiber):
-                """ convert a fiber assignment into a dictlist record """
                 if not fiber.target:
                     return {'fiber':fiber.name,'id':'unplugged'}
                 elif fiber.target not in self.field.all_targets:
                     return {'fiber':fiber.name,'id':'unassigned'}
                 else:
                     return fiber.target.dict
-
-            #verify bug wasn't a problem
-            bug=[dicter(f)==dicter2(f) for f in self.cassette_config.fibers]
-            try:
-                assert sum(bug)==len(bug)
-            except AssertionError:
-                import ipdb;ipdb.set_trace()
 
             #Grab fibers
             dl=[dicter(f) for f in self.cassette_config.fibers]
