@@ -147,7 +147,10 @@ def _parse_record_row(rec, keys, user_keys, REQUIRED=[]):
     vals=rec.split()
     
     #Number of values in the row must match the number of keys
-    assert len(vals)==len(keys)
+    try:
+        assert len(vals)==len(keys)
+    except AssertionError:
+        raise ValueError('Parse fail: {}::{}::{}'.format(rec,keys,user_keys))
     
     #Create the dictionary
     rdict={keys[i].lower():vals[i] for i in range(len(keys))
@@ -163,9 +166,9 @@ def _parse_record_row(rec, keys, user_keys, REQUIRED=[]):
         assert k in rdict
     
     #Enforce cannonical RA & DEC format
-    if 'ra' in keys:
+    if 'ra' in rdict:
         rdict['ra'] = sexconvert(rdict['ra'],dtype=float,ra=True)
-    if 'dec' in keys:
+    if 'dec' in rdict:
         rdict['dec'] = sexconvert(rdict['dec'],dtype=float)
     
     #Set a priority if one isn't set
@@ -176,7 +179,7 @@ def _parse_record_row(rec, keys, user_keys, REQUIRED=[]):
     if 'id' in keys and 'id' not in rdict:
         rdict['id'] = _generate_default_id(rdict)
 
-    if 'type' in keys:
+    if 'type' in rdict:
         #Force type to be upper case
         rdict['type']=rdict['type'].upper()
     

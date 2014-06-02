@@ -22,6 +22,21 @@ def rangify(data):
             str_list.append('%d' % ilist[0])
     return ', '.join(str_list)
 
+def DEAD_FIBERS():
+    with open(DEAD_FIBER_FILE(),'r') as fp:
+        lines=[l.strip() for l in fp.readlines()]
+
+    dead=[]
+    for l in (l for l in lines if l and not l.startswith('#')):
+        cass,_,deads=l.partition(' ')
+        assert (len(cass)==2 and
+                cass[0].upper() in 'RB' and
+                cass[1] in '12345678')
+        deads=map(int, re.split('\W+',deads))
+        for d in (d for d in deads if d>0 and d<17):
+            dead.append('{}-{:02}'.format(cass,d))
+    return tuple(dead)
+
 def _get_fiber_staus():
     """
     returns a dict
@@ -29,7 +44,7 @@ def _get_fiber_staus():
     {cassettename:8-tuple of booleans with True being good}
     """
     default={n:[True]*8 for n in CASSETTE_NAMES}
-    with open(DEAD_FIBER_FILE,'r') as fp:
+    with open(DEAD_FIBER_FILE(),'r') as fp:
         lines=[l.strip() for l in fp.readlines()]
 
     lines=[l for l in lines if l and not l.startswith('#')]
@@ -270,29 +285,27 @@ class Cassette(object):
 
 class CassetteConfig(object):
     """ A set of M2FS cassettes"""
-    def __init__(self, usable=None, usableR=None, usableB=None):
-        if usable:
-            assert len(usable)==16
-            assert not usableR
-            assert not usableB
-            usableR=usableB=usable
-        else:
-            if not usableR:
-                usableR=(True,)*16
-            if not usableB:
-                usableB=(True,)*16
-
-        assert len(usableR)==16
-        assert len(usableB)==16
-
+    def __init__(self, usable):
+        """
+        usable must be an object with attributes .r.active_fibers &
+        .b.active_fibers active_fibers must be a dict with keys 1-8 and values 
+        boolean tuples of length 16
+        """
         fiber_stat=_get_fiber_staus()
+        
+        usableR=usable.r.active_fibers
+        usableB=usable.b.active_fibers
         
         self._cassettes=[]
         for name in RED_CASSETTE_NAMES:
-            use=[i+1 for i in range(8) if usableR[i] and fiber_stat[name][i]]
+            offset=0 if name[2].lower()=='l' else 8
+            use=[i+1 for i in range(8)
+                 if usableR[int(name[1])][i+offset] and fiber_stat[name][i]]
             self._cassettes.append(Cassette(name, use))
         for name in BLUE_CASSETTE_NAMES:
-            use=[i+1 for i in range(8) if usableB[i] and fiber_stat[name][i]]
+            offset=0 if name[2].lower()=='l' else 8
+            use=[i+1 for i in range(8)
+                 if usableB[int(name[1])][i+offset] and fiber_stat[name][i]]
             self._cassettes.append(Cassette(name, use))
 
 
@@ -309,6 +322,10 @@ class CassetteConfig(object):
 
     def get_cassette(self, name):
         return [c for c in self if c.name == name][0]
+
+    @property
+    def n_available(self):
+        return sum(c.n_avail for c in self)
 
     @property
     def n_r_usable(self):
@@ -343,6 +360,8 @@ class CassetteConfig(object):
 
     @property
     def fibers(self):
-        return [f for c in self for f in c.fibers.values()]
+        ret=[f for c in self for f in c.fibers.values()]
+        ret.sort(key=lambda x:x.name)
+        return ret
 
 

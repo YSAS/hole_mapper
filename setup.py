@@ -2,12 +2,15 @@ from ConfigParser import RawConfigParser
 import os.path
 from glob import glob
 from plate import get_plate
-from cassettes import CassetteConfig
+from cassettes import CassetteConfig, DEAD_FIBERS
 from cassettes import CASSETTE_NAMES, RED_CASSETTE_NAMES, BLUE_CASSETTE_NAMES
-from pathconf import CONFIGDEF_DIRECTORY, SETUP_DIRECTORY
+from pathconf import SETUP_DIRECTORY
 from readerswriters import _dictlist_to_records, _format_attrib_nicely
 from logger import getLogger
 from config import get_config
+from assign import assign
+import hashlib
+import fibermap
 
 log = getLogger('setup')
 
@@ -29,22 +32,30 @@ def load_dotsetup(file):
         cp.readfp(fp)
     
     setupdefs=[]
-    
-    for section in cp.sections():
-        section_dict=dict(cp.items(section))
-        setupdefs.append(SetupDefinition(file, section_dict.pop('plate'),
-                                         section_dict.pop('field'),
-                                         section_dict.pop('config'),
-                                         section_dict.pop('assign_to'),
-                                         extra=section_dict))
+
+    try:
+        for section in cp.sections():
+            section_dict=dict(cp.items(section))
+            setupdefs.append(SetupDefinition(file, section_dict.pop('plate'),
+                                             section_dict.pop('field'),
+                                             section_dict.pop('config'),
+                                             section_dict.pop('assign_to'),
+                                             extra=section_dict))
+    except KeyError as e:
+        err='File {}: Key {} missing from setup {}'.format(file, e.message,
+                                                           section)
+        log.error(err)
+        raise IOError(err)
     return setupdefs
 
 
 def _load_setups():
-    setupfiles=glob(SETUP_DIRECTORY+'*.setup')
+    setupfiles=glob(SETUP_DIRECTORY()+'*.setup')
     for f in setupfiles:
-        _KNOWN_SETUPS.update({s.name:s for s in load_dotsetup(f)})
-
+        try:
+            _KNOWN_SETUPS.update({s.name:s for s in load_dotsetup(f)})
+        except IOError:
+            pass
 
 def get_setup(setupname):
     try:
@@ -69,7 +80,7 @@ def get_setup(setupname):
 
     return Setup(setup_def, plate, config)
 
-def get_setups_for_plate(platename):
+def get_setup_names_for_plate(platename):
     _load_setups()
     return [name for name, sdef in _KNOWN_SETUPS.items()
             if sdef.platename==platename]
@@ -86,6 +97,7 @@ class SetupDefinition(object):
         self.fieldname=fieldname
         self.configname=configname
         self.assign_to=assign_to.lower()
+        self.assign_given=extra.pop('assign_given','')
         if self.assign_to not in ['single', 'any']:
             raise ValueError('Supported values for assign_to are '
                              'single and any. Fix file {}'.format(self.file))
@@ -93,8 +105,13 @@ class SetupDefinition(object):
     
     @property
     def name(self):
-        return '{}:{}:{}'.format(self.platename, self.fieldname,
-                                 self.configname)
+        if self.assign_to!='any' or self.assign_given:
+            hashstr=':'+hashlib.sha1(self.assign_to+
+                                    self.assign_given).hexdigest()[:6]
+        else:
+            hashstr=''
+        return '{}:{}:{}{}'.format(self.platename, self.fieldname,
+                                 self.configname,hashstr)
 
 
 class Setup(object):
@@ -109,25 +126,33 @@ class Setup(object):
         self.assign_to=setupdef.assign_to
 
         self.plate=plate
+        
+        self.setupdef=setupdef
 
         #Fetch Field from plate
         self.field=self.plate.get_field(setupdef.fieldname)
         
         #Fetch cassettes
-        self.cassette_config=CassetteConfig(usableR=config.r.active_fibers,
-                                            usableB=config.b.active_fibers)
+        self.cassette_config=CassetteConfig(usable=config)
 
     def reset(self):
         self.config=get_config(self.config.name)
         for t in self.field.skys+self.field.targets:
             t.reset_assignment()
-        self.cassette_config=CassetteConfig(usableR=self.config.r.active_fibers,
-                                            usableB=self.config.b.active_fibers)
+        self.cassette_config=CassetteConfig(usable=self.config)
+        
+    @property
+    def minsky(self):
+        return int(self.field.info.get('minsky',0))
 
     @property
     def info(self):
         ret=self.field.info.copy()
-    
+        ret['field']=ret.pop('name')
+        ret['fieldfile']=ret.pop('file')
+        if self.setupdef.assign_given:
+            ret['assign_given']= self.setupdef.assign_given
+#        import ipdb;ipdb.set_trace()
         addit={'assign_with':', '.join(s.name for s in self.assign_with),
                'plate':self.plate.name, 'config':self.config.name,
                'name':self.name}
@@ -138,6 +163,31 @@ class Setup(object):
         ret.update(addit)
         
         return ret
+    
+    @property
+    def assign_with(self):
+        return []
+    
+    @property
+    def to_assign(self):
+        """
+        Return a list of skys and targets which should be assigned for this
+        setup. Includes all skys. Exludes targets from assign_given setups
+        
+        """
+        get_map=self.setupdef.assign_given
+        previously=[]
+        while get_map:
+            log.info('Excluding previously assigned from {}'.format(
+                      get_map))
+            fm=fibermap.get_fibermap_for_setup(get_map)
+            previously+=fm.mapping.values()
+            get_map=fm.dict.get('assign_given','')
+        
+        targs=[t for t in self.field.targets if t.id not in previously]
+        return self.field.skys+targs
+    
+    
     
     @property
     def uses_b_side(self):
@@ -159,13 +209,12 @@ class Setup(object):
     def n_usable_fibers(self):
         """number of fibers usable when instrument configured for this setup"""
         #TODO: Implement
-        return 256
+        return self.cassette_config.n_r_usable+self.cassette_config.n_b_usable
 
     @property
     def n_needed_fibers(self):
-        """number of fibers usable when instrument configured for this setup"""
-        #TODO: Implement
-        return 256
+        """number of fibers desired by the setup's field"""
+        return len(self.field.skys)+len(self.field.targets)
 
     def writemap(self, dir='./'):
         """
@@ -181,13 +230,16 @@ class Setup(object):
         header
         records
         """
-        filename='{}.fibermap'.format(self.name)
-
-        with open(os.path.join(dir, filename),'w') as fp:
+        filename=os.path.join(dir, '{}.fibermap'.format(self.name)).replace(':','-')
+        with open(filename,'w') as fp:
     
             fp.write("[setup]\n")
 
-            for r in _format_attrib_nicely(self.info):
+            d=self.info
+            import datetime
+            d['mapdate']=str(datetime.datetime.now())
+            d['deadfibers']=', '.join(DEAD_FIBERS())
+            for r in _format_attrib_nicely(d):
                 fp.write(r)
     
             #Fibers assigned and unassigned
@@ -195,9 +247,9 @@ class Setup(object):
 
             def dicter(fiber):
                 """ convert a fiber assignment into a dictlist record """
-                if not f.target:
+                if not fiber.target:
                     return {'fiber':fiber.name,'id':'unplugged'}
-                elif f.target not in self.field.all_targets:
+                elif fiber.target not in self.field.all_targets:
                     return {'fiber':fiber.name,'id':'unassigned'}
                 else:
                     return fiber.target.dict
@@ -228,7 +280,8 @@ class Setup(object):
     def write(self,dir='./'):
         """ Call to write the outputs after calling assign"""
         self.writemap(dir=dir)
-        self.config.write_plist(self.name+'m2fs', dir=dir)
+        filename=os.path.join(dir,self.name+'.m2fs').replace(':','-')
+        self.config.write_plist(filename)
     
 #        for s in self.assign_with:
 #            s.writemap(dir=dir)

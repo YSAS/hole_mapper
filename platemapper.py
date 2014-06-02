@@ -5,10 +5,11 @@ import BetterCanvas
 import os
 import argparse
 import platemanager
+import pathconf
 from dimensions import PLATE_RADIUS
 from ttkcalendar import date_time_picker
 from setup import get_all_setups
-
+import argparse
 from logger import getLogger
 log=getLogger('plateplanner')
 
@@ -145,7 +146,7 @@ class App(Tkinter.Tk):
         #Basic window stuff
         swid=120
         bhei=55
-        whei=735
+        whei=935
         chei=whei-bhei
         wwid=chei+swid
         self.geometry("%ix%i"%(wwid,whei))
@@ -161,8 +162,8 @@ class App(Tkinter.Tk):
 
         #The canvas for drawing the plate        
         self.canvas=BetterCanvas.BetterCanvas(self, chei, chei,
-                                              1.01*PLATE_RADIUS,
-                                              1.01*PLATE_RADIUS,
+                                              1.05*PLATE_RADIUS,
+                                              1.05*PLATE_RADIUS,
                                               bg='White')
         self.canvas.place(x=swid,y=0)
         self.canvas.bind("<Button-1>", self.canvasclick)
@@ -234,7 +235,7 @@ class App(Tkinter.Tk):
         self.show()
 
     def make_plug(self):
-        self.manager.save_plug_and_config()
+        self.manager.save_plug_and_config(self.canvas)
 
 
 class PopupWindow(object):
@@ -253,9 +254,19 @@ class PopupWindow(object):
         self.value=self.e.get()
         self.top.destroy()
 
+def parse_cl():
+    parser = argparse.ArgumentParser(description='Quadrant merger',
+                                     add_help=True)
+    parser.add_argument('-d','--dir', dest='dir',
+                        action='store', required=False, type=str,
+                        help='source dir for plate data',default='./')
+    return parser.parse_args()
+
 
 if __name__ == "__main__":
     log.info('Starting...')
+    args=parse_cl()
+    pathconf.ROOT=args.dir
     app = App(None)
     app.title('Hole Mapper')
     app.mainloop()

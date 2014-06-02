@@ -16,11 +16,12 @@ import math
 from hole import Hole
 import numpy as np
 from assign import assign
+from pathconf import OUTPUT_DIR
 
 log=getLogger('plateplanner.platemanager')
 
 
-GUIDE_COLOR_SEQUENCE=['deeppink','seagreen','black','teal','purple','green4'
+GUIDE_COLOR_SEQUENCE=['seagreen','black','deeppink','teal','purple','green4'
                       'maroon', 'peachpuff4', 'navy', 'orange', 'saddlebrown']
 def guide_color(i):
     return GUIDE_COLOR_SEQUENCE[i % len(GUIDE_COLOR_SEQUENCE)]
@@ -87,10 +88,16 @@ class Manager(object):
              if h.id in holeIDs]
         return ret
 
-    def save_plug_and_config(self):
-        """Write .plug and .m2fs of the loaded setup"""
+    def save_plug_and_config(self, canvas=None):
+        """Write .plug and .m2fs of the loaded setup
+        saves an eps of the canvas if passed
+        """
         for s in self.selected_setups:
-            s.write(dir='./')
+            s.write(dir=OUTPUT_DIR())
+        if canvas:
+            fname='_'.join([s.name for s in self.selected_setups])
+            file=os.path.join(OUTPUT_DIR(),fname+'.eps').replace(':','-')
+            canvas.postscript(file=file, colormode='color')
 
     def _draw_hole(self, hole, canvas, color=None, fcolor='White', radmult=1.0):
         
@@ -113,14 +120,19 @@ class Manager(object):
         canvas.drawCircle( (0,0) , PLATE_RADIUS)
         canvas.drawCircle( (0,0) , SH_RADIUS)
         
+        for i, setup in enumerate(self.selected_setups):
+            canvas.drawText((0,PROJ_PLATE_LABEL_Y-(i)*0.05*PLATE_RADIUS),
+                            setup.name, color=guide_color(i),center=0)
+        
         setup=self.selected_setups[0]
         
         self._draw_with_assignements(setup, canvas)
         
         #Standards
         for t in setup.plate.plate_holes:
-            self._draw_hole(t.hole, canvas, color='Magenta', fcolor='Magenta')
-    
+            self._draw_hole(t.hole, canvas, color='chocolate',
+                            fcolor='chocolate')
+        
         #Guides an Acquisitions
         for i,s in enumerate(self.selected_setups):
             for t in s.field.guides+s.field.acquisitions:

@@ -1,8 +1,21 @@
 import os.path
 
+ROOT='./plates/'
 
-PLATE_DIRECTORY='./testing/plates/'
-CONFIGDEF_DIRECTORY='./testing/configs/'
-SETUP_DIRECTORY='./testing/setups/'
+def PLATE_DIRECTORY():
+    return os.path.join(ROOT,'plates')+os.sep
 
-DEAD_FIBER_FILE=CONFIGDEF_DIRECTORY+'deadfibers.txt'
+def CONFIGDEF_DIRECTORY():
+    return os.path.join(ROOT,'configs')+os.sep
+
+def SETUP_DIRECTORY():
+    return os.path.join(ROOT,'setups')+os.sep
+
+def DEAD_FIBER_FILE():
+    return os.path.join(CONFIGDEF_DIRECTORY(),'deadfibers.txt')
+
+def OUTPUT_DIR():
+    return os.path.join(ROOT,'output')+os.sep
+
+def FIBERMAP_DIRECTORY():
+    return OUTPUT_DIR()

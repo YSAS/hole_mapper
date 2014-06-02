@@ -5,6 +5,7 @@ from cassettes import CASSETTE_POSITIONS
 from hole import Hole
 import operator
 from logger import getLogger
+from fiber import Fiber
 
 log=getLogger('target')
 
@@ -103,8 +104,9 @@ class Target(object):
         self._usable_cassette_names=self._preset_usable_cassette_names.copy()
             
     def __str__(self):
-        return '{} ({}, {}) type={}'.format(self.id,self.ra.sexstr,
-                                         self.dec.sexstr,self.type)
+        return '{} ({}, {}) t={} p={}'.format(self.id,self.ra.sexstr,
+                                         self.dec.sexstr,self.type,
+                                         self.priority)
     
     def assign(self, cassette=None, fiber=None):
         if cassette:
@@ -369,7 +371,10 @@ class Target(object):
         try:
             assert len(self._usable_cassette_names)>0
         except AssertionError:
-            import ipdb;ipdb.set_trace()
+            pass
+#            print('updating possible_cassettes to zero for {}'.format(
+#                  str(self)))
+#            import ipdb;ipdb.set_trace()
 
 
 

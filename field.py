@@ -402,6 +402,26 @@ class Field(object):
         self.skys=[g for g in drilled if g.is_sky]
 
     @property
+    def ra(self):
+        return self.info['(ra, dec)'].split()[0]
+    
+    @property
+    def dec(self):
+        return self.info['(ra, dec)'].split()[1]
+    
+    @property
+    def epoch(self):
+        return 2000.0
+    
+    @property
+    def pm_ra(self):
+        return 0.0
+    
+    @property
+    def pm_dec(self):
+        return 0.0
+    
+    @property
     def all_targets(self):
         return (self.skys+self.targets+self.guides+self.acquisitions)
 

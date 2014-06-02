@@ -89,7 +89,7 @@ def _configure_possible_cassettes_names(setups):
         _log.info('Assigning > 2')
         for s in setups[1:]:
             if (s.config.r.active_fibers != setups[0].config.r.active_fibers or
-                s.config.r.active_fibers != setups[0].config.r.active_fibers):
+                s.config.b.active_fibers != setups[0].config.b.active_fibers):
                 raise AssignmentConstraintError("Setups do not all use the "
                                                 "same set of active fibers")
         
@@ -164,8 +164,8 @@ def _assign_fibers(setups):
     """
     
     #Get all the targets we are to assign
-    to_assign=[t for s in setups for t in s.field.skys+s.field.targets]
-    
+    to_assign=[t for s in setups for t in s.to_assign]
+
     #Filter out targets which can't be plugged simultaneously
     to_assign=_filter_for_pluggability(to_assign)
     
@@ -188,6 +188,60 @@ def _assign_fibers(setups):
 
     unassignable=[]
 
+    #This is a bit of a hack, which works when not assigning with things
+    #If more targets & skys drilled than have usable fibers, then sort by
+    #priority and discard the lowest
+    #This doesn't respect min sky settings in the pathological case of assigning
+    # multiple setups with each other
+#    import ipdb;ipdb.set_trace()
+
+    n_skip=len(unassigned_skys)+len(unassigned_objs)-cassettes.n_available
+    
+    #First drop skys
+    if n_skip > 0:
+        for s in setups:
+            skys=[sk for sk in unassigned_skys if sk in s.field.skys]
+            #Drop as many as we can while respecting minsky
+            todrop=max(min(len(skys)-s.minsky, n_skip),0)
+            #respect priorities
+            skys.sort(key=lambda x:x.priority)
+            
+            unassignable+=skys[:todrop]
+            for sk in skys[:todrop]:
+                try:
+                    unassigned_skys.remove(sk)
+                except ValueError:
+                    pass
+            _log.warn('Dropping {} of {} skys in {} '.format(todrop, len(skys),
+                                                       s.name)+
+                      'because there are too many things to plug.')
+            n_skip-=todrop
+            if n_skip <1:
+                break
+
+    #Then drop targets if still needed
+    if n_skip > 0:
+        for s in setups:
+            objs=[t for t in unassigned_objs if t in s.field.targets]
+            #Drop as many as we must
+            todrop=n_skip
+            #respect priorities
+            objs.sort(key=lambda x:x.priority)
+            
+            unassignable+=objs[:todrop]
+            for t in objs[:todrop]:
+                try:
+                    unassigned_objs.remove(t)
+                except ValueError:
+                    pass
+            _log.warn('Dropping {} of {} targets in {} '.format(todrop,
+                                                               len(objs),
+                                                               s.name)+
+                      'because there are too many things to plug.')
+            n_skip-=todrop
+            if n_skip <1:
+                break
+
     #assign targets first
     while unassigned_objs:
         #Update cassette availability for each hole (a cassette may have filled)
@@ -206,7 +260,8 @@ def _assign_fibers(setups):
             cassettes.assign(t, t.nearest_usable_cassette)
         else:
             unassignable.append(t)
-            _log.warn('No suitable cassette for {}'.format(t))
+#            import ipdb;ipdb.set_trace()
+            _log.warn('No suitable cassette for targ {}'.format(t))
 
     #Assign skys second
     while unassigned_skys:
@@ -226,7 +281,7 @@ def _assign_fibers(setups):
             cassettes.assign(t, t.nearest_usable_cassette)
         else:
             unassignable.append(t)
-            _log.warn('No suitable cassette for {}'.format(t))
+            _log.warn('No suitable cassette for sky {}'.format(t))
 
 
     ####As many targets as possible have now been assigned to a cassette####
@@ -392,7 +447,7 @@ def _filter_for_pluggability(targets):
 #    try:
 #        loc=locals()
 #        globa=globals()
-#        file=os.path.join(SETUP_DIRECTORY,setupname)+'.setup.py'
+#        file=os.path.join(SETUP_DIRECTORY(),setupname)+'.setup.py'
 #        with open(file,'r') as f:
 #            exec(f.read(), globa, loc) #I'm a very bad person
 #        _log.warning('Using custom usable cassette function: {} '.format(file))
