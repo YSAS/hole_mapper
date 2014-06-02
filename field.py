@@ -1,7 +1,7 @@
 from collections import defaultdict
 import os
 from astropy.time import Time
-from jbastro.astroLib import sexconvert
+from jbastro.astrolibsimple import sexconvert
 from datetime import datetime
 import holesxy
 from logger import getLogger

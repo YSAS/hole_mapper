@@ -2,7 +2,7 @@ from target import VALID_TYPE_CODES
 from collections import defaultdict
 import os.path
 from datetime import datetime
-from jbastro.astroLib import sexconvert
+from jbastro.astrolibsimple import sexconvert
 
 #Default priority if '-'
 DEFAULT_PRIORITY = float('-inf')

@@ -1,4 +1,4 @@
-from jbastro.astroLib import sexconvert
+from jbastro.astrolibsimple import sexconvert
 class RA(float):
     def __new__(self, value):
         return float.__new__(self, sexconvert(value,dtype=float,ra=True))

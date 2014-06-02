@@ -1,5 +1,5 @@
 import numpy as np
-from jbastro.astroLib import sexconvert
+from jbastro.astrolibsimple import sexconvert
 
 CLAY_LONGITUDE=sexconvert(70,42,06.00,dtype=float) #70 42 06.00 in decimal degrees
 CLAY_LATITUDE=sexconvert(-29,00,12.00,dtype=float) #-29 00 12.00 in decimal degrees

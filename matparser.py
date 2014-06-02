@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import argparse
 from astropy.io import fits
 import os
-from jbastro.astroLib import sexconvert
+from jbastro.astrolibsimple import sexconvert
 from field import load_dotfield
 
 def _parse_cl():

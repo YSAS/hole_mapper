@@ -2,7 +2,7 @@
 from collections import defaultdict
 import argparse
 import os
-from jbastro.astroLib import sexconvert
+from jbastro.astrolibsimple import sexconvert
 from field import load_dotfield
 
 def _parse_cl():
