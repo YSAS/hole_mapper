@@ -361,7 +361,6 @@ class CassetteConfig(object):
     @property
     def fibers(self):
         ret=[f for c in self for f in c.fibers.values()]
-        import ipdb;ipdb.set_trace()
         ret.sort(key=lambda x:x.name)
         return ret
 

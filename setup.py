@@ -9,6 +9,8 @@ from readerswriters import _dictlist_to_records, _format_attrib_nicely
 from logger import getLogger
 from config import get_config
 from assign import assign
+import hashlib
+import fibermap
 
 log = getLogger('setup')
 
@@ -95,6 +97,7 @@ class SetupDefinition(object):
         self.fieldname=fieldname
         self.configname=configname
         self.assign_to=assign_to.lower()
+        self.assign_given=extra.pop('assign_given','')
         if self.assign_to not in ['single', 'any']:
             raise ValueError('Supported values for assign_to are '
                              'single and any. Fix file {}'.format(self.file))
@@ -102,8 +105,13 @@ class SetupDefinition(object):
     
     @property
     def name(self):
-        return '{}:{}:{}'.format(self.platename, self.fieldname,
-                                 self.configname)
+        if self.assign_to!='any' or self.assign_given:
+            hashstr=':'+hashlib.sha1(self.assign_to+
+                                    self.assign_given).hexdigest()[:6]
+        else:
+            hashstr=''
+        return '{}:{}:{}{}'.format(self.platename, self.fieldname,
+                                 self.configname,hashstr)
 
 
 class Setup(object):
@@ -142,6 +150,8 @@ class Setup(object):
         ret=self.field.info.copy()
         ret['field']=ret.pop('name')
         ret['fieldfile']=ret.pop('file')
+        if self.setupdef.assign_given:
+            ret['assign_given']= self.setupdef.assign_given
 #        import ipdb;ipdb.set_trace()
         addit={'assign_with':', '.join(s.name for s in self.assign_with),
                'plate':self.plate.name, 'config':self.config.name,
@@ -157,6 +167,27 @@ class Setup(object):
     @property
     def assign_with(self):
         return []
+    
+    @property
+    def to_assign(self):
+        """
+        Return a list of skys and targets which should be assigned for this
+        setup. Includes all skys. Exludes targets from assign_given setups
+        
+        """
+        get_map=self.setupdef.assign_given
+        previously=[]
+        while get_map:
+            log.info('Excluding previously assigned from {}'.format(
+                      get_map))
+            fm=fibermap.get_fibermap_for_setup(get_map)
+            previously+=fm.mapping.values()
+            get_map=fm.dict.get('assign_given','')
+        
+        targs=[t for t in self.field.targets if t.id not in previously]
+        return self.field.skys+targs
+    
+    
     
     @property
     def uses_b_side(self):

@@ -164,8 +164,8 @@ def _assign_fibers(setups):
     """
     
     #Get all the targets we are to assign
-    to_assign=[t for s in setups for t in s.field.skys+s.field.targets]
-    
+    to_assign=[t for s in setups for t in s.to_assign]
+
     #Filter out targets which can't be plugged simultaneously
     to_assign=_filter_for_pluggability(to_assign)
     

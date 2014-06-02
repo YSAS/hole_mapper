@@ -33,7 +33,8 @@ class Plate(object):
         try:
             return [f for f in self.fields if f.name ==name][0]
         except IndexError:
-            raise ValueError('No field by given name')
+            raise ValueError('No field with name {} on plate {}'.format(name,
+                              self.name))
 
     @property
     def all_holes(self):

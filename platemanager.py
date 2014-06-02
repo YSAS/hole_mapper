@@ -21,7 +21,7 @@ from pathconf import OUTPUT_DIR
 log=getLogger('plateplanner.platemanager')
 
 
-GUIDE_COLOR_SEQUENCE=['deeppink','seagreen','black','teal','purple','green4'
+GUIDE_COLOR_SEQUENCE=['seagreen','black','deeppink','teal','purple','green4'
                       'maroon', 'peachpuff4', 'navy', 'orange', 'saddlebrown']
 def guide_color(i):
     return GUIDE_COLOR_SEQUENCE[i % len(GUIDE_COLOR_SEQUENCE)]
@@ -130,8 +130,9 @@ class Manager(object):
         
         #Standards
         for t in setup.plate.plate_holes:
-            self._draw_hole(t.hole, canvas, color='Magenta', fcolor='Magenta')
-    
+            self._draw_hole(t.hole, canvas, color='chocolate',
+                            fcolor='chocolate')
+        
         #Guides an Acquisitions
         for i,s in enumerate(self.selected_setups):
             for t in s.field.guides+s.field.acquisitions:
