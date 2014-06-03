@@ -51,7 +51,9 @@ def load_dotsetup(file):
 
 def _load_setups():
     setupfiles=glob(SETUP_DIRECTORY()+'*.setup')
-    for f in (f for f in setupfiles if f.lower() != 'example.setup'):
+    files=(f for f in setupfiles
+           if os.path.basename(f).lower() != 'example.setup')
+    for f in files:
         try:
             _KNOWN_SETUPS.update({s.name:s for s in load_dotsetup(f)})
         except IOError:
