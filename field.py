@@ -1,6 +1,5 @@
 from collections import defaultdict
 import os
-from astropy.time import Time
 from jbastro.astrolibsimple import sexconvert
 from datetime import datetime
 import holesxy
@@ -88,6 +87,7 @@ class FieldCatalog(object):
         """
         Process the targets in the field to find their update xyz positions
         """
+        from astropy.time import Time
         obs_date=self.obsdate
         
         targs=self.guides+self.targets+self.acquisitions+self.skys
@@ -98,7 +98,7 @@ class FieldCatalog(object):
         pmdec=[t.pm_dec for t in targs]
         
 
-        #compute  time delta for each tar
+        #compute  time delta for each star
         obtime=Time(self.obsdate,scale='utc')
         delta=[obtime-Time('J{}'.format(t.epoch) if t.epoch!=1950 else
                            'B{}'.format(t.epoch), scale='utc') for t in targs]
