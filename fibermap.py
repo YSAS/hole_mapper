@@ -158,3 +158,72 @@ def get_fibermap_names_for_plate(platename):
             except (IOError, FibermapError) as e:
                 _log.warn('Skipped {} due to {}'.format(file,str(e)))
     return ret
+
+
+#from fibermap import *
+#platefile='/Users/one/Desktop/February Plates/curated/Nidever3-4.plate'
+#import oldplate
+#oldplate.Plate(platefile)
+#from glob import glob
+#for f in glob('/Users/one/Desktop/procold/*.plate'):
+#    makefm(f,'/Users/one/Desktop/procold/')
+def makefm(platefile, dir='./'):
+    import oldplate
+    from readerswriters import _dictlist_to_records, _format_attrib_nicely
+    REQUIRED_PLUGGED_SECTION_KEYS=['fiber', 'id', 'ra', 'dec', 'epoch', 'type',
+                               'priority','pm_ra','pm_dec','x','y','z','d']
+    REQUIRED_GUIDE_SECTION_KEYS=['id', 'ra', 'dec', 'epoch', 'type',
+                                 'priority','pm_ra','pm_dec','x','y','z','d']
+    REQUIRED_UNUSED_SECTION_KEYS=['id', 'ra', 'dec', 'epoch', 'type',
+                                  'priority','pm_ra','pm_dec','x','y','z','d']
+
+    old=oldplate.Plate(platefile)
+    for sname, s in old.setups.items():
+
+        mapfile='{}:{}:o.fibermap'.format(old.name, sname.replace(' ',''))
+        mapfile=mapfile.replace(':','-')
+        with open(os.path.join(dir,mapfile),'w') as fp:
+    
+            fp.write("[setup]\n")
+
+            d=s.attrib
+            d['(ra, dec)']='{} {}'.format(d.pop('ra','').replace(' ',':'),
+                                          d.pop('de','').replace(' ',':'))
+            d['(az, el)']='{} {}'.format(d.pop('az',''),d.pop('el',''))
+            d['(ha, st)']=''
+            d['config']='o'
+            d['nused']=s.n_fibers_used()
+            d['plate']=old.name
+            d['fieldname']=sname
+            d['name']='{}:{}:{}'.format(old.name.replace(' ','_'),
+                                        sname.replace(' ','_'),
+                                        'o')
+            d['obsdate']=d.pop('utc','')
+            d.pop('n')
+            for r in _format_attrib_nicely(d): fp.write(r)
+    
+            #Fibers assigned and unassigned
+
+            #Grab fibers
+            fp.write("[assignments]\n")
+            dl=s._target_list
+            for i,d in enumerate(dl):
+                if d['id']=='inactive': d['id']='unplugged'
+                d['dec']=d.pop('de')
+            recs=_dictlist_to_records(dl,col_first=REQUIRED_PLUGGED_SECTION_KEYS)
+            for r in recs: fp.write(r)
+    
+            #Write guides and acquisitions
+            fp.write("[guides]\n")
+            dl=s._guide_list
+            
+            for i,d in enumerate(dl):
+                d['id']='guide{}'.format(i)
+                d['dec']=d.pop('de')
+            recs=_dictlist_to_records(dl, col_first=REQUIRED_GUIDE_SECTION_KEYS)
+            for r in recs: fp.write(r)
+
+            #All the other targets
+            fp.write("[unused]\n")
+            recs=_dictlist_to_records([],col_first=REQUIRED_UNUSED_SECTION_KEYS)
+            for r in recs: fp.write(r)
