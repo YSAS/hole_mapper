@@ -241,6 +241,7 @@ class Setup(object):
             import datetime
             d['mapdate']=str(datetime.datetime.now())
             d['deadfibers']=', '.join(DEAD_FIBERS())
+            d['nused']='{}'.format(self.cassette_config.n_used)
             for r in _format_attrib_nicely(d):
                 fp.write(r)
     
@@ -250,9 +251,13 @@ class Setup(object):
             def dicter(fiber):
                 """ convert a fiber assignment into a dictlist record """
                 if not fiber.target:
-                    return {'fiber':fiber.name,'id':'unplugged'}
+                    return {'fiber':fiber.name,
+                            'id':'unplugged',
+                            'type':'I'}
                 elif fiber.target not in self.field.all_targets:
-                    return {'fiber':fiber.name,'id':'unassigned'}
+                    return {'fiber':fiber.name,
+                            'id':'unassigned',
+                            'type':'U'}
                 else:
                     return fiber.target.dict
 

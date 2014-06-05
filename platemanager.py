@@ -120,28 +120,29 @@ class Manager(object):
         canvas.drawCircle( (0,0) , PLATE_RADIUS)
         canvas.drawCircle( (0,0) , SH_RADIUS)
         
-        for i, setup in enumerate(self.selected_setups):
-            canvas.drawText((0,PROJ_PLATE_LABEL_Y-(i)*0.05*PLATE_RADIUS),
-                            setup.name, color=guide_color(i),center=0)
-        
         setup=self.selected_setups[0]
         
-        self._draw_with_assignements(setup, canvas)
+        #Draw holes for everything else
+        for h in self.inactive_holes(showing_b=True, showing_r=True):
+            self._draw_hole(h, canvas)
         
         #Standards
         for t in setup.plate.plate_holes:
             self._draw_hole(t.hole, canvas, color='chocolate',
                             fcolor='chocolate')
         
-        #Guides an Acquisitions
+        self._draw_with_assignements(setup, canvas)
+        
+        #Guides and Acquisitions
         for i,s in enumerate(self.selected_setups):
             for t in s.field.guides+s.field.acquisitions:
                 self._draw_hole(t.hole, canvas, color=guide_color(i),
                                 fcolor=guide_color(i))
+        
+        for i, setup in enumerate(self.selected_setups):
+            canvas.drawText((0,PROJ_PLATE_LABEL_Y-(i)*0.05*PLATE_RADIUS),
+                            setup.name, color=guide_color(i),center=0)
 
-        #Draw holes for everything else
-        for h in self.inactive_holes(showing_b=True, showing_r=True):
-            self._draw_hole(h, canvas)
 
     def draw_image(self, canvas, channel='all',radmult=.75):
         
