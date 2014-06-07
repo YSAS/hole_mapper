@@ -18,7 +18,8 @@ def load_dotfibermap(filename):
 
     #Read file
     try:
-        lines=open(filename,'r').readlines()
+        with open(filename,'r') as f:
+            lines=f.readlines()
     except IOError as e:
         raise e
 
@@ -68,9 +69,8 @@ def load_dotfibermap(filename):
                 user_keys=[k for k in keys if k not in req]
 
     #            import ipdb;ipdb.set_trace()
-                dicts=[]
-                for l in sec['lines'][1:]:
-                    dicts.append(_parse_record_row(l, keys, user_keys))
+                dicts=[_parse_record_row(l, keys, user_keys)
+                       for l in sec['lines'][1:]]
                 sec['processed']=dicts
         
         dict=sections['setup']['processed']
