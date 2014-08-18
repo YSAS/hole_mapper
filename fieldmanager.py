@@ -385,13 +385,61 @@ class Manager(object):
         
         #Rebuild the graph allowing partial overlap
         coll_graph=build_overlap_graph_cartesian(x, y, d, overlap_pct_r_ok=0.9)
-
+#TODO: parameterize overlap_pct_r_ok
     
         #priorities must first be redistributed onto the same scale
         #must keeps > wants> filler  guide and acquisitions don't matter
-        #Go though collision graph and flag all the targets with issues
-        #import ipdb;ipdb.set_trace()
         
+        pri_holes=[h for h in holes if h.target.is_sky or h.target.is_target]
+        for h in pri_holes:
+            h.target.fm_priority=None
+        
+        for f in list(set(h.target.field for h in pri_holes)):
+            min_priority=f.min_priority
+            max_priority=f.max_priority
+            for h in (x for x in holes if x.target.field==f):
+                if (h.target.field.keep_all and
+                    h.target.priority==max_priority):
+                    h.target.fm_priority=1e9
+                if (h.target.field.filler_targ and
+                    h.target.priority==min_priority):
+                    h.target.fm_priority=1
+
+        need_fm_pri=[h.target for h in pri_holes
+                     if h.target.fm_priority == None and
+                     1]
+        
+        #break need_fm_pri into groups by field
+        from itertools import groupby
+        grouping_iter=groupby(sorted(need_fm_pri, key=lambda x:x.field),
+                              lambda x:x.field)
+        field_fm_pri_group=[list(g) for k,g in grouping_iter]
+        
+        #sort each group by priority
+        for x in field_fm_pri_group:
+            x.sort(key=lambda x:x.priority)
+
+        next_priority=sum(len(x) for x in field_fm_pri_group)+10
+        pri_group=0
+        while sum(len(x) for x in field_fm_pri_group)>0:
+            #cycle through groups taking highest pri target
+            t=field_fm_pri_group[pri_group].pop()
+            t.fm_priority=next_priority
+            next_priority-=1
+
+            #Remove empty groups
+            if len(field_fm_pri_group[pri_group])==0:
+                field_fm_pri_group.pop(pri_group)
+                pri_group-=1
+
+            #Determine the next group to sample
+            pri_group+=1
+            if pri_group >= len(field_fm_pri_group):
+                pri_group=0
+        
+        #Go though collision graph and flag all the targets with issues
+
+#TODO add support for minsky here or maybe after acquisitions above
         while not coll_graph.is_disconnected: #Edges are holes too close together
         
             coll_ndx = coll_graph.get_colliding_node()

@@ -39,6 +39,7 @@ class FieldCatalog(object):
         
         self.holesxy_info=None
         self.keep_all=False
+        self.filler_targ=False
         self._processed=False
     
     @property
@@ -82,6 +83,16 @@ class FieldCatalog(object):
             raise ValueError('Target {} of unknown type'.format(targ))
 
         targ.field=self
+    
+    @property
+    def max_priority(self):
+        """max priority of type T in the catalog """
+        return max([t.priority for t in self.targets])
+    
+    @property
+    def min_priority(self):
+        """min priority of type T in the catalog """
+        return min([t.priority for t in self.targets])
 
     def process(self):
         """
@@ -351,7 +362,10 @@ def load_dotfield(file):
                 field_cat.obsdate=datetime(*map(int,re.split('\W+', v)))
             elif k=='name':
                 field_cat.field_name=v
-            elif k=='keep_all':
+            elif k in ['keep_all', 'mustkeep']:
+                k='keep_all'
+                log.info('Dropping targets forbidden for field {} in {}'.format(
+                    field_cat.field_name, file))
                 field_cat.keep_all=True if v.lower()!='false' else False
             else:
                 field_cat.user[k]=v

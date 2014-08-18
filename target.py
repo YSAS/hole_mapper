@@ -47,6 +47,8 @@ class Target(object):
         self.type=kwargs.pop('type','')
         self.field=kwargs.pop('field',None)
         
+        # self.fm_priority_tmp is reserved for fieldmanager.py use
+        
 #        if self.type==STANDARD_TYPE and self.id='':
 #            self.id='STANDARD'
         if self.type==FIDUCIAL_TYPE:
