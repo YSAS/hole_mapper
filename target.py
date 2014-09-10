@@ -19,7 +19,7 @@ GUIDEREF_TYPE='R'
 FIDUCIAL_TYPE='F'
 THUMBSCREW_TYPE='B'
 
-VALID_TYPE_CODES=['T', 'S', 'C', 'G', 'A', 'Z','O','F','B','R']
+VALID_TYPE_CODES=['T', 'S', 'C', 'G', 'A', 'Z','O','F','B','R','I','U']
 
 class ConflictDummy(object):
     """Dummy conflict type for things like off edge of plate"""
