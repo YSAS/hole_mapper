@@ -60,12 +60,12 @@ def load_dotplate(filename):
     sections={}
     for l in (l for l in lines if l and l[0]!='#'):
         
-        if l[0] =='[':
-            #Check formatting
-            if not l.endswith(']') or not l[1:-1]:
-                err='{} - Bad section name l{}: {}'.format(
-                      os.path.basename(filename), lines.index(l), l)
-                raise PlateError(err)
+        if l[0] =='[' and l[-1]==']':
+#            #Check formatting
+#            if not l.endswith(']') or not l[1:-1]:
+#                err='{} - Bad section name l{}: {}'.format(
+#                      os.path.basename(filename), lines.index(l), l)
+#                raise PlateError(err)
             curr_section=l[1:-1].lower()
             sections[curr_section]={'lines':[]}
         else:

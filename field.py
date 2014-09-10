@@ -414,6 +414,8 @@ class Field(object):
         self.targets=[g for g in drilled if g.is_target]
         self.acquisitions=[g for g in drilled if g.is_acquisition]
         self.skys=[g for g in drilled if g.is_sky]
+        
+        for t in self.all_targets: t.field=self
 
     @property
     def ra(self):
@@ -437,6 +439,7 @@ class Field(object):
     
     @property
     def all_targets(self):
+        """Return targets + skys+guids+acquisitions"""
         return (self.skys+self.targets+self.guides+self.acquisitions)
 
     @property

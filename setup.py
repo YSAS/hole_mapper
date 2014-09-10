@@ -125,7 +125,7 @@ class Setup(object):
         
         self.config=config
         
-        self.assign_to=setupdef.assign_to
+        self._assigning_to=''
 
         self.plate=plate
         
@@ -136,13 +136,46 @@ class Setup(object):
         
         #Fetch cassettes
         self.cassette_config=CassetteConfig(usable=config)
+    
+        for t in self.field.all_targets:
+            try:
+                assert t.field==self.field
+            except AssertionError:
+                import ipdb;ipdb.set_trace()
+
+    @property
+    def assign_to(self):
+        return self.setupdef.assign_to
 
     def reset(self):
         self.config=get_config(self.config.name)
         for t in self.field.skys+self.field.targets:
             t.reset_assignment()
         self.cassette_config=CassetteConfig(usable=self.config)
-        
+    
+    def set_assigning_to(self,red=False, blue=False, both=False):
+        if sum([red, blue, both])!=1:
+            raise ValueError('One and only one of red, blue, '
+                             'or both must be True')
+        if both and self.assign_to=='single':
+            raise ValueError('Definition specifies single assignment')
+        if red:
+            self._assigning_to='r'
+        elif blue:
+            self._assigning_to='b'
+        else:
+            self._assigning_to='both'
+    
+    @property
+    def assigning_to(self):
+        if self._assigning_to=='b':
+            return 'b'
+        elif self._assigning_to=='r':
+            return 'r'
+        elif self._assigning_to:
+            return 'both'
+        raise RuntimeError('Must call set_assigning_to first')
+
     @property
     def minsky(self):
         return int(self.field.info.get('minsky',0))
@@ -168,7 +201,19 @@ class Setup(object):
     
     @property
     def assign_with(self):
-        return []
+        return self._assign_with
+    
+    def set_assign_with(self, setups):
+        """inform setup of other setups used while assigning"""
+        try:
+            setups=set(setups)
+        except TypeError:
+            setups=set([setups])
+        try:
+            setups.remove(self)
+        except KeyError:
+            pass
+        self._assign_with=tuple(setups)
     
     @property
     def to_assign(self):
@@ -209,9 +254,19 @@ class Setup(object):
     
     @property
     def n_usable_fibers(self):
-        """number of fibers usable when instrument configured for this setup"""
-        #TODO: Implement
-        return self.cassette_config.n_r_usable+self.cassette_config.n_b_usable
+        """number of fibers usable when instrument configured for this setup
+        respects assign_to
+        """
+        if self.assign_to =='r':
+            return self.cassette_config.n_r_usable
+        elif self.assign_to=='b':
+            return self.cassette_config.n_b_usable
+        elif self.assign_to=='single':
+            return max(self.cassette_config.n_r_usable,
+                       self.cassette_config.n_b_usable)
+        else:
+            return (self.cassette_config.n_r_usable +
+                    self.cassette_config.n_b_usable)
 
     @property
     def n_needed_fibers(self):
@@ -255,9 +310,14 @@ class Setup(object):
                             'id':'unplugged',
                             'type':'I'}
                 elif fiber.target not in self.field.all_targets:
-                    return {'fiber':fiber.name,
-                            'id':'unassigned',
-                            'type':'U'}
+                    if (fiber.target.field.ra==self.field.ra and
+                        fiber.target.field.dec==self.field.dec):
+                        return fiber.target.dict
+                    else:
+                        import ipdb;ipdb.set_trace()
+                        return {'fiber':fiber.name,
+                                'id':'unassigned',
+                                'type':'U'}
                 else:
                     return fiber.target.dict
 

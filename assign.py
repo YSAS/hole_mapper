@@ -16,6 +16,8 @@ def assign(setups):
     #or acquisitions in any setups, because such cases were culled when
     #creating the plate
     
+    for s in setups: s.set_assign_with(setups)
+    
     #define which targets in each setup are allowed to go into which cassette
     _configure_possible_cassettes_names(setups)
 
@@ -43,51 +45,66 @@ def _configure_possible_cassettes_names(setups):
         raise exception if incompatible instrument configurations
         assign across both sides
     """
+    
     if len(setups)==1:
         setup=setups[0]
         n_b_avail=setup.cassette_config.n_b_usable
         n_r_avail=setup.cassette_config.n_r_usable
         n_needed=len(setup.field.skys+setup.field.targets)
-        if n_needed<= max(n_b_avail, n_r_avail):
+        if (n_needed<= max(n_b_avail, n_r_avail) or
+            setup.assign_to=='single'):
             if n_needed<=n_r_avail:
                 _log.info('Assigning all of single to R')
+                setup.set_assigning_to(red=True)
                 for t in setup.field.skys+setup.field.targets:
                     t.set_possible_cassettes(RED_CASSETTE_NAMES)
             else:
-                _log.info('Assigning all of single to R')
+                _log.info('Assigning all of single to B')
+                setup.set_assigning_to(blue=True)
                 for t in setup.field.skys+setup.field.targets:
                     t.set_possible_cassettes(BLUE_CASSETTE_NAMES)
         else:
             _log.info('Assigning all of single to both')
+            setup.set_assigning_to(both=True)
             for t in setup.field.skys+setup.field.targets:
                 t.set_possible_cassettes(CASSETTE_NAMES)
 
     elif len(setups)==2: #two setups
+        #Consider adding a constraing/warning/test for case where user
+        # specifies a side
+#        if (setups[0].assign_to in ['r','b'] and
+#            setups[0].assign_to==setups[1].assign_to)
+
         incompatible=(setups[0].config.r.active_fibers !=
                       setups[1].config.r.active_fibers or
-                      setups[0].config.r.active_fibers !=
-                      setups[1].config.r.active_fibers)
-                    
+                      setups[0].config.b.active_fibers !=
+                      setups[1].config.b.active_fibers)
         if (incompatible or
             setups[0].assign_to=='single' or
             setups[1].assign_to=='single'): #stick one on R and one on B
             _log.info('Assigning 2 to seperate spectrographs')
             for t in setups[0].field.skys+setups[0].field.targets:
                 t.set_possible_cassettes(BLUE_CASSETTE_NAMES)
-                setups[0].config.r.active_fibers=setups[1].config.r.active_fibers
+            setups[0].set_assigning_to(blue=True)
+            setups[0].config.r.active_fibers=setups[1].config.r.active_fibers
             for t in setups[1].field.skys+setups[1].field.targets:
                 t.set_possible_cassettes(RED_CASSETTE_NAMES)
-                setups[1].config.b.active_fibers=setups[0].config.b.active_fibers
+            setups[1].config.b.active_fibers=setups[0].config.b.active_fibers
+            setups[1].set_assigning_to(red=True)
         else:
             _log.info('Assigning 2 to both')
             for s in setups:
+                s.set_assigning_to(both=True)
                 for t in s.field.skys+s.field.targets:
                     t.set_possible_cassettes(CASSETTE_NAMES)
 
     else: # more than 2 setups
         #make sure all are fiber compatible (e.g. all to odds, all to evens, etc)
         _log.info('Assigning > 2')
+        _log.warn('Assigning > 2 setups support is spotty if you want anything '
+                  'more than plane jane setups together.')
         for s in setups[1:]:
+            s.set_assigning_to(both=True)
             if (s.config.r.active_fibers != setups[0].config.r.active_fibers or
                 s.config.b.active_fibers != setups[0].config.b.active_fibers):
                 raise AssignmentConstraintError("Setups do not all use the "
@@ -195,11 +212,57 @@ def _assign_fibers(setups):
     # multiple setups with each other
 #    import ipdb;ipdb.set_trace()
 
-    n_skip=len(unassigned_skys)+len(unassigned_objs)-cassettes.n_available
-    
-    #First drop skys
-    if n_skip > 0:
+    #this doesn't work with pultible setups, esp. when there are excessive
+    # numbers of targets in one/both
+    #we need to compute n_skip seperately if the setups are being assigned to
+    #disjoint sets of fibers and then skip within each setup.
+    #if sharing a common set of fibers we need to apply n_skip evenly to the
+    # setups
+
+    #determine number to skip in each setup when assigning setups to R/B side
+    # only
+    n_skip_map={}
+    if len([s for s in setups if s.assigning_to!='both'])==0:
+        n_skip=(sum(len([x for x in to_assign if x in s.to_assign])
+                   for s in setups) - cassettes.n_available)
+        base_skip=n_skip / len(setups)
+        extra_skip=n_skip % len(setups)
         for s in setups:
+            n_skip_map[s]=base_skip
+            if extra_skip>0:
+                n_skip_map[s]+=1
+                extra_skip-=1
+    else:
+        #R side
+        r_setups=[s for s in setups if s.assigning_to=='r']
+        if r_setups:
+            n_skip_r=(sum(len([x for x in to_assign if x in s.to_assign])
+                          for s in r_setups) - cassettes.n_r_available)
+            base_skip=n_skip_r / len(r_setups)
+            extra_skip=n_skip_r % len(r_setups)
+            for s in r_setups:
+                n_skip_map[s]=base_skip
+                if extra_skip>0:
+                    n_skip_map[s]+=1
+                    extra_skip-=1
+        #B Side
+        b_setups=[s for s in setups if s.assigning_to=='b']
+        if b_setups:
+            n_skip_b=(sum(len([x for x in to_assign if x in s.to_assign])
+                          for s in b_setups) - cassettes.n_b_available)
+            base_skip=n_skip_b / len(b_setups)
+            extra_skip=n_skip_b % len(b_setups)
+            for s in b_setups:
+                n_skip_map[s]=base_skip
+                if extra_skip>0:
+                    n_skip_map[s]+=1
+                    extra_skip-=1
+
+#    n_skip=len(unassigned_skys)+len(unassigned_objs)-cassettes.n_available
+    #First drop skys
+    for s in setups:
+        n_skip=n_skip_map[s]
+        if n_skip > 0:
             skys=[sk for sk in unassigned_skys if sk in s.field.skys]
             #Drop as many as we can while respecting minsky
             todrop=max(min(len(skys)-s.minsky, n_skip),0)
@@ -212,16 +275,20 @@ def _assign_fibers(setups):
                     unassigned_skys.remove(sk)
                 except ValueError:
                     pass
-            _log.warn('Dropping {} of {} skys in {} '.format(todrop, len(skys),
-                                                       s.name)+
-                      'because there are too many things to plug.')
-            n_skip-=todrop
-            if n_skip <1:
-                break
+            if todrop:
+                _log.warn('Dropping {} of {} skys in {} '.format(todrop,
+                                                                 len(skys),
+                                                                 s.name)+
+                          'because there are too many things to plug.')
+            n_skip_map[s]-=todrop
+#            n_skip-=todrop
+##            if n_skip <1:
+##                break
 
     #Then drop targets if still needed
-    if n_skip > 0:
-        for s in setups:
+    for s in setups:
+        n_skip=n_skip_map[s]
+        if n_skip > 0:
             objs=[t for t in unassigned_objs if t in s.field.targets]
             #Drop as many as we must
             todrop=n_skip
@@ -234,13 +301,17 @@ def _assign_fibers(setups):
                     unassigned_objs.remove(t)
                 except ValueError:
                     pass
-            _log.warn('Dropping {} of {} targets in {} '.format(todrop,
-                                                               len(objs),
-                                                               s.name)+
-                      'because there are too many things to plug.')
-            n_skip-=todrop
-            if n_skip <1:
-                break
+            if todrop:
+                _log.warn('Dropping {} of {} targets in {} '.format(todrop,
+                                                                    len(objs),
+                                                                    s.name)+
+                          'because there are too many things to plug.')
+            n_skip_map[s]-=todrop
+#            n_skip-=todrop
+#            if n_skip <1:
+#                break
+
+#    import ipdb;ipdb.set_trace()
 
     #assign targets first
     while unassigned_objs:
@@ -440,65 +511,3 @@ def _filter_for_pluggability(targets):
     return [targets[i] for i in keep]
 
 
-#def get_custom_usable_cassette_func(setupname):
-#    """ if file exists file should have a function with the following sig:
-#    targets_configured_for_assignement=usable_cassette(setup_object, list_of_assign_with_setup_objects)
-#    """
-#    try:
-#        loc=locals()
-#        globa=globals()
-#        file=os.path.join(SETUP_DIRECTORY(),setupname)+'.setup.py'
-#        with open(file,'r') as f:
-#            exec(f.read(), globa, loc) #I'm a very bad person
-#        _log.warning('Using custom usable cassette function: {} '.format(file))
-#        return loc['usable_cassette']
-#    except IOError:
-#        raise NameError()
-#
-#
-#
-#def usable_cassette(setup, assign_with=None):
-#    """ 
-#    This function recieves the setup and any setups which should be
-#    assigned simultaneously and returns the list of targets for which 
-#    assignments should be computed, with their
-#    _preset_usable_cassette_names attribute set to a set of cassette names
-#    which may be used
-#    To override this create a .py file with the same name of the setup in the
-#    same directory as the setup with single? function named usable_cassette
-#    """
-#    to_assign=setup.field.skys+setup.field.targets
-#    
-#    to_assign_with=[t for s in assign_with
-#                      for t in s.field.skys+s.field.targets]
-#    
-#    if not to_assign_with:
-#        if len(to_assign) <= setup.cassette_config.n_r_usable:
-#            #put all on one side by setting
-#            for t in to_assign:
-#                t._preset_usable_cassette_names=set(RED_CASSETTE_NAMES)
-#        elif len(to_assign) <= setup.cassette_config.n_b_usable:
-#            for t in to_assign:
-#                t._preset_usable_cassette_names=set(BLUE_CASSETTE_NAMES)
-#        else:
-#            for t in setup.field.targets:
-#                t._preset_usable_cassette_names=set(CASSETTE_NAMES)
-#            for i, t in enumerate(setup.field.skys):
-#                if i % 2:
-#                    t._preset_usable_cassette_names=set(RED_CASSETTE_NAMES)
-#                else:
-#                    t._preset_usable_cassette_names=set(BLUE_CASSETTE_NAMES)
-#    else:
-#        #Assume we are distributing everything evenly
-#        to_assign+=to_assign_with
-#        for t in (t for t in to_assign if t.is_target):
-#            t._preset_usable_cassette_names=set(CASSETTE_NAMES)
-#        for i, t in enumerate(t for t in to_assign if t.is_sky):
-#            if i % 2:
-#                t._preset_usable_cassette_names=set(RED_CASSETTE_NAMES)
-#            else:
-#                t._preset_usable_cassette_names=set(BLUE_CASSETTE_NAMES)
-#
-#    to_assign=to_assign[:setup.cassette_config.n_b_usable+
-#                         setup.cassette_config.n_r_usable]
-#    return to_assign
