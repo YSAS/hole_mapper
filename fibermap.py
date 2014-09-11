@@ -5,7 +5,6 @@ from pathconf import FIBERMAP_DIRECTORY
 from readerswriters import _parse_header_row, _parse_record_row
 from glob import glob
 import hashlib
-import copy
 
 REQUIRED_ASSIGNMENTS_SECTION_KEYS=['fiber', 'id','ra','dec','epoch','pm_ra',
    'pm_dec', 'priority', 'type', 'x','y', 'z','d']
@@ -25,9 +24,10 @@ def hashfile(filepath):
     return sha1.hexdigest()
 
 def load_dotfibermap(filename):
+    """Does not return a discreete instance of the map. don't change it!"""
     try:
         if _FIBERMAP_CACHE[filename]['hash']==hashfile(filename):
-            return copy.deepcopy(_FIBERMAP_CACHE[filename]['map'])
+            return _FIBERMAP_CACHE[filename]['map']
     except KeyError:
         pass
     
