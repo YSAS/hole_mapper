@@ -4,6 +4,8 @@ from logger import getLogger
 from pathconf import FIBERMAP_DIRECTORY
 from readerswriters import _parse_header_row, _parse_record_row
 from glob import glob
+import hashlib
+import copy
 
 REQUIRED_ASSIGNMENTS_SECTION_KEYS=['fiber', 'id','ra','dec','epoch','pm_ra',
    'pm_dec', 'priority', 'type', 'x','y', 'z','d']
@@ -14,8 +16,21 @@ REQUIRED_GUIDES_SECTION_KEYS=['id','ra','dec','epoch','pm_ra',
 
 _log=getLogger('fibermap')
 
-def load_dotfibermap(filename):
+_FIBERMAP_CACHE={}
 
+def hashfile(filepath):
+    sha1 = hashlib.sha1()
+    with open(filepath, 'rb') as f:
+        sha1.update(f.read())
+    return sha1.hexdigest()
+
+def load_dotfibermap(filename):
+    try:
+        if _FIBERMAP_CACHE[filename]['hash']==hashfile(filename):
+            return copy.deepcopy(_FIBERMAP_CACHE[filename]['map'])
+    except KeyError:
+        pass
+    
     #Read file
     try:
         with open(filename,'r') as f:
@@ -76,11 +91,12 @@ def load_dotfibermap(filename):
         dict=sections['setup']['processed']
 
         assigned=sections['assignments']['processed']
-    #    assigned=map(lambda x: Target(**x),sections['assignments']['processed'])
 
+        map=Fibermap(sections['setup']['processed'], assigned)
+        _FIBERMAP_CACHE[filename]={'hash':hashfile(filename), 'map':map}
 
         #Finally the plate
-        return Fibermap(sections['setup']['processed'], assigned)
+        return map
 
     except Exception as e:
         raise FibermapError(str(e))
