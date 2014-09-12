@@ -2,6 +2,7 @@ import operator
 from cassettes import CASSETTE_NAMES, RED_CASSETTE_NAMES, BLUE_CASSETTE_NAMES
 from graphcollide import build_overlap_graph_cartesian
 from logger import getLogger
+from errors import ConstraintError
 _log=getLogger('assign')
 
 def assign(setups):
@@ -52,8 +53,9 @@ def _configure_possible_cassettes_names(setups):
         n_r_avail=setup.cassette_config.n_r_usable
         n_needed=len(setup.field.skys+setup.field.targets)
         if (n_needed<= max(n_b_avail, n_r_avail) or
-            setup.assign_to=='single'):
-            if n_needed<=n_r_avail:
+            setup.assign_to in ['single','r','b']):
+            if ((n_needed<=n_r_avail and setup.assign_to!='b') or
+                setup.assign_to=='r'):
                 _log.info('Assigning all of single to R')
                 setup.set_assigning_to(red=True)
                 for t in setup.field.skys+setup.field.targets:
@@ -80,17 +82,37 @@ def _configure_possible_cassettes_names(setups):
                       setups[0].config.b.active_fibers !=
                       setups[1].config.b.active_fibers)
         if (incompatible or
-            setups[0].assign_to=='single' or
-            setups[1].assign_to=='single'): #stick one on R and one on B
+            setups[0].assign_to in ['single','r','b'] or
+            setups[1].assign_to in ['single','r','b']):
+            if (incompatible and
+                setups[0].assign_to==setups[1].assign_to and
+                setups[0].assign_to!='single'):
+                _log.critical('Setups can not be assigned together.')
+                raise ConstraintError('Setups incompatible and required to '
+                                      'be on same arm. Correct .setup.')
+            if (setups[0].assign_to==setups[1].assign_to and
+                setups[0].assign_to!='single'):
+                raise ConstraintError('Setups should be on different arms. '
+                                      'Correct .setup.')
             _log.info('Assigning 2 to seperate spectrographs')
-            for t in setups[0].field.skys+setups[0].field.targets:
+            
+            if setups[0].assign_to=='b' or setups[1].assign_to=='r':
+                setup_to_b=setups[0]
+                setup_to_r=setups[1]
+            else:
+                setup_to_b=setups[1]
+                setup_to_r=setups[0]
+            
+            for t in setup_to_b.field.skys+setup_to_b.field.targets:
                 t.set_possible_cassettes(BLUE_CASSETTE_NAMES)
-            setups[0].set_assigning_to(blue=True)
-            setups[0].config.r.active_fibers=setups[1].config.r.active_fibers
-            for t in setups[1].field.skys+setups[1].field.targets:
+            setup_to_b.set_assigning_to(blue=True)
+            setup_to_b.config.r.active_fibers=setup_to_r.config.r.active_fibers
+            
+            for t in setup_to_r.field.skys+setup_to_r.field.targets:
                 t.set_possible_cassettes(RED_CASSETTE_NAMES)
-            setups[1].config.b.active_fibers=setups[0].config.b.active_fibers
-            setups[1].set_assigning_to(red=True)
+            setup_to_r.config.b.active_fibers=setup_to_b.config.b.active_fibers
+            setup_to_r.set_assigning_to(red=True)
+            
         else:
             _log.info('Assigning 2 to both')
             for s in setups:
@@ -101,17 +123,26 @@ def _configure_possible_cassettes_names(setups):
     else: # more than 2 setups
         #make sure all are fiber compatible (e.g. all to odds, all to evens, etc)
         _log.info('Assigning > 2')
-        _log.warn('Assigning > 2 setups support is spotty if you want anything '
-                  'more than plane jane setups together.')
-        for s in setups[1:]:
-            s.set_assigning_to(both=True)
-            if (s.config.r.active_fibers != setups[0].config.r.active_fibers or
-                s.config.b.active_fibers != setups[0].config.b.active_fibers):
-                raise AssignmentConstraintError("Setups do not all use the "
-                                                "same set of active fibers")
+        _log.warn('Assigning > 2 setups support is spotty if you want '
+                  'anything more than plane jane setups together.')
+        try:
+            for s in setups:
+                assert s.assign_to=='any'
+        except AssertionError:
+            raise ConstraintError('Assigning > 2 only supports assign_to=any.')
+        try:
+            for s in setups[1:]:
+                assert (s.config.r.active_fibers ==
+                        setups[0].config.r.active_fibers)
+                assert (s.config.b.active_fibers ==
+                        setups[0].config.b.active_fibers)
+        except AssertionError:
+            raise ConstraintError('Assigning > 2 only supports setups which '
+                                  'all use use the same set of active fibers.')
         
         #Set all to use any
         for s in setups:
+            s.set_assigning_to(both=True)
             for t in s.field.skys+s.field.targets:
                 t.set_possible_cassettes(CASSETTE_NAMES)
     
@@ -258,8 +289,7 @@ def _assign_fibers(setups):
                     n_skip_map[s]+=1
                     extra_skip-=1
 
-#    n_skip=len(unassigned_skys)+len(unassigned_objs)-cassettes.n_available
-    #First drop skys
+    #First drop skys, respecting minsky
     for s in setups:
         n_skip=n_skip_map[s]
         if n_skip > 0:
@@ -296,6 +326,19 @@ def _assign_fibers(setups):
             objs.sort(key=lambda x:x.priority)
             
             unassignable+=objs[:todrop]
+            
+            #verify that none of the targets to drop have highest priority and mustkeep set
+            if s.mustkeep:
+                not_droppable=[o for o in objs[:todrop]
+                               if o.priority==s.field.max_priority]
+            else:
+               not_droppable=[]
+            if not_droppable:
+                err=('Need to drop {} highest priority targets '
+                     'to make assignment work but mustkeep '
+                     'is set')
+                raise ConstraintError(err.format(len(not_droppable)))
+            
             for t in objs[:todrop]:
                 try:
                     unassigned_objs.remove(t)

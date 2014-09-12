@@ -165,6 +165,7 @@ class FieldCatalog(object):
         ret={'name':self.name,
              'file':self.file,
              'obsdate':str(self.obsdate),
+             'mustkeep':str(self.mustkeep),
              '(ra, dec)':'{} {}'.format(self.sh.ra.sexstr,self.sh.dec.sexstr),
              '(az, el)':'{:3f} {:3f}'.format(self.holesxy_info.az,
                                              self.holesxy_info.el),
@@ -416,6 +417,14 @@ class Field(object):
         
         for t in self.all_targets: t.field=self
 
+    @property
+    def max_priority(self):
+        try:
+            return self._max_priority
+        except AttributeError:
+            self._max_priority=max([t.priority for t in self.targets])
+        return self._max_priority
+        
     @property
     def ra(self):
         return self.info['(ra, dec)'].split()[0]

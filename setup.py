@@ -100,16 +100,18 @@ class SetupDefinition(object):
         self.configname=configname
         self.assign_to=assign_to.lower()
         self.assign_given=extra.pop('assign_given','')
-        if self.assign_to not in ['single', 'any']:
+        if self.assign_to not in ['single', 'any', 'r','b']:
             raise ValueError('Supported values for assign_to are '
                              'single and any. Fix file {}'.format(self.file))
         self.extra=extra if extra else {}
     
     @property
     def name(self):
-        if self.assign_to!='any' or self.assign_given:
+        if (self.assign_to!='any' or self.assign_given or
+            'mustkeep' in self.extra):
             hashstr=':'+hashlib.sha1(self.assign_to+
-                                    self.assign_given).hexdigest()[:6]
+                                     self.assign_given+
+                                     str(self.extra.get('mustkeep',None))).hexdigest()[:6]
         else:
             hashstr=''
         return '{}:{}:{}{}'.format(self.platename, self.fieldname,
@@ -146,6 +148,13 @@ class Setup(object):
     @property
     def assign_to(self):
         return self.setupdef.assign_to
+    
+    @property
+    def mustkeep(self):
+        if 'mustkeep' in self.setupdef.extra:
+            return self.setupdef.extra['mustkeep']
+        return self.field.info.get('mustkeep', False)
+                
 
     def reset(self):
         self.config=get_config(self.config.name)
@@ -187,6 +196,7 @@ class Setup(object):
         ret['fieldfile']=ret.pop('file')
         if self.setupdef.assign_given:
             ret['assign_given']= self.setupdef.assign_given
+        ret['mustkeep']=self.mustkeep
 #        import ipdb;ipdb.set_trace()
         addit={'assign_with':', '.join(s.name for s in self.assign_with),
                'plate':self.plate.name, 'config':self.config.name,
