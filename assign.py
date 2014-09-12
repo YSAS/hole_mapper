@@ -546,7 +546,11 @@ def _filter_for_pluggability(targets):
     #Nothing can conflict
     coll_graph=build_overlap_graph_cartesian(x,y,d)
 
-    keep=coll_graph.crappy_min_vertex_cover_cut()
+    uncuttable=[i for i,t in enumerate(targets)
+                if t.priority==t.field.max_priority and t.setup.mustkeep]
+    weights=[t.priority/t.field.max_priority for t in targets]
+    keep=coll_graph.crappy_min_vertex_cover_cut(uncuttable=uncuttable,
+                                                weights=weights)
 
     return [targets[i] for i in keep]
 
