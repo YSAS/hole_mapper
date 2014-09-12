@@ -48,9 +48,9 @@ class FieldSettingsDialog(object):
 #        Tkinter.Label(lframe, text='Setup #:').grid(row=0,column=0)
 
 
-        self.keep_all = Tkinter.IntVar(value=int(field.keep_all))
-        Tkinter.Checkbutton(self.dialog, text="Keep All",
-                            variable=self.keep_all).pack()
+        self.mustkeep = Tkinter.IntVar(value=int(field.mustkeep))
+        Tkinter.Checkbutton(self.dialog, text="Must Keep",
+                            variable=self.mustkeep).pack()
         if field.obsdate:
             now=field.obsdate.strftime('%Y-%m-%d %H:%M:%S')
         else:
@@ -88,7 +88,7 @@ class FieldSettingsDialog(object):
                                                  '%Y-%m-%d %H:%M:%S')
         except ValueError:
             return False
-        self.field.keep_all=bool(self.keep_all.get())
+        self.field.mustkeep=bool(self.mustkeep.get())
         return True
 
 class HoleInfoDialog:

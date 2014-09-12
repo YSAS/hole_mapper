@@ -38,7 +38,7 @@ class FieldCatalog(object):
         self.standards=standards if standards else []
         
         self.holesxy_info=None
-        self.keep_all=False
+        self.mustkeep=False
         self.filler_targ=False
         self._processed=False
     
@@ -363,10 +363,9 @@ def load_dotfield(file):
             elif k=='name':
                 field_cat.field_name=v
             elif k in ['keep_all', 'mustkeep']:
-                k='keep_all'
                 log.info('Dropping targets forbidden for field {} in {}'.format(
                     field_cat.field_name, file))
-                field_cat.keep_all=True if v.lower()!='false' else False
+                field_cat.mustkeep=True if v.lower()!='false' else False
             else:
                 field_cat.user[k]=v
                 

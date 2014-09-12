@@ -267,13 +267,13 @@ class Manager(object):
             #Keep those with collisions if don't have enough
             if len(keep) < MIN_GUIDES:
                 #Keep min guides, we can't keep the guide if it conflicts
-                # with a target in a field with keep_all set
+                # with a target in a field with mustkeep set
                 while with_coll:
                     i=with_coll.pop(0)
                     #See if we must drop the guide
                     drop_guide=False
                     for j in coll_graph.collisions(i):
-                        drop_guide|=(holes[j].target.field.keep_all and
+                        drop_guide|=(holes[j].target.field.mustkeep and
                                      (holes[j].target.is_sky or
                                       holes[j].target.is_target))
                         if drop_guide:
@@ -332,13 +332,13 @@ class Manager(object):
             
             if len(keep) < MIN_ACQUISITIONS:
                 #Keep min acquisitions, we can't keep them if it conflicts
-                # with a target in a field with keep_all set
+                # with a target in a field with mustkeep set
                 while with_coll:
                     i=with_coll.pop(0)
                     #See if we must drop it
                     drop=False
                     for j in coll_graph.collisions(i):
-                        drop|=(holes[j].target.field.keep_all and
+                        drop|=(holes[j].target.field.mustkeep and
                                (holes[j].target.is_sky or
                                 holes[j].target.is_target))
                         if drop:
@@ -398,7 +398,7 @@ class Manager(object):
             min_priority=f.min_priority
             max_priority=f.max_priority
             for h in (x for x in holes if x.target.field==f):
-                if (h.target.field.keep_all and
+                if (h.target.field.mustkeep and
                     h.target.priority==max_priority):
                     h.target.fm_priority=1e9
                 if (h.target.field.filler_targ and
