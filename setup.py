@@ -140,6 +140,7 @@ class Setup(object):
         self.cassette_config=CassetteConfig(usable=config)
     
         for t in self.field.all_targets:
+            t.setup=self
             try:
                 assert t.field==self.field
             except AssertionError:

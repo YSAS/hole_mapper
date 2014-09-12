@@ -311,9 +311,6 @@ def _assign_fibers(setups):
                                                                  s.name)+
                           'because there are too many things to plug.')
             n_skip_map[s]-=todrop
-#            n_skip-=todrop
-##            if n_skip <1:
-##                break
 
     #Then drop targets if still needed
     for s in setups:
