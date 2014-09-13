@@ -9,7 +9,7 @@ import operator
 import os.path
 from logger import getLogger
 from dimensions import PLATE_RADIUS, SH_RADIUS
-from setup import get_all_setups
+from setup import get_all_setups, get_setup
 from graphcollide import build_overlap_graph_cartesian
 from holesxy import get_plate_holes
 import math
@@ -77,9 +77,11 @@ class Manager(object):
         self.selected_setups=None
 
     def pick_setups(self, setup_names):
-        setups=get_all_setups()
-        self.selected_setups=[s for s in setups if s.name in setup_names]
-    
+
+        self.selected_setups=[get_setup(s) for s in setup_names]
+#        setups=get_all_setups()
+#        self.selected_setups=[s for s in setups if s.name in setup_names]
+
         #Assign setups
         assign(self.selected_setups)
 
