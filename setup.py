@@ -107,11 +107,14 @@ class SetupDefinition(object):
     
     @property
     def name(self):
-        if (self.assign_to!='any' or self.assign_given or
-            'mustkeep' in self.extra):
+        if (self.assign_to!='any' or
+            self.assign_given or
+            self.extra.get('mustkeep',None)!=None or
+            self.extra.get('keepall',False)):
             hashstr=':'+hashlib.sha1(self.assign_to+
                                      self.assign_given+
-                                     str(self.extra.get('mustkeep',None))).hexdigest()[:6]
+                                     str(self.extra.get('mustkeep',None))+
+                                     str(self.extra.get('keepall',False))).hexdigest()[:6]
         else:
             hashstr=''
         return '{}:{}:{}{}'.format(self.platename, self.fieldname,
@@ -152,10 +155,15 @@ class Setup(object):
     
     @property
     def mustkeep(self):
+        """should keep all the highest priority targets"""
         if 'mustkeep' in self.setupdef.extra:
             return self.setupdef.extra['mustkeep']
         return self.field.info.get('mustkeep', False)
-                
+    
+    @property
+    def keepall(self):
+        """ don't drop any targets due to conflicts with other setups"""
+        return self.setupdef.extra.get('keepall', False)
 
     def reset(self):
         self.config=get_config(self.config.name)
@@ -244,8 +252,6 @@ class Setup(object):
         
         targs=[t for t in self.field.targets if t.id not in previously]
         return self.field.skys+targs
-    
-    
     
     @property
     def uses_b_side(self):

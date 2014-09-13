@@ -1,6 +1,8 @@
 from jbastro.great_circle_dist import dist_radec_fast
 import numpy as np
 
+class GraphCutError(Exception):
+    pass
 
 def build_overlap_graph_cartesian(x, y, d, overlap_pct_r_ok=0):
     """
@@ -113,7 +115,7 @@ class CollisionGraph(object):
 
         if not uncuttable:
             uncuttable=[]
-        
+
         edgegraph=deepcopy(self._graph)
         edgegraph=OrderedDict(edgegraph)
         
@@ -130,16 +132,20 @@ class CollisionGraph(object):
                 # and remove them from the graph
                 single_drop_count+=1
                 
-                if (weights[node] < weights[edge_set[0]] and
-                    node not in uncuttable):
+                if (node in uncuttable and
+                    edge_set[0] in uncuttable):
+                    raise GraphCutError('Connected nodes both in uncuttable. '
+                                        'Error at node {}'.format(node))
+                
+                if ((weights[node] < weights[edge_set[0]] and
+                     node not in uncuttable) or
+                    edge_set[0] in uncuttable):
                     to_drop=node
                     edgegraph.pop(edge_set[0])
                 else:
-                    if edge_set[0] in uncuttable:
-                        raise ValueError('Connected nodes both in uncuttable')
                     to_drop=edge_set[0]
                     edge_set=edgegraph.pop(edge_set[0])
-
+            
                 #Drop the node
                 nodes.remove(to_drop)
                 dropped.append((to_drop, edge_set))
@@ -158,7 +164,8 @@ class CollisionGraph(object):
                                                    edge_set, weights,
                                                    uncuttable)
                 if to_drop==None:
-                    raise ValueError('Connected nodes all uncuttable')
+                    raise GraphCutError('Connected nodes all uncuttable.'
+                                        'Error at node {}'.format(node))
                 
                 edge_set=edgegraph.pop(to_drop)
 
@@ -207,10 +214,14 @@ class CollisionGraph(object):
             weight and most edges of min weights"""
         visited=[]
         to_visit=set(edges)
-        cur=start
-        minw=weights[start]
+
+        if start in uncuttable:
+            minw=float('inf')
+        else:
+            minw=weights[start]
         rank=len(edges)
         to_drop=start
+        
         while to_visit:
             current=to_visit.pop()
             try:

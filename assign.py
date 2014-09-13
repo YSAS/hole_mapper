@@ -1,6 +1,6 @@
 import operator
 from cassettes import CASSETTE_NAMES, RED_CASSETTE_NAMES, BLUE_CASSETTE_NAMES
-from graphcollide import build_overlap_graph_cartesian
+from graphcollide import build_overlap_graph_cartesian, GraphCutError
 from logger import getLogger
 from errors import ConstraintError
 _log=getLogger('assign')
@@ -211,11 +211,46 @@ def _assign_fibers(setups):
         assign fiber numbers with x coordinate of holes
     """
     
-    #Get all the targets we are to assign
-    to_assign=[t for s in setups for t in s.to_assign]
+    #Get all the targets we are to assign filtering out targets
+    # which can't be plugged simultaneously
+    to_assign=[]
 
-    #Filter out targets which can't be plugged simultaneously
-    to_assign=_filter_for_pluggability(to_assign)
+    #Filter each setup by priority
+    for s in setups:
+        setup_targets=s.to_assign
+        x=[t.hole.x for t in setup_targets]
+        y=[t.hole.y for t in setup_targets]
+        d=[t.hole.conflict_d for t in setup_targets]
+        weights=[t.priority/t.field.max_priority for t in setup_targets]
+        
+        coll_graph=build_overlap_graph_cartesian(x,y,d) #Nothing can conflict
+        keep=coll_graph.crappy_min_vertex_cover_cut(weights=weights)
+        
+        to_assign.extend([setup_targets[i] for i in keep])
+
+    #Filter the ensemble together respecting mustkeep and keepall
+    #to_assign=[t for t in to_assign if t.setup==setups[0]]
+    x=[t.hole.x for t in to_assign]
+    y=[t.hole.y for t in to_assign]
+    d=[t.hole.conflict_d for t in to_assign]
+
+    weights=[t.priority/t.field.max_priority for t in to_assign]
+    uncuttable=[i for i,t in enumerate(to_assign)
+                if (t.priority==t.field.max_priority and t.setup.mustkeep) or
+                   t.setup.keepall]
+    
+    coll_graph=build_overlap_graph_cartesian(x, y, d) #Nothing can conflict
+
+    try:
+        keep=coll_graph.crappy_min_vertex_cover_cut(uncuttable=uncuttable,
+                                                    weights=weights)
+    except GraphCutError as e:
+        raise ConstraintError('Collisions among targets affected by mustkeep '
+                              'or keepall make assignment impossible.')
+
+    assert set(uncuttable).issubset(set(keep))
+
+    to_assign=[to_assign[i] for i in keep]
     
     #Reset all the assignments
     for s in setups:
@@ -549,9 +584,13 @@ def _filter_for_pluggability(targets):
     uncuttable=[i for i,t in enumerate(targets)
                 if t.priority==t.field.max_priority and t.setup.mustkeep]
     weights=[t.priority/t.field.max_priority for t in targets]
-    keep=coll_graph.crappy_min_vertex_cover_cut(uncuttable=uncuttable,
-                                                weights=weights)
-
+    import ipdb;ipdb.set_trace()
+    try:
+        keep=coll_graph.crappy_min_vertex_cover_cut(uncuttable=uncuttable,
+                                                    weights=weights)
+    except GraphCutError:
+        raise ConstraintError('Collisions among targets affected by mustkeep '
+                              'makes assignment impossible')
     return [targets[i] for i in keep]
 
 

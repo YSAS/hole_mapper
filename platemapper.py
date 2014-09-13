@@ -11,6 +11,8 @@ from ttkcalendar import date_time_picker
 from setup import get_all_setups
 import argparse
 from logger import getLogger
+import tkMessageBox
+import errors
 log=getLogger('plateplanner')
 
 
@@ -218,7 +220,11 @@ class App(Tkinter.Tk):
 
     def pick_setups(self, event):
         log.info('Selecting {}'.format(event.widget.selection()))
-        self.manager.pick_setups(event.widget.selection())
+        try:
+            self.manager.pick_setups(event.widget.selection())
+        except errors.ConstraintError as e:
+            log.critical('Selection failed: {}'.format(e))
+            tkMessageBox.showerror('Mapping Error', str(e))
         self.show()
 
     def make_plug(self):
