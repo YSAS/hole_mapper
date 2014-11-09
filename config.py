@@ -8,7 +8,7 @@ from copy import deepcopy
 KNOWN_SLITS=['180','125','95','75','58','45']
 KNOWN_FILTERS=['BK7', 'Mgb_O69',' CalRT_O41','HotJupiter','Mgb_Rev2', 'IanR',
               'Halpha_Li', 'IanR_O77_80','Mgb-Rev2','CaT-OneOrder',
-              'BStar_O80_87']
+              'BStar_O80_87', 'BulgeGC_1','Mgb_FourOrders']
 
 def _load_configs():
     setupfiles=glob(CONFIGDEF_DIRECTORY()+'*.configdef')
@@ -36,7 +36,7 @@ def load_dotconfigdef(filename):
         kwords=_config_dict_from_dotsetup_dict(section_dict,'B')
         configB=M2FSArmConfig('B', **kwords)
     except (ValueError, AssertionError) as e:
-        raise ValueError('Bad config {}: {}'.format(filename,str(e)))
+        raise ValueError('Bad config {}: {}'.format(filename,str(e)+l))
 
     return M2FSConfig(name, configR, configB)
 
