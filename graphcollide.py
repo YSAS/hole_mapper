@@ -18,7 +18,7 @@ def build_overlap_graph_cartesian(x, y, d, overlap_pct_r_ok=0):
     x--(-)y overlaps for y by 1 radius and .5 for x
     default allowable_overlap
     
-    may generate conntions that only go one direction
+    may generate connections that only go one direction
     """
     edges={}
     x=np.array(x)
@@ -285,6 +285,9 @@ class CollisionGraph(object):
 
     def get_colliding_node(self):
         return self._graph.keys()[0]
+    
+    def get_colliding_nodes(self):
+        return self._graph.keys()
 
     @property
     def is_disconnected(self):
