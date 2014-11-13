@@ -284,7 +284,9 @@ class FieldCatalog(object):
         return (self.skys+self.targets+self.guides+self.acquisitions)
 
     def holes(self):
-        """ return a list of all the holes the field would like on a plate """
+        """
+        return a list of all the holes the field would like on a plate
+        """
         try:
             return [hole for t in self.all_targets for hole in t.holes]
         except AttributeError:
@@ -309,7 +311,25 @@ class FieldCatalog(object):
 
     @property
     def n_conflicts(self):
-        return len([t.info for t in self.skys+self.targets if t.conflicting])
+        return len([t for t in self.skys+self.targets if t.conflicting])
+
+    @property
+    def n_drillable_targs(self):
+        return len([t for t in self.targets
+                    if not t.conflicting and t.on_plate])
+    @property
+    def n_drillable_skys(self):
+        return len([t for t in self.skys if not t.conflicting and t.on_plate])
+
+    @property
+    def n_mustkeep_conflicts(self):
+        """return number of mustkeeps with conflicts, nonzero means 
+        constraints aren't met """
+        if not self.mustkeep:
+            return 0
+        else:
+            return len([t for t in self.targets if
+                        t.priority==self.max_priority and t.conflicting])
 
     def undrillable_dictlist(self, flat=False):
         ret=[t.info for t in self.all_targets
@@ -355,9 +375,9 @@ def load_dotfield(file):
                 v=v.strip()
                 assert v != ''
             except Exception as e:
-                raise IOError('Failed on line '
-                        '{}: {}\n  Bad key=value formatting:{}'.format(
-                        lines.index(l), l ,str(e)))
+                msg=('Failed at {}({}): \n {}\n '.format(lines.index(l), l) +
+                    'Bad key=value formatting: '+str(e))
+                raise IOError(msg)
 
             if k=='obsdate':
                 field_cat.obsdate=datetime(*map(int,re.split('\W+', v)))
@@ -375,16 +395,16 @@ def load_dotfield(file):
                 keys=_parse_header_row(l.lower(), REQUIRED=REQUIRED_FIELD_KEYS)
                 user_keys=[k for k in keys if k not in FIELD_KEYS]
             except Exception as e:
-                raise IOError('Failed on line {}: {}\n  {}'.format(
-                               lines.index(l), l ,str(e)))
+                raise IOError('Failed at {}({}):\n  {}\n  {}'.format(
+                               file,lines.index(l), l ,str(e)))
         else:
             try:
                 rec=_parse_record_row(l, keys, user_keys,
                                       REQUIRED=REQUIRED_FIELD_RECORD_ENTRIES)
                 field_cat.add_target(Target(**rec))
             except Exception as e:
-                raise IOError('Failed on line {}: {}\n  {}'.format(
-                               lines.index(l), l ,str(e)))
+                raise IOError('Failed at {}({}):\n  {}\n  {}'.format(
+                               file,lines.index(l), l ,str(e)))
 
     return field_cat
 

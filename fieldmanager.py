@@ -265,7 +265,7 @@ class Manager(object):
             keep=no_coll
             
             #Keep those with collisions if don't have enough
-            if len(keep) < MIN_GUIDES:
+            if len(keep) < min(MIN_GUIDES, len(f.guides)):
                 #Keep min guides, we can't keep the guide if it conflicts
                 # with a target in a field with mustkeep set
                 while with_coll:
@@ -289,7 +289,7 @@ class Manager(object):
             else:
                 discard+=with_coll
             
-            if len(keep) < MIN_GUIDES:
+            if len(keep) < min(MIN_GUIDES, len(f.guides)):
                 raise ConstraintError("Can't keep enough guides for {} due to collisions with undroppable targets".format(f.name))
     
             #Keep the guides from the field
@@ -355,7 +355,7 @@ class Manager(object):
                 discard+=with_coll
                             
             if len(keep) < MIN_ACQUISITIONS:
-                raise ConstraintError("Can't keep enough guides for {} due to collisions with undroppable targets".format(f.name))
+                raise ConstraintError("Can't keep enough acquisitions for {} due to collisions with undroppable targets".format(f.name))
             
             #Keep the guides from the field
             to_keep+=keep
