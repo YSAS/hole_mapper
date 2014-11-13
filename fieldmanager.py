@@ -1,12 +1,12 @@
 import operator
 import os.path
 from logger import getLogger
-from dimensions import PLATE_RADIUS, SH_RADIUS
+from dimensions import PLATE_RADIUS, SH_RADIUS, DRILLABLE_PCT_R_OVERLAP_OK
 from readerswriters import _dictlist_to_records, _format_attrib_nicely
 from field import load_dotfield
 from graphcollide import build_overlap_graph_cartesian
 from holesxy import get_plate_holes
-from target import Target
+from target import Target,ConflictDummy
 from hole import Hole
 from errors import ConstraintError
 log=getLogger('plateplanner.foo')
@@ -210,24 +210,68 @@ class Manager(object):
     
     def select_fields(self, field_names):
         old=set([f.name for f in self.selected_fields])
-#        if not set(field_names).issuperset(old):
-#
+
         self.reset()
         ndxs=[i for i,f in enumerate(self.fields) if f.name in field_names]
         self.selected_fields=[self.fields[i] for i in ndxs]
         
-        #Determine the conflicts
+        #Get all the holes that might go on the plate
         targs = [t for f in self.selected_fields
                    for t in f.get_drillable_targets() ]
         holes=[t.hole for t in targs] + [t.hole for t in self.plate_holes]
-               
+        
+
+        #Determine the conflicts
         self._determine_conflicts(holes)
     
-        #TODO: Verify that enough guides and acquistions can be plugged
-        #simultaneously for each field
+        #go through and make sure all the mutkeep targets were kept all the
+        #fields have atleast minsky
+        # were lost due to minsky
+        # if some were lost due to minsky then constrainterror
+
+        for f in self.selected_fields:
+            if f.n_drillable_skys<f.minsky or f.n_mustkeep_conflicts:
+                raise ConstraintError("An feud between undroppable targets and "
+                                      "the minsky constraint precludes these "
+                                      "fields from coexisting.")
+
+        #Set excess skys as conflicting
+        for f in self.selected_fields:
+            #grab non-conflicting skys
+            skys=[s for s in f.skys if not s.conflicting]
+            if len(skys) <= f.maxsky:
+                continue
+            
+            #group by priority
+            from itertools import groupby
+            skys.sort(key=lambda x:x.priority, reverse=True)
+            sky_groups=[list(g) for k,g in groupby(skys,lambda x:x.priority)]
+          
+            #take min(n_in_priority, maxsky) randomly from priority groups
+            # in order of decreasing priority until maxsky  obtained.
+            keep=[]
+            import random
+            random.seed(0)
+            for sg in sky_groups:
+                if len(keep) < f.maxsky:
+                    keep.extend(random.sample(sg,
+                                              min(len(sg), f.maxsky-len(keep))))
+                else:
+                    break
+            
+            #for skys left set a conflict dummy
+            for t in (t for t in skys if t not in keep):
+                t.conflicting=ConflictDummy(id='maxsky')
+
+
 
     def _determine_conflicts(self, holes):
-
+        """
+        determines conflits within the set of holes accounting for 
+        interfield issues
+        """
+        
+        
         x=[h.x for h in holes]
         y=[h.y for h in holes]
         d=[h.conflict_d for h in holes]
@@ -371,43 +415,55 @@ class Manager(object):
             for d in dropped:
                 holes[d].target.conflicting=holes[ndx].target
 
-#        ipdb.set_trace()
+        ######################
 
         #Now repeat the process using only sky and targets
-        discard+=to_keep
-        holes=[h for i, h in enumerate(holes) if i not in discard]
+        holes=[h for i, h in enumerate(holes) if i not in discard+to_keep]
         x=[h.x for h in holes]
         y=[h.y for h in holes]
         d=[h.conflict_d for h in holes]
 
+        #Make certain there are no guides or acquisitions in holes under
+        # consideration
         assert len([h for h in holes
                     if h.target.is_guide or h.target.is_acquisition])==0
         
         #Rebuild the graph allowing partial overlap
-        coll_graph=build_overlap_graph_cartesian(x, y, d, overlap_pct_r_ok=0.9)
-#TODO: parameterize overlap_pct_r_ok
+        coll_graph=build_overlap_graph_cartesian(x, y, d, overlap_pct_r_ok=
+                                                 DRILLABLE_PCT_R_OVERLAP_OK)
     
-        #priorities must first be redistributed onto the same scale
-        #must keeps > wants> filler  guide and acquisitions don't matter
+        #Redistribute priorities onto the same scale
+        #must keeps (highest priority in a field) > wants > filler
         
+        #Grab only the skys and targets
         pri_holes=[h for h in holes if h.target.is_sky or h.target.is_target]
-        for h in pri_holes:
-            h.target.fm_priority=None
         
+        #Create a new attribute to store the computed priority
+        for h in pri_holes: h.target.fm_priority=None
+        
+        #must keeps (max pri if mustkeep set) get fm_pri=1e9
+        #filler (min pri if filler_targ set and min pri !=max pri) get fm_pri=1
+        
+        #For each of the fields for which there is a sky or target
         for f in list(set(h.target.field for h in pri_holes)):
-            min_priority=f.min_priority
-            max_priority=f.max_priority
+            #for each of the holes which belong to that field
             for h in (x for x in holes if x.target.field==f):
                 if (h.target.field.mustkeep and
-                    h.target.priority==max_priority):
+                    h.target.priority==f.max_priority):
                     h.target.fm_priority=1e9
                 if (h.target.field.filler_targ and
-                    h.target.priority==min_priority):
+                    f.max_priority!=f.min_priority and
+                    h.target.priority==f.min_priority):
                     h.target.fm_priority=1
-
+    
+        #Assign all non mustkeep skys as filler, we will respect minsky later
+        filler_sky=[h for h in pri_holes
+                    if h.target.fm_priority is None and h.target.is_sky]
+        for h in filler_sky: h.target.fm_priority=1
+        
+        #all the targets left neither must keep nor filler
         need_fm_pri=[h.target for h in pri_holes
-                     if h.target.fm_priority == None and
-                     1]
+                     if h.target.fm_priority is None]
         
         #break need_fm_pri into groups by field
         from itertools import groupby
@@ -416,8 +472,7 @@ class Manager(object):
         field_fm_pri_group=[list(g) for k,g in grouping_iter]
         
         #sort each group by priority
-        for x in field_fm_pri_group:
-            x.sort(key=lambda x:x.priority)
+        for x in field_fm_pri_group: x.sort(key=lambda x:x.priority)
 
         next_priority=sum(len(x) for x in field_fm_pri_group)+10
         pri_group=0
@@ -433,16 +488,34 @@ class Manager(object):
                 pri_group-=1
 
             #Determine the next group to sample
-            pri_group+=1
-            if pri_group >= len(field_fm_pri_group):
-                pri_group=0
+            pri_group=0 if pri_group>=len(field_fm_pri_group)-1 else pri_group+1
         
         #Go though collision graph and flag all the targets with issues
 
-#TODO add support for minsky here or maybe after acquisitions above
+        #rank each sky by -sum of weights of things it interferes with
+        # to penalize skys that interfere with things the most
+        sky_pri=[-sum([holes[i].target.fm_priority for i in
+                      coll_graph.collisions(holes.index(s))])
+                 for s in filler_sky]
+        for s,p in zip(filler_sky,sky_pri): s.target.fm_priority=p
+
+
+
+        #Didn't assign fm_priorities to standard holes and the like
+        coll_sort_key=(lambda x: holes[x].target.fm_priority if
+                                 holes[x].target.fm_priority!=None else
+                                 -1e9)
         while not coll_graph.is_disconnected: #Edges are holes too close together
-        
-            coll_ndx = coll_graph.get_colliding_node()
+
+            #need to go through the collisions lowest priority first with minsky
+            # because drop choice is no longer local to a conflict group
+            # could have dropped a bunch of skys elsewhere then get a sky
+            # interfereing with a mustkeep that we could have otherwise dropped.
+            coll_ndxs=coll_graph.get_colliding_nodes()
+            coll_ndxs.sort(key=coll_sort_key)
+            coll_ndx=coll_ndxs[0]
+            
+#            coll_ndx = coll_graph.get_colliding_node()
             coll_targ=holes[coll_ndx].target
             
             if coll_targ.is_standard: #Drop the standard star hole
@@ -453,7 +526,9 @@ class Manager(object):
                 #Get conflicting holes
                 collwith_ndxs=coll_graph.collisions(coll_ndx)
                 conflicts=set([holes[i].target for i in collwith_ndxs])
-                if coll_targ.priority < max(t.priority for t in conflicts):
+                if (coll_targ.priority < max(t.priority for t in conflicts) and
+                    (not coll_targ.is_sky or
+                     coll_targ.field.n_drillable_skys>coll_targ.field.minsky)):
                     #Drop the target
                     coll_targ.conflicting=conflicts
                     coll_graph.drop(coll_ndx)

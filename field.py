@@ -9,7 +9,10 @@ from target import Target,ConflictDummy
 from target import GUIDEREF_TYPE, GUIDE_TYPE, ACQUISITION_TYPE, SH_TYPE
 from graphcollide import build_overlap_graph_cartesian
 from dimensions import PLATE_TARGET_RADIUS_LIMIT
-from readerswriters import _parse_header_row, _parse_record_row, _dictlist_to_records
+from readerswriters import _parse_header_row, _parse_record_row
+from readerswriters import _dictlist_to_records
+from dimensions import SIMULTANEOUS_PLUG_PCT_R_OVERLAP_OK
+from dimensions import GUIDEACQ_PCT_R_OVERLAP_OK
 from errors import ConstraintError
 import numpy as np
 import re
@@ -39,6 +42,8 @@ class FieldCatalog(object):
         
         self.holesxy_info=None
         self.mustkeep=False
+        self.maxsky=1000
+        self.minsky=0
         self.filler_targ=False
         self._processed=False
     
@@ -71,6 +76,14 @@ class FieldCatalog(object):
             self.skys.append(targ)
         elif targ.is_target:
             self.targets.append(targ)
+            try:
+                del self._max_priority
+            except Exception:
+                pass
+            try:
+                del self._min_priority
+            except Exception:
+                pass
         elif targ.is_guide:
             self.guides.append(targ)
         elif targ.is_acquisition:
@@ -87,12 +100,20 @@ class FieldCatalog(object):
     @property
     def max_priority(self):
         """max priority of type T in the catalog """
-        return max([t.priority for t in self.targets])
+        try:
+            return self._max_priority
+        except AttributeError:
+            self._max_priority=max([t.priority for t in self.targets])
+            return self._max_priority
     
     @property
     def min_priority(self):
         """min priority of type T in the catalog """
-        return min([t.priority for t in self.targets])
+        try:
+            return self._min_priority
+        except AttributeError:
+            self._min_priority=min([t.priority for t in self.targets])
+            return self._min_priority
 
     def process(self):
         """
@@ -166,6 +187,8 @@ class FieldCatalog(object):
              'file':self.file,
              'obsdate':str(self.obsdate),
              'mustkeep':str(self.mustkeep),
+             'minsky':str(self.minsky),
+             'maxsky':str(self.maxsky),
              '(ra, dec)':'{} {}'.format(self.sh.ra.sexstr,self.sh.dec.sexstr),
              '(az, el)':'{:3f} {:3f}'.format(self.holesxy_info.az,
                                              self.holesxy_info.el),
@@ -223,7 +246,8 @@ class FieldCatalog(object):
 
         #Per Mario:
         #No overlap with guides/acquisitions/sh
-        coll_graph=build_overlap_graph_cartesian(x,y,d, overlap_pct_r_ok=0.0)
+        coll_graph=build_overlap_graph_cartesian(x,y,d, overlap_pct_r_ok=
+                                                 GUIDEACQ_PCT_R_OVERLAP_OK)
         #Drop everything conflicting with the sh, guides or acquisitions
         ndxs=[i for i, h in enumerate(holes) if h.target.type in
               [GUIDE_TYPE, ACQUISITION_TYPE, SH_TYPE]]
@@ -245,7 +269,8 @@ class FieldCatalog(object):
         pri=[h.target.priority for h in holes]
 
         #Now do it again but allowing some overlap
-        coll_graph=build_overlap_graph_cartesian(x, y, d, overlap_pct_r_ok=-0.05)
+        coll_graph=build_overlap_graph_cartesian(x, y, d, overlap_pct_r_ok=
+                            SIMULTANEOUS_PLUG_PCT_R_OVERLAP_OK)
 
 
         keep, drop=coll_graph.crappy_min_vertex_cover_cut(weights=pri,
@@ -384,11 +409,17 @@ def load_dotfield(file):
             elif k=='name':
                 field_cat.field_name=v
             elif k in ['keep_all', 'mustkeep']:
-                log.info('Dropping targets forbidden for field {} in {}'.format(
+                log.info('Dropping targets is forbidden for field {} in {}'.format(
                     field_cat.field_name, file))
                 field_cat.mustkeep=True if v.lower()!='false' else False
+            elif k =='minsky':
+                #todo: verify minsky value
+                field_cat.minsky=int(v)
+            elif k =='maxsky':
+                #todo: verify maxsky value
+                field_cat.maxsky=int(v)
             else:
-                field_cat.user[k]=v
+                field_cat.user[k]=int(v)
                 
         elif l.lower().startswith('ra'):
             try:
