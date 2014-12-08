@@ -19,7 +19,7 @@ GUIDEREF_TYPE='R'
 FIDUCIAL_TYPE='F'
 THUMBSCREW_TYPE='B'
 
-VALID_TYPE_CODES=['T', 'S', 'C', 'G', 'A', 'Z','O','F','B','R']
+VALID_TYPE_CODES=['T', 'S', 'C', 'G', 'A', 'Z','O','F','B','R','I','U']
 
 class ConflictDummy(object):
     """Dummy conflict type for things like off edge of plate"""
@@ -37,6 +37,8 @@ class Target(object):
         """ 
         hole should be a single hole or a list of holes with the primary hole first
         """
+        #self.setup is reserved for adding by the setup class as needed
+        
         self.ra=RA(kwargs.pop('ra',0.0))
         self.dec=Dec(kwargs.pop('dec',0.0))
         self.epoch=float(kwargs.pop('epoch',2000.0))

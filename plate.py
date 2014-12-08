@@ -4,6 +4,7 @@ import os.path
 from logger import getLogger
 from pathconf import PLATE_DIRECTORY
 from glob import glob
+import copy, hashlib
 
 from readerswriters import _parse_header_row, _parse_record_row
 
@@ -18,6 +19,15 @@ REQUIRED_PLATE_RECORD_ENTRIES=['ra', 'dec', 'epoch', 'id', 'type', 'priority',
                                'pm_ra','pm_dec','x','y','z']
 
 _log=getLogger('plate')
+
+_PLATE_CACHE={}
+
+def hashfile(filepath):
+    sha1 = hashlib.sha1()
+    with open(filepath, 'rb') as f:
+        sha1.update(f.read())
+    return sha1.hexdigest()
+
 
 class PlateError(Exception):
     pass
@@ -45,7 +55,15 @@ class Plate(object):
     def file_version(self):
         return '1.0'
 
-def load_dotplate(filename):
+def load_dotplate(filename, singleton_ok=False):
+    try:
+        if _PLATE_CACHE[filename]['hash']==hashfile(filename):
+            if singleton_ok:
+                return _PLATE_CACHE[filename]['value']
+            else:
+                copy.deepcopy(_PLATE_CACHE[filename]['value'])
+    except KeyError:
+        pass
 
     #Read file
     try:
@@ -123,7 +141,11 @@ def load_dotplate(filename):
             fields.append(Field(field_dict, drilled, undrilled, standards))
 
         #Finally the plate
-        return Plate(sections['plate']['processed'], plate_holes, fields)
+        plate=Plate(sections['plate']['processed'], plate_holes, fields)
+
+        _PLATE_CACHE[filename]={'hash':hashfile(filename), 'value':plate}
+
+        return plate
 
     except Exception as e:
         raise PlateError(str(e))
@@ -142,7 +164,7 @@ def get_all_plate_names():
     for file in files:
         if os.path.basename(file).lower() not in ['none.plate', 'sample.plate']:
             try:
-                p=load_dotplate(file)
+                p=load_dotplate(file, singleton_ok=True)
                 ret[p.name]=file
             except (IOError, PlateError) as e:
                 _log.warn('Skipped {} due to {}'.format(file,str(e)))

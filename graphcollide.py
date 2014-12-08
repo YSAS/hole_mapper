@@ -1,6 +1,8 @@
 from jbastro.great_circle_dist import dist_radec_fast
 import numpy as np
 
+class GraphCutError(Exception):
+    pass
 
 def build_overlap_graph_cartesian(x, y, d, overlap_pct_r_ok=0):
     """
@@ -16,7 +18,7 @@ def build_overlap_graph_cartesian(x, y, d, overlap_pct_r_ok=0):
     x--(-)y overlaps for y by 1 radius and .5 for x
     default allowable_overlap
     
-    may generate conntions that only go one direction
+    may generate connections that only go one direction
     """
     edges={}
     x=np.array(x)
@@ -87,7 +89,7 @@ class CollisionGraph(object):
                 assert i in self._graph[e]
 
     def crappy_min_vertex_cover_cut(self, weights=None, ID='graph',
-                                    retdrop=False):
+                                    retdrop=False, uncuttable=None):
         """
         Takes the number of nodes in the graph and a dict of lists
         keys into dict and node ids and the lists contain the ids of nodes
@@ -99,8 +101,9 @@ class CollisionGraph(object):
         
         
         Now for each star with a conflict there are a few cases
-        Ideally we would find the (potentially weighted) minimal vertex cover
-          and drop it, but that is getting all fancy and graph theoretic
+        We find the (potentially weighted) minimal vertex cover
+          and drop it. Weights entirely override node rank e.g. a maximally 
+          connected high priority node will cause all others to be dropped
         """
         from collections import OrderedDict
         from copy import deepcopy
@@ -108,9 +111,11 @@ class CollisionGraph(object):
         nodes=range(self._nnodes)
         #default to first node is most important
         if not weights:
-            weights=[self._nnodes - i for i in nodes]
+            weights=[0]*self._nnodes
 
-        
+        if not uncuttable:
+            uncuttable=[]
+
         edgegraph=deepcopy(self._graph)
         edgegraph=OrderedDict(edgegraph)
         
@@ -127,7 +132,14 @@ class CollisionGraph(object):
                 # and remove them from the graph
                 single_drop_count+=1
                 
-                if weights[node] < weights[edge_set[0]]:
+                if (node in uncuttable and
+                    edge_set[0] in uncuttable):
+                    raise GraphCutError('Connected nodes both in uncuttable. '
+                                        'Error at node {}'.format(node))
+                
+                if ((weights[node] < weights[edge_set[0]] and
+                     node not in uncuttable) or
+                    edge_set[0] in uncuttable):
                     to_drop=node
                     edgegraph.pop(edge_set[0])
                 else:
@@ -149,7 +161,11 @@ class CollisionGraph(object):
                 
                 edgegraph[node]=edge_set
                 to_drop=self._walk_return_dropnode(edgegraph, node,
-                                                   edge_set, weights)
+                                                   edge_set, weights,
+                                                   uncuttable)
+                if to_drop==None:
+                    raise GraphCutError('Connected nodes all uncuttable.'
+                                        'Error at node {}'.format(node))
                 
                 edge_set=edgegraph.pop(to_drop)
 
@@ -192,15 +208,20 @@ class CollisionGraph(object):
         else:
             return nodes
 
-    def _walk_return_dropnode(self, edgegraph, start, edges, weights):
+    def _walk_return_dropnode(self, edgegraph, start, edges, weights,
+                              uncuttable):
         """walk the graph connected to start and return the node having min
             weight and most edges of min weights"""
         visited=[]
         to_visit=set(edges)
-        cur=start
-        minw=weights[start]
+
+        if start in uncuttable:
+            minw=float('inf')
+        else:
+            minw=weights[start]
         rank=len(edges)
         to_drop=start
+        
         while to_visit:
             current=to_visit.pop()
             try:
@@ -212,14 +233,17 @@ class CollisionGraph(object):
             #add new points to to_visit
             to_visit.update([e for e in current_edges if e not in visited])
 
-            #Select the current node for removal if lower weight or same weight
-            # and more connections
-            if weights[current] < minw:
-                minw=weights[current]
-                to_drop=current
-            elif weights[current]==minw and len(current_edges)> rank:
-                to_drop=current
-
+            if current not in uncuttable:
+                #Select the current node for removal if lower weight
+                # or same weight and more connections
+                if weights[current] < minw:
+                    minw=weights[current]
+                    to_drop=current
+                elif weights[current]==minw and len(current_edges)> rank:
+                    to_drop=current
+    
+        if to_drop in uncuttable:
+            to_drop=None
         return to_drop
 
     def drop(self, node):
@@ -261,6 +285,9 @@ class CollisionGraph(object):
 
     def get_colliding_node(self):
         return self._graph.keys()[0]
+    
+    def get_colliding_nodes(self):
+        return self._graph.keys()
 
     @property
     def is_disconnected(self):

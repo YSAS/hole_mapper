@@ -9,7 +9,10 @@ from target import Target,ConflictDummy
 from target import GUIDEREF_TYPE, GUIDE_TYPE, ACQUISITION_TYPE, SH_TYPE
 from graphcollide import build_overlap_graph_cartesian
 from dimensions import PLATE_TARGET_RADIUS_LIMIT
-from readerswriters import _parse_header_row, _parse_record_row, _dictlist_to_records
+from readerswriters import _parse_header_row, _parse_record_row
+from readerswriters import _dictlist_to_records
+from dimensions import SIMULTANEOUS_PLUG_PCT_R_OVERLAP_OK
+from dimensions import GUIDEACQ_PCT_R_OVERLAP_OK
 from errors import ConstraintError
 import numpy as np
 import re
@@ -38,7 +41,9 @@ class FieldCatalog(object):
         self.standards=standards if standards else []
         
         self.holesxy_info=None
-        self.keep_all=False
+        self.mustkeep=False
+        self.maxsky=1000
+        self.minsky=0
         self.filler_targ=False
         self._processed=False
     
@@ -71,6 +76,14 @@ class FieldCatalog(object):
             self.skys.append(targ)
         elif targ.is_target:
             self.targets.append(targ)
+            try:
+                del self._max_priority
+            except Exception:
+                pass
+            try:
+                del self._min_priority
+            except Exception:
+                pass
         elif targ.is_guide:
             self.guides.append(targ)
         elif targ.is_acquisition:
@@ -87,12 +100,20 @@ class FieldCatalog(object):
     @property
     def max_priority(self):
         """max priority of type T in the catalog """
-        return max([t.priority for t in self.targets])
+        try:
+            return self._max_priority
+        except AttributeError:
+            self._max_priority=max([t.priority for t in self.targets])
+            return self._max_priority
     
     @property
     def min_priority(self):
         """min priority of type T in the catalog """
-        return min([t.priority for t in self.targets])
+        try:
+            return self._min_priority
+        except AttributeError:
+            self._min_priority=min([t.priority for t in self.targets])
+            return self._min_priority
 
     def process(self):
         """
@@ -165,6 +186,9 @@ class FieldCatalog(object):
         ret={'name':self.name,
              'file':self.file,
              'obsdate':str(self.obsdate),
+             'mustkeep':str(self.mustkeep),
+             'minsky':str(self.minsky),
+             'maxsky':str(self.maxsky),
              '(ra, dec)':'{} {}'.format(self.sh.ra.sexstr,self.sh.dec.sexstr),
              '(az, el)':'{:3f} {:3f}'.format(self.holesxy_info.az,
                                              self.holesxy_info.el),
@@ -222,7 +246,8 @@ class FieldCatalog(object):
 
         #Per Mario:
         #No overlap with guides/acquisitions/sh
-        coll_graph=build_overlap_graph_cartesian(x,y,d, overlap_pct_r_ok=0.0)
+        coll_graph=build_overlap_graph_cartesian(x,y,d, overlap_pct_r_ok=
+                                                 GUIDEACQ_PCT_R_OVERLAP_OK)
         #Drop everything conflicting with the sh, guides or acquisitions
         ndxs=[i for i, h in enumerate(holes) if h.target.type in
               [GUIDE_TYPE, ACQUISITION_TYPE, SH_TYPE]]
@@ -244,7 +269,8 @@ class FieldCatalog(object):
         pri=[h.target.priority for h in holes]
 
         #Now do it again but allowing some overlap
-        coll_graph=build_overlap_graph_cartesian(x, y, d, overlap_pct_r_ok=-0.05)
+        coll_graph=build_overlap_graph_cartesian(x, y, d, overlap_pct_r_ok=
+                            SIMULTANEOUS_PLUG_PCT_R_OVERLAP_OK)
 
 
         keep, drop=coll_graph.crappy_min_vertex_cover_cut(weights=pri,
@@ -283,7 +309,9 @@ class FieldCatalog(object):
         return (self.skys+self.targets+self.guides+self.acquisitions)
 
     def holes(self):
-        """ return a list of all the holes the field would like on a plate """
+        """
+        return a list of all the holes the field would like on a plate
+        """
         try:
             return [hole for t in self.all_targets for hole in t.holes]
         except AttributeError:
@@ -308,7 +336,25 @@ class FieldCatalog(object):
 
     @property
     def n_conflicts(self):
-        return len([t.info for t in self.skys+self.targets if t.conflicting])
+        return len([t for t in self.skys+self.targets if t.conflicting])
+
+    @property
+    def n_drillable_targs(self):
+        return len([t for t in self.targets
+                    if not t.conflicting and t.on_plate])
+    @property
+    def n_drillable_skys(self):
+        return len([t for t in self.skys if not t.conflicting and t.on_plate])
+
+    @property
+    def n_mustkeep_conflicts(self):
+        """return number of mustkeeps with conflicts, nonzero means 
+        constraints aren't met """
+        if not self.mustkeep:
+            return 0
+        else:
+            return len([t for t in self.targets if
+                        t.priority==self.max_priority and t.conflicting])
 
     def undrillable_dictlist(self, flat=False):
         ret=[t.info for t in self.all_targets
@@ -354,37 +400,42 @@ def load_dotfield(file):
                 v=v.strip()
                 assert v != ''
             except Exception as e:
-                raise IOError('Failed on line '
-                        '{}: {}\n  Bad key=value formatting:{}'.format(
-                        lines.index(l), l ,str(e)))
+                msg=('Failed at {}({}): \n {}\n '.format(lines.index(l), l) +
+                    'Bad key=value formatting: '+str(e))
+                raise IOError(msg)
 
             if k=='obsdate':
                 field_cat.obsdate=datetime(*map(int,re.split('\W+', v)))
             elif k=='name':
                 field_cat.field_name=v
             elif k in ['keep_all', 'mustkeep']:
-                k='keep_all'
-                log.info('Dropping targets forbidden for field {} in {}'.format(
+                log.info('Dropping targets is forbidden for field {} in {}'.format(
                     field_cat.field_name, file))
-                field_cat.keep_all=True if v.lower()!='false' else False
+                field_cat.mustkeep=True if v.lower()!='false' else False
+            elif k =='minsky':
+                #todo: verify minsky value
+                field_cat.minsky=int(v)
+            elif k =='maxsky':
+                #todo: verify maxsky value
+                field_cat.maxsky=int(v)
             else:
-                field_cat.user[k]=v
+                field_cat.user[k]=int(v)
                 
         elif l.lower().startswith('ra'):
             try:
                 keys=_parse_header_row(l.lower(), REQUIRED=REQUIRED_FIELD_KEYS)
                 user_keys=[k for k in keys if k not in FIELD_KEYS]
             except Exception as e:
-                raise IOError('Failed on line {}: {}\n  {}'.format(
-                               lines.index(l), l ,str(e)))
+                raise IOError('Failed at {}({}):\n  {}\n  {}'.format(
+                               file,lines.index(l), l ,str(e)))
         else:
             try:
                 rec=_parse_record_row(l, keys, user_keys,
                                       REQUIRED=REQUIRED_FIELD_RECORD_ENTRIES)
                 field_cat.add_target(Target(**rec))
             except Exception as e:
-                raise IOError('Failed on line {}: {}\n  {}'.format(
-                               lines.index(l), l ,str(e)))
+                raise IOError('Failed at {}({}):\n  {}\n  {}'.format(
+                               file,lines.index(l), l ,str(e)))
 
     return field_cat
 
@@ -417,6 +468,14 @@ class Field(object):
         
         for t in self.all_targets: t.field=self
 
+    @property
+    def max_priority(self):
+        try:
+            return self._max_priority
+        except AttributeError:
+            self._max_priority=max([t.priority for t in self.targets])
+        return self._max_priority
+        
     @property
     def ra(self):
         return self.info['(ra, dec)'].split()[0]

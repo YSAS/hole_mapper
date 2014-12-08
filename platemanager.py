@@ -9,7 +9,7 @@ import operator
 import os.path
 from logger import getLogger
 from dimensions import PLATE_RADIUS, SH_RADIUS
-from setup import get_all_setups
+from setup import get_all_setups, get_setup
 from graphcollide import build_overlap_graph_cartesian
 from holesxy import get_plate_holes
 import math
@@ -77,9 +77,11 @@ class Manager(object):
         self.selected_setups=None
 
     def pick_setups(self, setup_names):
-        setups=get_all_setups()
-        self.selected_setups=[s for s in setups if s.name in setup_names]
-    
+
+        self.selected_setups=[get_setup(s) for s in setup_names]
+#        setups=get_all_setups()
+#        self.selected_setups=[s for s in setups if s.name in setup_names]
+
         #Assign setups
         assign(self.selected_setups)
 
@@ -120,18 +122,16 @@ class Manager(object):
         canvas.drawCircle( (0,0) , PLATE_RADIUS)
         canvas.drawCircle( (0,0) , SH_RADIUS)
         
-        setup=self.selected_setups[0]
-        
         #Draw holes for everything else
         for h in self.inactive_holes(showing_b=True, showing_r=True):
             self._draw_hole(h, canvas)
-        
+
         #Standards
-        for t in setup.plate.plate_holes:
+        for t in self.selected_setups[0].plate.plate_holes:
             self._draw_hole(t.hole, canvas, color='chocolate',
                             fcolor='chocolate')
         
-        self._draw_with_assignements(setup, canvas)
+        self._draw_with_assignements(self.selected_setups[0], canvas)
         
         #Guides and Acquisitions
         for i,s in enumerate(self.selected_setups):
@@ -193,24 +193,31 @@ class Manager(object):
         #Get the assigned targets
         if showing_b:
             targ=setup.cassette_config.assigned_targets(side='b')
-            active_holes.extend([t.hole for t in targ])
+            active_holes.extend([t.hole.id for t in targ])
         if showing_r:
             targ=setup.cassette_config.assigned_targets(side='r')
-            active_holes.extend([t.hole for t in targ])
+            active_holes.extend([t.hole.id for t in targ])
         
         #Get the guide and acquisition
         targ=[t for s in self.selected_setups
                 for t in s.field.guides + s.field.acquisitions]
-        active_holes.extend([t.hole for t in targ])
+        active_holes.extend([t.hole.id for t in targ])
         
         #Get the plate holes
         targ=setup.plate.plate_holes
-        active_holes.extend([t.hole for t in targ])
+        active_holes.extend([t.hole.id for t in targ])
         
         #Find all the inactive holes
         all_holes=setup.plate.all_holes
         
-        return [h for h in all_holes if h not in active_holes]
+        inactive=[h for h in all_holes if h.id not in active_holes]
+        try:
+            assert set([h.id for h in inactive]).isdisjoint(
+                        t.hole.id for s in self.selected_setups
+                        for t in s.to_assign if t.is_assigned)
+        except AssertionError:
+            import ipdb;ipdb.set_trace()
+        return inactive
 
     def _draw_with_assignements(self, setup, canvas, radmult=1.0,
                                 lblcolor='black', show_b=True, show_r=True):

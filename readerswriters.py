@@ -116,7 +116,7 @@ KEY_VETTERS=defaultdict(lambda : lambda x: len(x.split())==1)
 KEY_VETTERS['ra']=_is_valid_ra
 KEY_VETTERS['dec']=_is_valid_dec
 KEY_VETTERS['epoch']=_is_floatable
-KEY_VETTERS['type']=lambda x: x in VALID_TYPE_CODES
+KEY_VETTERS['type']=lambda x: x.upper() in VALID_TYPE_CODES
 KEY_VETTERS['priority']=_is_floatable
 KEY_VETTERS['pm_ra']=_is_floatable
 KEY_VETTERS['pm_dec']=_is_floatable

@@ -16,11 +16,11 @@ log=getLogger('plateplanner')
 
 
 def parse_cl():
-    parser = argparse.ArgumentParser(description='Help undefined',
+    parser = argparse.ArgumentParser(description='Plate Planner',
                                      add_help=True)
-    parser.add_argument('-p','--port', dest='PORT',
-                        action='store', required=False, type=int,
-                        help='')
+    parser.add_argument('-o','--out', dest='outdir',default='./',
+                        action='store', required=False, type=str,
+                        help='Output directory')
     parser.add_argument('--log', dest='LOG_LEVEL',
                         action='store', required=False, default='',
                         type=str,
@@ -48,9 +48,9 @@ class FieldSettingsDialog(object):
 #        Tkinter.Label(lframe, text='Setup #:').grid(row=0,column=0)
 
 
-        self.keep_all = Tkinter.IntVar(value=int(field.keep_all))
-        Tkinter.Checkbutton(self.dialog, text="Keep All",
-                            variable=self.keep_all).pack()
+        self.mustkeep = Tkinter.IntVar(value=int(field.mustkeep))
+        Tkinter.Checkbutton(self.dialog, text="Must Keep",
+                            variable=self.mustkeep).pack()
         if field.obsdate:
             now=field.obsdate.strftime('%Y-%m-%d %H:%M:%S')
         else:
@@ -88,7 +88,7 @@ class FieldSettingsDialog(object):
                                                  '%Y-%m-%d %H:%M:%S')
         except ValueError:
             return False
-        self.field.keep_all=bool(self.keep_all.get())
+        self.field.mustkeep=bool(self.mustkeep.get())
         return True
 
 class HoleInfoDialog:
@@ -260,7 +260,8 @@ class App(Tkinter.Tk):
     
         new=Tkinter.Toplevel(self)
         
-        cols=('RA', 'Dec', 'nT+S', 'nConflict')
+        cols=('RA', 'Dec', 'nT','nS', 'nLost',
+              'Drillable Targ', 'Drillable Sky')
         self.tree = tree = ttk.Treeview(new, columns=cols)
         tree.heading('#0',text='Name')
         for c in cols:
@@ -269,7 +270,8 @@ class App(Tkinter.Tk):
         for f in self.manager.fields:
             tree.insert('', 'end', f.name, text=f.name, tags=(),
                         values=(f.sh.ra.sexstr, f.sh.dec.sexstr,
-                                len(f.targets)+len(f.skys),f.n_conflicts))
+                                len(f.targets),len(f.skys), f.n_conflicts,
+                                f.n_drillable_targs,f.n_drillable_skys))
         tree.bind('<Button-2>', self.field_settings)
         tree.bind('<ButtonRelease-1>', func=self.select_fields)
         tree.pack()
@@ -291,11 +293,14 @@ class App(Tkinter.Tk):
         try:
             self.manager.select_fields(event.widget.selection())
         except ConstraintError as e:
-            tkMessageBox.showerror('Incompatible Fields', str(e))
+            tkMessageBox.showerror('Selection Error', str(e))
             
         #update treview nconflict column
         for f in self.manager.selected_fields:
-            self.tree.set(f.name, 'nConflict', f.n_conflicts)
+            self.tree.set(f.name, 'nLost', f.n_conflicts)
+            self.tree.set(f.name, 'Drillable Targ', f.n_drillable_targs)
+            self.tree.set(f.name, 'Drillable Sky', f.n_drillable_skys)
+
         self.show()
 
     def make_plate(self):
