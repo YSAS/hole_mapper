@@ -266,17 +266,14 @@ def _assign_fibers(setups):
     #Grab targets with assignments and associate them with their cassettes
     assigned=[t for t in to_assign if t.is_assigned]
     print("{} targets had preset assignments".format(len(assigned)))
-    for t in assigned:
-        cassettes.assign(t, t.fiber.cassette_name)
+    try:
+        for t in assigned: cassettes.assign(t, t.fiber.cassette_name)
+    except ValueError:
+        raise ConstraintError('Collisions among targets with preset fibers '
+                              ' assignment impossible.')
 
     unassignable=[]
 
-    #This is a bit of a hack, which works when not assigning with things
-    #If more targets & skys drilled than have usable fibers, then sort by
-    #priority and discard the lowest
-    #This doesn't respect min sky settings in the pathological case of assigning
-    # multiple setups with each other
-#    import ipdb;ipdb.set_trace()
 
     #this doesn't work with pultible setups, esp. when there are excessive
     # numbers of targets in one/both
