@@ -10,7 +10,7 @@ log.setLevel(logging.INFO)
 
 from pathconf import DEAD_FIBER_FILE
 
-def rangify(data):
+def rangify(data,delim=','):
     from itertools import groupby
     from operator import itemgetter
     str_list = []
@@ -20,7 +20,7 @@ def rangify(data):
             str_list.append('%d-%d' % (ilist[0], ilist[-1]))
         else:
             str_list.append('%d' % ilist[0])
-    return ', '.join(str_list)
+    return delim.join(str_list)
 
 def DEAD_FIBERS():
     with open(DEAD_FIBER_FILE(),'r') as fp:
@@ -229,7 +229,7 @@ class Cassette(object):
     def label(self):
         """Return a string label for the cassette e.g. R1 1-8 or B3 1,4,7"""
         fnums=[fnum for fnum,f in self.fibers.iteritems() if f.target]
-        return self.name[0:2]+' '+rangify(sorted(fnums))
+        return self.name[0:2]+' '+rangify(sorted(fnums),delim=',')
 
     def map_fibers(self, remap=False):
         """

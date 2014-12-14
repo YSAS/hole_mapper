@@ -93,7 +93,7 @@ class Target(object):
 #        self.setup=kwargs.pop('setup',None)
 
         #Fiber
-        self.preset_fiber=kwargs.pop('fiber',None)
+        self.preset_fiber=self.user.pop('fiber',None)
         if type(self.preset_fiber)==str:
             self.preset_fiber=Fiber(self.preset_fiber)
         self.fiber=self.preset_fiber

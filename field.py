@@ -448,6 +448,12 @@ class Field(object):
         """
 
         self.info=field_info #Dict, see keys returned by fieldcatalog.info
+        try:
+            self.info['mustkeep']=self.info.get('mustkeep','false').lower()
+            self.info['mustkeep']=self.info['mustkeep']=='true'
+        except TypeError:
+            raise ValueError('mustkeep must be a string value')
+
         self.name=field_info['name']
         self.undrilled=undrilled
         self.standards=standards

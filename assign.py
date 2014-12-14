@@ -284,8 +284,13 @@ def _assign_fibers(setups):
 
     #determine number to skip in each setup when assigning setups to R/B side
     # only
+    
+    #This penalizes each field with an equal number of losses, it probably
+    # should penalize in proportion to each setup's contribution to the
+    #total number of targets
     n_skip_map={}
     if len([s for s in setups if s.assigning_to!='both'])==0:
+        #nskip=total_number_of_things_needing_fibers - number_of_available_fibers
         n_skip=(sum(len([x for x in to_assign if x in s.to_assign])
                    for s in setups) - cassettes.n_available)
         base_skip=n_skip / len(setups)
@@ -385,6 +390,11 @@ def _assign_fibers(setups):
 
 #    import ipdb;ipdb.set_trace()
 
+    #Not sure why the skys and targets need to be done separately
+    #we only have as many targets and skys as fibers now
+
+    #note that the plug priority is not realated to the priority from users
+    # it has to do with the how reachable the target is from other fibers
     #assign targets first
     while unassigned_objs:
         #Update cassette availability for each hole (a cassette may have filled)
@@ -430,8 +440,13 @@ def _assign_fibers(setups):
     ####As many targets as possible have now been assigned to a cassette####
     assigned=[t for t in to_assign if t not in unassignable]
 
+
+    #Verify I havn't screwed up
     for t in assigned:
         if t not in cassettes.get_cassette(t.assigned_cassette).targets:
+            _log.critical("A cassette's list of targets doesn't include"
+                          "a target that is assigned to it."
+                          "This is a major bug. entering debugger. type help")
             import ipdb;ipdb.set_trace()
 
     #For each cassette assign fiber numbers with x coordinate of holes
