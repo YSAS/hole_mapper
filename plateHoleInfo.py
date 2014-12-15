@@ -960,14 +960,11 @@ def nGoodOdd():
     return 128-6
 
 def _SetDeadFibers(plateinfo):
-    dead=( ('R1l',(2,)),
-           ('R8l',(3,)),
-           ('R8h',(9,)),
-           ('R2h',(9,)),
-           ('R7h',(11, 12)),
-           ('B4l',(5,)),
-           ('B4h',(15,)),
-           ('B6l',(2,4)))
+    dead=( ('R6l',(5,)),
+           ('R6h',(9,)),
+           ('B5l',(8,)),
+           ('B6h',(9,)),
+           ('B3h',(14,)))
 #           b8-3, 6-13,5-7,4-4 treat as ok
 #           r8-3, 8-8, treat as ok
 
