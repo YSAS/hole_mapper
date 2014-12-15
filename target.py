@@ -120,7 +120,7 @@ class Target(object):
         else:
             assert fiber !=None
             if self.preset_fiber:
-                assert self.preset_fiber==fiber
+                assert self.preset_fiber.name==fiber.name
             else:
                 assert fiber.cassette_name in self._preset_usable_cassette_names
             self.fiber=fiber

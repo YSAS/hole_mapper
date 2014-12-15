@@ -290,8 +290,9 @@ def _assign_fibers(setups):
     #total number of targets
     n_skip_map={}
     if len([s for s in setups if s.assigning_to!='both'])==0:
-        #nskip=total_number_of_things_needing_fibers - number_of_available_fibers
-        n_skip=(sum(len([x for x in to_assign if x in s.to_assign])
+        #nskip is total_number_of_things_needing_fibers - number_of_available_fibers
+        n_skip=(sum(len([x for x in to_assign if x in s.to_assign
+                         and x not in assigned])
                    for s in setups) - cassettes.n_available)
         base_skip=n_skip / len(setups)
         extra_skip=n_skip % len(setups)
@@ -304,7 +305,8 @@ def _assign_fibers(setups):
         #R side
         r_setups=[s for s in setups if s.assigning_to=='r']
         if r_setups:
-            n_skip_r=(sum(len([x for x in to_assign if x in s.to_assign])
+            n_skip_r=(sum(len([x for x in to_assign if x in s.to_assign
+                               and x not in assigned])
                           for s in r_setups) - cassettes.n_r_available)
             base_skip=n_skip_r / len(r_setups)
             extra_skip=n_skip_r % len(r_setups)
@@ -316,7 +318,8 @@ def _assign_fibers(setups):
         #B Side
         b_setups=[s for s in setups if s.assigning_to=='b']
         if b_setups:
-            n_skip_b=(sum(len([x for x in to_assign if x in s.to_assign])
+            n_skip_b=(sum(len([x for x in to_assign if x in s.to_assign
+                               and x not in assigned])
                           for s in b_setups) - cassettes.n_b_available)
             base_skip=n_skip_b / len(b_setups)
             extra_skip=n_skip_b % len(b_setups)
@@ -452,30 +455,22 @@ def _assign_fibers(setups):
     #For each cassette assign fiber numbers with x coordinate of holes
     cassettes.map()
 
-    for t in assigned:
-        if t not in cassettes.get_cassette(t.assigned_cassette).targets:
-            import ipdb;ipdb.set_trace()
-
     #Compact the assignments (get rid of underutillized cassettes)
     _condense_cassette_assignments([c for c in cassettes if c.on_left])
     _condense_cassette_assignments([c for c in cassettes if c.on_right])
 
-    for t in assigned:
-        if t not in cassettes.get_cassette(t.assigned_cassette).targets:
-            import ipdb;ipdb.set_trace()
-    
     #Rejigger the fibers
     _rejigger_cassette_assignments([c for c in cassettes if c.on_left])
     _rejigger_cassette_assignments([c for c in cassettes if c.on_right])
 
+    #Remap fibers
+    cassettes.map(remap=True)
+    
+    #Make sure its all ok
     for t in assigned:
         if t not in cassettes.get_cassette(t.assigned_cassette).targets:
             import ipdb;ipdb.set_trace()
 
-    #Remap fibers
-    cassettes.map(remap=True)
-    
-    
     for s in setups:
         s.cassette_config=cassettes
 
@@ -495,8 +490,7 @@ def _condense_cassette_assignments(cassettes):
         targets=list(trial.targets)
         for t in targets:
             #If hole can't be assigned then screw it
-            if not t.is_assignable:
-                break
+            if not t.is_assignable(): continue
             #Try assigning the hole to another tetris
             recomp_non_full=False
             for c in non_full:
@@ -534,7 +528,7 @@ def _rejigger_cassette_assignments(cassettes):
         higer_cassettes=cassettes[i:]
 
         swappable_cassette_targets=[t for t in cassette.targets
-                                    if t.is_assignable]
+                                    if t.is_assignable()]
 
 #        if not swappable_cassette_targets:
 #            import ipdb;ipdb.set_trace()

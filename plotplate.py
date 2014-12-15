@@ -36,12 +36,12 @@ def draw_field(pax, fname, plate, args):
     
     pax.add_patch(Circle((0,0),dimensions.PLATE_RADIUS,facecolor='w'))
     for t in f.all_targets:
-        pax.add_patch(Circle((t.hole.x,t.hole.y),t.hole.d/2.0,
+        pax.add_patch(Circle((-t.hole.x,t.hole.y),t.hole.d/2.0,
                              color=colors[t.type]))
         if args.tag:
-            plt.text(t.hole.x, t.hole.y, t.id)
+            plt.text(-t.hole.x, t.hole.y, t.id)
         elif args.tag_sky and t.is_sky:
-            plt.text(t.hole.x, t.hole.y, t.id)
+            plt.text(-t.hole.x, t.hole.y, t.id)
     pax.set_xlim(-dimensions.PLATE_RADIUS,dimensions.PLATE_RADIUS)
     pax.set_ylim(-dimensions.PLATE_RADIUS,dimensions.PLATE_RADIUS)
     plt.show()
