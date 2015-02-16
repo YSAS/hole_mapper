@@ -104,7 +104,13 @@ class SetupDefinition(object):
             raise ValueError('Supported values for assign_to are '
                              'single and any. Fix file {}'.format(self.file))
         self.extra=extra if extra else {}
-    
+        if 'mustkeep' in self.extra:
+            mktrue=str(self.extra['mustkeep']).lower()!='false'
+            self.extra['mustkeep']=True if mktrue else False
+        if 'keepall' in self.extra:
+            mktrue=str(self.extra['keepall']).lower()!='false'
+            self.extra['keepall']=True if mktrue else False
+
     @property
     def name(self):
         if (self.assign_to!='any' or

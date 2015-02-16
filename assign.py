@@ -221,7 +221,8 @@ def _assign_fibers(setups):
         x=[t.hole.x for t in setup_targets]
         y=[t.hole.y for t in setup_targets]
         d=[t.hole.conflict_d for t in setup_targets]
-        weights=[t.priority/t.field.max_priority for t in setup_targets]
+        weights=[t.priority/(t.field.max_priority if t.field.max_priority else 1)
+                 for t in setup_targets]
         
         coll_graph=build_overlap_graph_cartesian(x,y,d) #Nothing can conflict
         keep=coll_graph.crappy_min_vertex_cover_cut(weights=weights)
@@ -234,7 +235,8 @@ def _assign_fibers(setups):
     y=[t.hole.y for t in to_assign]
     d=[t.hole.conflict_d for t in to_assign]
 
-    weights=[t.priority/t.field.max_priority for t in to_assign]
+    weights=[t.priority/(t.field.max_priority if t.field.max_priority else 1)
+             for t in to_assign]
     #target.must_be_drilled not necessarily the same thing as
     # t.priority==t.field.max_priority and t.setup.mustkeep
     uncuttable=[i for i,t in enumerate(to_assign)
@@ -593,7 +595,8 @@ def _filter_for_pluggability(targets):
     # t.priority==t.field.max_priority and t.setup.mustkeep
     uncuttable=[i for i,t in enumerate(targets)
                 if t.priority==t.field.max_priority and t.setup.mustkeep]
-    weights=[t.priority/t.field.max_priority for t in targets]
+    weights=[t.priority/(t.field.max_priority if t.field.max_priority else 1)
+             for t in targets]
     import ipdb;ipdb.set_trace()
     try:
         keep=coll_graph.crappy_min_vertex_cover_cut(uncuttable=uncuttable,
