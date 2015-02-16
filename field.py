@@ -134,18 +134,19 @@ class FieldCatalog(object):
         obtime=Time(self.obsdate,scale='utc')
         delta=[obtime-Time('J{}'.format(t.epoch) if t.epoch!=1950 else
                            'B{}'.format(t.epoch), scale='utc') for t in targs]
-        
-        for i in range(len(targs)):
-            conversion=delta[i].value/365.0/3600.0
-            ras[i]+=pmra[i]*conversion
-            decs[i]+=pmdec[i]*conversion
-        
+                           
+#        for i in range(len(targs)):
+#            conversion=(delta[i].value/365.242)/3600.0
+#            ras[i]+=pmra[i]*conversion
+#            decs[i]+=pmdec[i]*conversion
+
         
         #Correct sh pm
         shdelta=obtime-Time('J{}'.format(t.epoch) if self.sh.epoch!=1950 else
                             'B{}'.format(t.epoch), scale='utc')
-        field_ra=self.sh.ra.float+self.sh.pm_ra*shdelta.value/365.0/3600.0
-        field_dec=self.sh.dec.float+self.sh.pm_dec*shdelta.value/365.0/3600.0
+        conversion=(shdelta.value/365.242)/3600.0
+        field_ra=self.sh.ra.float   #+ self.sh.pm_ra*conversion
+        field_dec=self.sh.dec.float #+ self.sh.pm_dec*conversion
         
         epochs=[t.epoch for t in targs]
         targ_types=[t.type for t in targs]
@@ -347,6 +348,16 @@ class FieldCatalog(object):
         return len([t for t in self.skys if not t.conflicting and t.on_plate])
 
     @property
+    def n_drillable_guides(self):
+        return len([t for t in self.guides
+                    if not t.conflicting and t.on_plate])
+
+    @property
+    def n_drillable_acquisitions(self):
+        return len([t for t in self.acquisitions
+                    if not t.conflicting and t.on_plate])
+
+    @property
     def n_mustkeep_conflicts(self):
         """return number of mustkeeps with conflicts, nonzero means 
         constraints aren't met """
@@ -408,10 +419,14 @@ def load_dotfield(file):
                 field_cat.obsdate=datetime(*map(int,re.split('\W+', v)))
             elif k=='name':
                 field_cat.field_name=v
-            elif k in ['keep_all', 'mustkeep']:
-                log.info('Dropping targets is forbidden for field {} in {}'.format(
+            elif k in ['mustkeep']:
+                log.info('Dropping highest priority targets is forbidden for field {} in {}'.format(
                     field_cat.field_name, file))
-                field_cat.mustkeep=True if v.lower()!='false' else False
+                v.lower() in ['true','yes']
+                mk=True if v.lower() in ['true','yes'] else False
+                if v.lower() not in ['true','yes','false','no']:
+                    log.warn('Interpreting mustkeep={} as {}'.format(v,mk))
+                field_cat.mustkeep=mk
             elif k =='minsky':
                 #todo: verify minsky value
                 field_cat.minsky=int(v)

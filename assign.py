@@ -235,6 +235,8 @@ def _assign_fibers(setups):
     d=[t.hole.conflict_d for t in to_assign]
 
     weights=[t.priority/t.field.max_priority for t in to_assign]
+    #target.must_be_drilled not necessarily the same thing as
+    # t.priority==t.field.max_priority and t.setup.mustkeep
     uncuttable=[i for i,t in enumerate(to_assign)
                 if (t.priority==t.field.max_priority and t.setup.mustkeep) or
                    t.setup.keepall]
@@ -587,6 +589,8 @@ def _filter_for_pluggability(targets):
     #Nothing can conflict
     coll_graph=build_overlap_graph_cartesian(x,y,d)
 
+    #target.must_be_drilled not necessarily the same thing as
+    # t.priority==t.field.max_priority and t.setup.mustkeep
     uncuttable=[i for i,t in enumerate(targets)
                 if t.priority==t.field.max_priority and t.setup.mustkeep]
     weights=[t.priority/t.field.max_priority for t in targets]

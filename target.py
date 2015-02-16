@@ -190,6 +190,13 @@ class Target(object):
 #        """Return the required slit per the target, then per the setup"""
 
     @property
+    def must_be_drilled(self):
+        if self.field is None:
+            #STANDARD targets don't have fields
+            return False
+        return self.field.mustkeep and self.priority==self.field.max_priority
+
+    @property
     def conflicting_ids(self):
         ret=[]
         for ct in self._conflicting:
