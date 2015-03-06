@@ -6,9 +6,9 @@ from copy import deepcopy
 
 
 KNOWN_SLITS=['180','125','95','75','58','45']
-KNOWN_FILTERS=['BK7', 'Mgb_O69',' CalRT_O41','HotJupiter','Mgb_Rev2', 'IanR',
-              'Halpha_Li', 'IanR_O77_80','Mgb-Rev2','CaT-OneOrder',
-              'BStar_O80_87', 'BulgeGC_1','Mgb_FourOrders','RRLyr_1','JS_dSph']
+KNOWN_FILTERS=['BK7', 'Mgb_O69',' CalRT_O41','HotJupiter','Mgb_Rev2',
+              'Halpha_Li', 'IanR_O77_80','Mgb-Rev2','CalRT_O41',
+              'BStar_O80_87', 'BulgeGC_1','Mg_Wide','EP_RRLyr','JS_Blue']
 
 def _load_configs():
     setupfiles=glob(CONFIGDEF_DIRECTORY()+'*.configdef')
