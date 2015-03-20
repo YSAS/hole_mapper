@@ -14,7 +14,7 @@ log=getLogger('plateplanner.foo')
 
 COLOR_SEQUENCE=['red','blue','purple','green','black','teal','pink','orange']
 
-MIN_GUIDES=3
+MIN_GUIDES=2
 MIN_ACQUISITIONS=3
 
 PLATEHOLE_REQUIRED_COLS=['id','type','x','y','z','d']
@@ -143,8 +143,8 @@ class Manager(object):
             return None
 
     def reset(self):
-        for f in self.fields:
-            f.reset()
+        for t in self.plate_holes: t.conflicting=None
+        for f in self.fields: f.reset()
 
     def clear(self):
         self.fields=[]
@@ -230,10 +230,30 @@ class Manager(object):
         # if some were lost due to minsky then constrainterror
 
         for f in self.selected_fields:
-            if f.n_drillable_skys<f.minsky or f.n_mustkeep_conflicts:
-                raise ConstraintError("An feud between undroppable targets and "
+            if f.n_drillable_skys<f.minsky:
+                raise ConstraintError("A feud between undroppable targets and "
                                       "the minsky constraint precludes these "
                                       "fields from coexisting.")
+            if f.n_mustkeep_conflicts:
+                raise ConstraintError("A feud between undroppable targets "
+                                      "precludes these fields from coexisting.")
+
+            if f.n_drillable_acquisitions<MIN_ACQUISITIONS:
+                err='{} has only {} drillable acquisitons in this combination.'
+                err=err.format(f.field_name, f.n_drillable_acquisitions)
+                log.warning(err)
+#                raise ConstraintError(err)
+            if f.n_drillable_guides<MIN_GUIDES:
+                err='{} has only {} drillable guides in this combination.'
+                err=err.format(f.field_name, f.n_drillable_guides)
+                log.warning(err)
+#                raise ConstraintError(err)
+            report='Field {}: {:2} Guides {:2} Acq {:4} Targets {:4} Skys'
+            report=report.format(f.field_name, f.n_drillable_guides,
+                                 f.n_drillable_acquisitions,
+                                 f.n_drillable_targs,
+                                 f.n_drillable_skys)
+            log.info(report)
 
         #Set excess skys as conflicting
         for f in self.selected_fields:
@@ -317,11 +337,8 @@ class Manager(object):
                     #See if we must drop the guide
                     drop_guide=False
                     for j in coll_graph.collisions(i):
-                        drop_guide|=(holes[j].target.field.mustkeep and
-                                     (holes[j].target.is_sky or
-                                      holes[j].target.is_target))
-                        if drop_guide:
-                            break
+                        drop_guide|=holes[j].target.must_be_drilled
+                        if drop_guide: break
                     #Deal with the outcome
                     if drop_guide:
                         discard.append(i)
@@ -382,11 +399,8 @@ class Manager(object):
                     #See if we must drop it
                     drop=False
                     for j in coll_graph.collisions(i):
-                        drop|=(holes[j].target.field.mustkeep and
-                               (holes[j].target.is_sky or
-                                holes[j].target.is_target))
-                        if drop:
-                            break
+                        drop|=holes[j].target.must_be_drilled
+                        if drop: break
                     #Deal with the outcome
                     if drop:
                         discard.append(i)
@@ -431,13 +445,17 @@ class Manager(object):
         #Rebuild the graph allowing partial overlap
         coll_graph=build_overlap_graph_cartesian(x, y, d, overlap_pct_r_ok=
                                                  DRILLABLE_PCT_R_OVERLAP_OK)
-    
+
+
         #Redistribute priorities onto the same scale
         #must keeps (highest priority in a field) > wants > filler
         
         #Grab only the skys and targets
         pri_holes=[h for h in holes if h.target.is_sky or h.target.is_target]
-        
+        for h in (h for h in holes if h.target.is_standard):
+            #standards are filler
+            h.target.fm_priority=0
+
         #Create a new attribute to store the computed priority
         for h in pri_holes: h.target.fm_priority=None
         
@@ -448,8 +466,7 @@ class Manager(object):
         for f in list(set(h.target.field for h in pri_holes)):
             #for each of the holes which belong to that field
             for h in (x for x in holes if x.target.field==f):
-                if (h.target.field.mustkeep and
-                    h.target.priority==f.max_priority):
+                if h.target.must_be_drilled:
                     h.target.fm_priority=1e9
                 if (h.target.field.filler_targ and
                     f.max_priority!=f.min_priority and
@@ -498,13 +515,8 @@ class Manager(object):
                       coll_graph.collisions(holes.index(s))])
                  for s in filler_sky]
         for s,p in zip(filler_sky,sky_pri): s.target.fm_priority=p
-
-
-
-        #Didn't assign fm_priorities to standard holes and the like
-        coll_sort_key=(lambda x: holes[x].target.fm_priority if
-                                 holes[x].target.fm_priority!=None else
-                                 -1e9)
+        
+        
         while not coll_graph.is_disconnected: #Edges are holes too close together
 
             #need to go through the collisions lowest priority first with minsky
@@ -512,10 +524,9 @@ class Manager(object):
             # could have dropped a bunch of skys elsewhere then get a sky
             # interfereing with a mustkeep that we could have otherwise dropped.
             coll_ndxs=coll_graph.get_colliding_nodes()
-            coll_ndxs.sort(key=coll_sort_key)
+            coll_ndxs.sort(key=lambda x: holes[x].target.fm_priority)
             coll_ndx=coll_ndxs[0]
-            
-#            coll_ndx = coll_graph.get_colliding_node()
+
             coll_targ=holes[coll_ndx].target
             
             if coll_targ.is_standard: #Drop the standard star hole
@@ -526,8 +537,12 @@ class Manager(object):
                 #Get conflicting holes
                 collwith_ndxs=coll_graph.collisions(coll_ndx)
                 conflicts=set([holes[i].target for i in collwith_ndxs])
-                if (coll_targ.priority < max(t.priority for t in conflicts) and
-                    (not coll_targ.is_sky or
+#                if lowest piroirty and not sky
+#                if lowest pri andfee sky left
+                #use fm_priority not priority, also the <= is critical here
+                if ((coll_targ.fm_priority <=
+                     max(t.fm_priority for t in conflicts)) and
+                    ((not coll_targ.is_sky) or
                      coll_targ.field.n_drillable_skys>coll_targ.field.minsky)):
                     #Drop the target
                     coll_targ.conflicting=conflicts
@@ -541,6 +556,15 @@ class Manager(object):
                 raise Exception(' impossible collision')
 #                log.warn('Collision with {}'.format(coll_targ))
 
+        #Warn if no standard holes left
+        ok_stds=[h for h in holes
+                 if h.target.is_standard and not h.target.conflicting]
+        if len(ok_stds)<4:
+            if len(ok_stds)>0:
+                log.info('Lost {}'.format(4-len(ok_stds))+
+                         ' standard holes to collsions')
+            else:
+                log.warning('Lost all standard holes to collsions')
 
     def plate_drillable_dictlist(self):
         ret=[]

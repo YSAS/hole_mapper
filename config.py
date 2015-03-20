@@ -6,9 +6,9 @@ from copy import deepcopy
 
 
 KNOWN_SLITS=['180','125','95','75','58','45']
-KNOWN_FILTERS=['BK7', 'Mgb_O69',' CalRT_O41','HotJupiter','Mgb_Rev2', 'IanR',
-              'Halpha_Li', 'IanR_O77_80','Mgb-Rev2','CaT-OneOrder',
-              'BStar_O80_87', 'BulgeGC_1','Mgb_FourOrders']
+KNOWN_FILTERS=['BK7', 'Mgb_O69',' CalRT_O41','HotJupiter','Mgb_Rev2',
+              'Halpha_Li', 'IanR_O77_80','Mgb-Rev2','CalRT_O41',
+              'BStar_O80_87', 'BulgeGC_1','Mg_Wide','EP_RRLyr','JS_Blue']
 
 def _load_configs():
     setupfiles=glob(CONFIGDEF_DIRECTORY()+'*.configdef')
@@ -78,7 +78,7 @@ def _config_dict_from_dotsetup_dict(section_dict, side):
             'active_fibers3':get_active_fibers_key(section_dict,3,side),
             'active_fibers4':get_active_fibers_key(section_dict,4,side),
             'active_fibers5':get_active_fibers_key(section_dict,5,side),
-            'active_fibers6':get_active_fibers_key(section_dict,5,side),
+            'active_fibers6':get_active_fibers_key(section_dict,6,side),
             'active_fibers7':get_active_fibers_key(section_dict,7,side),
             'active_fibers8':get_active_fibers_key(section_dict,8,side),
             'n_amps':get_key(section_dict, 'n_amps',side),

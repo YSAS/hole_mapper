@@ -1,0 +1,32 @@
+_assign_fibers outline
+
+for each setup being assigned
+	get all things from each setup which need a science fiber on them
+	gather their positions and conflict diameters
+	gather their weights, normalizing each so it is from 0 - 1 with 1 	being the max priority target (T) in the field
+
+	create a collisions graph of the targets thats can't be plugged simultaneously and cut out the weighted minimum vertex cover
+	add whatever is left over to a bot of things needing science fibers
+
+get the positions and field-normalized priorities of of the targets
+flag any with its maximum field priority as uncuttable if mustkeep is set
+flag any in a field with keepall set as uncuttable
+
+create a collision graph and try to cut the weighted minimum vertex cover given uncuttable
+if failure assignment impossible
+
+reset any previous assignments for the setups involved
+
+gather all skys and objects that don't have assignments (i.e. user specified fibers from a fiber column)
+
+Assign all the things preset assignments to their cassette, failing if multiple things are set to the same fiber
+
+for each pool of possible assignments (all fibers if any setup is going to both
+
+determine how many more objects (T & S) there are that need fibers than there are fibers available. divide this by the number of setups to get the number of targets that are dropped from each setup. Do this separately for r & b arms if setup assignments are to be confined to one arm or the other.
+This penalizes each field with an equal number of losses, it probably should penalize in proportion to each setup's contribution to the total number of targets
+
+
+Now drop skys from each setup until none are left, the minsky limit is hit, or the number to be dropped from that setup is reached. Drop lower priority skys first.
+
+If there are still too many things left do the same with targets for each setup, respecting priorities, skipping anything with max priority if mustkeep is set. Fail if the needed number to be dropped from a setup can't be dropped.

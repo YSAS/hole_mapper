@@ -10,7 +10,7 @@ log.setLevel(logging.INFO)
 
 from pathconf import DEAD_FIBER_FILE
 
-def rangify(data):
+def rangify(data,delim=','):
     from itertools import groupby
     from operator import itemgetter
     str_list = []
@@ -20,7 +20,7 @@ def rangify(data):
             str_list.append('%d-%d' % (ilist[0], ilist[-1]))
         else:
             str_list.append('%d' % ilist[0])
-    return ', '.join(str_list)
+    return delim.join(str_list)
 
 def DEAD_FIBERS():
     with open(DEAD_FIBER_FILE(),'r') as fp:
@@ -189,7 +189,7 @@ class Cassette(object):
         self._init_fibers()
 
     def assign(self, target):
-        """Add the hole to the cassette and assign the cassette to the hole"""
+        """Add the target to the cassette and vice versa"""
         log.debug("Assign: {} to {}".format(target,self))
         if not self.n_avail:
             import ipdb;ipdb.set_trace()
@@ -201,8 +201,9 @@ class Cassette(object):
                 raise ValueError('target not compatible with cassette')
             if self.fibers[target.fiber.number].target:
                 raise ValueError('preset fiber already mapped')
-            self.fibers[target.fiber.number]=target
-            self.fibers[target.fiber.number]=target.fiber
+            fiber=self.fibers[target.preset_fiber.number]
+            target.assign(fiber=fiber)
+            fiber.target=target
         else:
             target.assign(cassette=self.name)
 
@@ -212,7 +213,7 @@ class Cassette(object):
 
     def unassign(self, target):
         """
-        Remove the hole from the cassette and unassign cassette from the hole
+        Remove the target from the cassette and unassign cassette from the hole
         """
         if target not in self.targets:
             import ipdb;ipdb.set_trace()
@@ -221,7 +222,7 @@ class Cassette(object):
         self.used-=1
         self.targets.remove(target)
         for fnum in self.fibers.keys():
-            if self.fibers[fnum].target:
+            if self.fibers[fnum].target==target:
                 self.fibers[fnum].target=None
                 break
     
@@ -229,7 +230,7 @@ class Cassette(object):
     def label(self):
         """Return a string label for the cassette e.g. R1 1-8 or B3 1,4,7"""
         fnums=[fnum for fnum,f in self.fibers.iteritems() if f.target]
-        return self.name[0:2]+' '+rangify(sorted(fnums))
+        return self.name[0:2]+' '+rangify(sorted(fnums),delim=',')
 
     def map_fibers(self, remap=False):
         """
@@ -246,6 +247,7 @@ class Cassette(object):
                     self.fibers[fnum].target.preset_fiber):
                     self.fibers[fnum].target=None
     
+        #Map the preset
         mapped_targ=[f.target for f in self.fibers.values() if f.target]
         targs=[t for t in self.targets if t not in mapped_targ]
         targs.sort(key=operator.attrgetter('hole.x'), reverse=self.on_left)

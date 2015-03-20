@@ -1,0 +1,34 @@
+-------------------------
+Using hole_mapper code. 
+-------------------------
+There are two programs: plateplanner.py and platemapper.py
+
+plateplanner.py is for designing plates and generates the .plate files. It is described here.
+
+platemapper.py is used to generate fiber assignments for plates and is discussed elsewhere.
+
+Execution is (in dir of plateplanner.py): "plateplanner.py", but running the program prior to the following steps is pointless.
+
+
+-------------------------
+Creating plates
+-------------------------
+go through all the received files and fix formatting errors or yell at submitter
+Some common issues:
+abbreviated required column names
+RA2000 DE2000 instead of RA, Dec, & epoch columns 
+extension not .field
+# in front of header row
+no field=name
+<> around a number value
+
+Create a directory with all of the .field files, and make an archive of your starting point.
+
+
+Figure out what UT each field should be drilled for and add the line
+obsdate = yyyy mm dd h m s
+
+run plateplanner.py: ./plateplanner.py
+
+
+

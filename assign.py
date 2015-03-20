@@ -221,7 +221,8 @@ def _assign_fibers(setups):
         x=[t.hole.x for t in setup_targets]
         y=[t.hole.y for t in setup_targets]
         d=[t.hole.conflict_d for t in setup_targets]
-        weights=[t.priority/t.field.max_priority for t in setup_targets]
+        weights=[t.priority/(t.field.max_priority if t.field.max_priority else 1)
+                 for t in setup_targets]
         
         coll_graph=build_overlap_graph_cartesian(x,y,d) #Nothing can conflict
         keep=coll_graph.crappy_min_vertex_cover_cut(weights=weights)
@@ -234,7 +235,10 @@ def _assign_fibers(setups):
     y=[t.hole.y for t in to_assign]
     d=[t.hole.conflict_d for t in to_assign]
 
-    weights=[t.priority/t.field.max_priority for t in to_assign]
+    weights=[t.priority/(t.field.max_priority if t.field.max_priority else 1)
+             for t in to_assign]
+    #target.must_be_drilled not necessarily the same thing as
+    # t.priority==t.field.max_priority and t.setup.mustkeep
     uncuttable=[i for i,t in enumerate(to_assign)
                 if (t.priority==t.field.max_priority and t.setup.mustkeep) or
                    t.setup.keepall]
@@ -266,17 +270,14 @@ def _assign_fibers(setups):
     #Grab targets with assignments and associate them with their cassettes
     assigned=[t for t in to_assign if t.is_assigned]
     print("{} targets had preset assignments".format(len(assigned)))
-    for t in assigned:
-        cassettes.assign(t, t.fiber.cassette_name)
+    try:
+        for t in assigned: cassettes.assign(t, t.fiber.cassette_name)
+    except ValueError:
+        raise ConstraintError('Collisions among targets with preset fibers '
+                              ' assignment impossible.')
 
     unassignable=[]
 
-    #This is a bit of a hack, which works when not assigning with things
-    #If more targets & skys drilled than have usable fibers, then sort by
-    #priority and discard the lowest
-    #This doesn't respect min sky settings in the pathological case of assigning
-    # multiple setups with each other
-#    import ipdb;ipdb.set_trace()
 
     #this doesn't work with pultible setups, esp. when there are excessive
     # numbers of targets in one/both
@@ -287,9 +288,15 @@ def _assign_fibers(setups):
 
     #determine number to skip in each setup when assigning setups to R/B side
     # only
+    
+    #This penalizes each field with an equal number of losses, it probably
+    # should penalize in proportion to each setup's contribution to the
+    #total number of targets
     n_skip_map={}
     if len([s for s in setups if s.assigning_to!='both'])==0:
-        n_skip=(sum(len([x for x in to_assign if x in s.to_assign])
+        #nskip is total_number_of_things_needing_fibers - number_of_available_fibers
+        n_skip=(sum(len([x for x in to_assign if x in s.to_assign
+                         and x not in assigned])
                    for s in setups) - cassettes.n_available)
         base_skip=n_skip / len(setups)
         extra_skip=n_skip % len(setups)
@@ -302,7 +309,8 @@ def _assign_fibers(setups):
         #R side
         r_setups=[s for s in setups if s.assigning_to=='r']
         if r_setups:
-            n_skip_r=(sum(len([x for x in to_assign if x in s.to_assign])
+            n_skip_r=(sum(len([x for x in to_assign if x in s.to_assign
+                               and x not in assigned])
                           for s in r_setups) - cassettes.n_r_available)
             base_skip=n_skip_r / len(r_setups)
             extra_skip=n_skip_r % len(r_setups)
@@ -314,7 +322,8 @@ def _assign_fibers(setups):
         #B Side
         b_setups=[s for s in setups if s.assigning_to=='b']
         if b_setups:
-            n_skip_b=(sum(len([x for x in to_assign if x in s.to_assign])
+            n_skip_b=(sum(len([x for x in to_assign if x in s.to_assign
+                               and x not in assigned])
                           for s in b_setups) - cassettes.n_b_available)
             base_skip=n_skip_b / len(b_setups)
             extra_skip=n_skip_b % len(b_setups)
@@ -388,6 +397,11 @@ def _assign_fibers(setups):
 
 #    import ipdb;ipdb.set_trace()
 
+    #Not sure why the skys and targets need to be done separately
+    #we only have as many targets and skys as fibers now
+
+    #note that the plug priority is not realated to the priority from users
+    # it has to do with the how reachable the target is from other fibers
     #assign targets first
     while unassigned_objs:
         #Update cassette availability for each hole (a cassette may have filled)
@@ -433,37 +447,34 @@ def _assign_fibers(setups):
     ####As many targets as possible have now been assigned to a cassette####
     assigned=[t for t in to_assign if t not in unassignable]
 
+
+    #Verify I havn't screwed up
     for t in assigned:
         if t not in cassettes.get_cassette(t.assigned_cassette).targets:
+            _log.critical("A cassette's list of targets doesn't include"
+                          "a target that is assigned to it."
+                          "This is a major bug. entering debugger. type help")
             import ipdb;ipdb.set_trace()
 
     #For each cassette assign fiber numbers with x coordinate of holes
     cassettes.map()
 
-    for t in assigned:
-        if t not in cassettes.get_cassette(t.assigned_cassette).targets:
-            import ipdb;ipdb.set_trace()
-
     #Compact the assignments (get rid of underutillized cassettes)
     _condense_cassette_assignments([c for c in cassettes if c.on_left])
     _condense_cassette_assignments([c for c in cassettes if c.on_right])
 
-    for t in assigned:
-        if t not in cassettes.get_cassette(t.assigned_cassette).targets:
-            import ipdb;ipdb.set_trace()
-    
     #Rejigger the fibers
     _rejigger_cassette_assignments([c for c in cassettes if c.on_left])
     _rejigger_cassette_assignments([c for c in cassettes if c.on_right])
 
+    #Remap fibers
+    cassettes.map(remap=True)
+    
+    #Make sure its all ok
     for t in assigned:
         if t not in cassettes.get_cassette(t.assigned_cassette).targets:
             import ipdb;ipdb.set_trace()
 
-    #Remap fibers
-    cassettes.map(remap=True)
-    
-    
     for s in setups:
         s.cassette_config=cassettes
 
@@ -483,8 +494,7 @@ def _condense_cassette_assignments(cassettes):
         targets=list(trial.targets)
         for t in targets:
             #If hole can't be assigned then screw it
-            if not t.is_assignable:
-                break
+            if not t.is_assignable(): continue
             #Try assigning the hole to another tetris
             recomp_non_full=False
             for c in non_full:
@@ -522,7 +532,7 @@ def _rejigger_cassette_assignments(cassettes):
         higer_cassettes=cassettes[i:]
 
         swappable_cassette_targets=[t for t in cassette.targets
-                                    if t.is_assignable]
+                                    if t.is_assignable()]
 
 #        if not swappable_cassette_targets:
 #            import ipdb;ipdb.set_trace()
@@ -581,9 +591,12 @@ def _filter_for_pluggability(targets):
     #Nothing can conflict
     coll_graph=build_overlap_graph_cartesian(x,y,d)
 
+    #target.must_be_drilled not necessarily the same thing as
+    # t.priority==t.field.max_priority and t.setup.mustkeep
     uncuttable=[i for i,t in enumerate(targets)
                 if t.priority==t.field.max_priority and t.setup.mustkeep]
-    weights=[t.priority/t.field.max_priority for t in targets]
+    weights=[t.priority/(t.field.max_priority if t.field.max_priority else 1)
+             for t in targets]
     import ipdb;ipdb.set_trace()
     try:
         keep=coll_graph.crappy_min_vertex_cover_cut(uncuttable=uncuttable,

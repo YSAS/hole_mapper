@@ -93,7 +93,7 @@ class Target(object):
 #        self.setup=kwargs.pop('setup',None)
 
         #Fiber
-        self.preset_fiber=kwargs.pop('fiber',None)
+        self.preset_fiber=self.user.pop('fiber',None)
         if type(self.preset_fiber)==str:
             self.preset_fiber=Fiber(self.preset_fiber)
         self.fiber=self.preset_fiber
@@ -120,7 +120,7 @@ class Target(object):
         else:
             assert fiber !=None
             if self.preset_fiber:
-                assert self.preset_fiber==fiber
+                assert self.preset_fiber.name==fiber.name
             else:
                 assert fiber.cassette_name in self._preset_usable_cassette_names
             self.fiber=fiber
@@ -188,6 +188,13 @@ class Target(object):
 #    @property
 #    def required_slit(self):
 #        """Return the required slit per the target, then per the setup"""
+
+    @property
+    def must_be_drilled(self):
+        if self.field is None:
+            #STANDARD targets don't have fields
+            return False
+        return self.field.mustkeep and self.priority==self.field.max_priority
 
     @property
     def conflicting_ids(self):

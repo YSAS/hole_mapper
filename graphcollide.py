@@ -18,7 +18,6 @@ def build_overlap_graph_cartesian(x, y, d, overlap_pct_r_ok=0):
     x--(-)y overlaps for y by 1 radius and .5 for x
     default allowable_overlap
     
-    may generate connections that only go one direction
     """
     edges={}
     x=np.array(x)
