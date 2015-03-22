@@ -422,7 +422,7 @@ class Manager(object):
             else:
                 discard+=with_coll
                             
-            if len(keep) < MIN_ACQUISITIONS:
+            if len(keep) < min(MIN_ACQUISITIONS, len(f.acquisitions)):
                 raise ConstraintError("Can't keep enough acquisitions for {} due to collisions with undroppable targets".format(f.name))
             
             #Keep the guides from the field
