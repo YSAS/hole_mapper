@@ -17,6 +17,8 @@ from errors import ConstraintError
 import numpy as np
 import re
 
+from settings import DEFAULT_MAXSKY, DEFAULT_MINSKY
+
 REQUIRED_FIELD_KEYS=['ra', 'dec', 'epoch', 'id', 'type', 'priority']
 FIELD_KEYS=REQUIRED_FIELD_KEYS+['pm_ra','pm_dec']
 REQUIRED_FIELD_RECORD_ENTRIES=['ra', 'dec', 'epoch', 'type']
@@ -42,8 +44,8 @@ class FieldCatalog(object):
         
         self.holesxy_info=None
         self.mustkeep=False
-        self.maxsky=1000
-        self.minsky=0
+        self.maxsky=DEFAULT_MAXSKY
+        self.minsky=DEFAULT_MINSKY
         self.filler_targ=False
         self._processed=False
     

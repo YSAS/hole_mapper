@@ -10,12 +10,11 @@ from target import Target,ConflictDummy
 from hole import Hole
 from errors import ConstraintError
 log=getLogger('plateplanner.foo')
-
+from settings import MIN_GUIDES, MIN_ACQUISITIONS
 
 COLOR_SEQUENCE=['red','blue','purple','green','black','teal','pink','orange']
 
-MIN_GUIDES=2
-MIN_ACQUISITIONS=3
+
 
 PLATEHOLE_REQUIRED_COLS=['id','type','x','y','z','d']
 UNDRILLABLE_REQUIRED_COLS=['id','ra','dec','epoch','pm_ra','pm_dec','priority',
