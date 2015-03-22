@@ -270,7 +270,7 @@ class FieldCatalog(object):
         x=[h.x for h in holes]
         y=[h.y for h in holes]
         d=[h.conflict_d for h in holes]
-        pri=[h.target.priority for h in holes]
+        pri=[-1e100 if h.target.is_sky else h.target.priority for h in holes]
 
         #Now do it again but allowing some overlap
         coll_graph=build_overlap_graph_cartesian(x, y, d, overlap_pct_r_ok=
