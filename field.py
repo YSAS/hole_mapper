@@ -31,7 +31,8 @@ class FieldCatalog(object):
                  acquisitions=None, skys=None, standards=None):
         """sh should be a target"""
         
-        self.file=file
+        self.file=os.path.basename(file)
+        self.full_file=file
         self.field_name=name
         self._obsdate=obsdate
         self.sh=sh if sh else Target(type='C')
@@ -384,7 +385,7 @@ def load_dotfield(file):
     returns FieldCatalog() or raises error if file has issues.
     """
     
-    field_cat=FieldCatalog(file=os.path.basename(file))
+    field_cat=FieldCatalog(file=file)
 
     try:
         lines=open(file,'r').readlines()

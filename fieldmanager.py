@@ -8,6 +8,7 @@ from graphcollide import build_overlap_graph_cartesian
 from holesxy import get_plate_holes
 from target import Target,ConflictDummy
 from hole import Hole
+import tkMessageBox
 from errors import ConstraintError
 log=getLogger('plateplanner.foo')
 from settings import MIN_GUIDES, MIN_ACQUISITIONS
@@ -125,11 +126,21 @@ class Manager(object):
 
         try:
             for f in files:
+                if f in [x.full_file for x in self.fields]:
+                    log.info("Skipping {}. Already loaded".format(f))
+                    continue
+                
                 field=load_dotfield(f)
-                log.info("Loaded {}")
-                if field.name in [f.name for f in self.fields]:
-                    log.error("field already loaded")
+                if [x for x in self.fields if
+                    x.name==field.name
+                    and x.file!=field.file]:
+                    exist=[x for x in self.fields if x.name==field.name][0]
+                    log.error("Duplicate field names found")
+                    tkMessageBox.showerror('Duplicate field name',
+                                           '{} & {}'.format(os.path.basename(f),
+                                           os.path.basename(exist.file)))
                 else:
+                    log.info("Loaded {}".format(field.name))
                     self.fields.append(field)
         
         except IOError as e:
