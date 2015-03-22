@@ -26,11 +26,11 @@ def load_dotconfigdef(filename):
         section_dict={}
         for l in (l for l in lines if l and l[0]!='#'):
             k,v=l.split('=')
-            assert k.strip() not in section_dict
+            assert k.strip().lower() not in section_dict
             assert v.strip()
-            section_dict[k.strip()]=v.strip()
+            section_dict[k.strip().lower()]=v.strip()
 
-        name=os.path.basename(filename)[:-10]
+        name=os.path.basename(filename)[:-10].lower()
         kwords=_config_dict_from_dotsetup_dict(section_dict,'R')
         configR=M2FSArmConfig('R', **kwords)
         kwords=_config_dict_from_dotsetup_dict(section_dict,'B')
