@@ -55,7 +55,7 @@ class Plate(object):
     def file_version(self):
         return '1.0'
 
-def load_dotplate(filename, singleton_ok=False):
+def load_dotplate(filename, singleton_ok=False, debug=False):
     try:
         if _PLATE_CACHE[filename]['hash']==hashfile(filename):
             if singleton_ok:
@@ -99,7 +99,7 @@ def load_dotplate(filename, singleton_ok=False):
                 #Section is key value pairs
                 d={}
                 for l in sec['lines']:
-                    k,v=l.split('=')
+                    k,_,v=l.partition('=')
                     d[k.strip()]=v.strip()
                 sec['processed']=d
             else:
@@ -148,6 +148,8 @@ def load_dotplate(filename, singleton_ok=False):
         return plate
 
     except Exception as e:
+        if debug:
+            import ipdb;ipdb.set_trace()
         raise PlateError(str(e))
 
 def get_plate(platename):
