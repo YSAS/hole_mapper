@@ -97,7 +97,7 @@ class SetupDefinition(object):
         self.file=file
         self.platename=platename
         self.fieldname=fieldname
-        self.configname=configname
+        self.configname=configname.lower()
         self.assign_to=assign_to.lower()
         self.assign_given=extra.pop('assign_given','')
         if self.assign_to not in ['single', 'any', 'r','b']:

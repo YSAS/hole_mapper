@@ -55,13 +55,13 @@ def get_config(configname):
 
 def _config_dict_from_dotsetup_dict(section_dict, side):
     
-    get_key= lambda d, key, side : d.get(key+side, d.get(key, None))
+    get_key= lambda d, key, side : d.get(key+side.lower(), d.get(key, None))
     
     
     def get_active_fibers_key(d, n, side):
-        return d.get('active_fibers{}{}'.format(n,side),
+        return d.get('active_fibers{}{}'.format(n,side.lower()),
                      d.get('active_fibers{}'.format(n),
-                           d.get('active_fibers{}'.format(side),
+                           d.get('active_fibers{}'.format(side.lower()),
                                  d.get('active_fibers', None))))
     
     conf_name=get_key(section_dict, 'config', side)
