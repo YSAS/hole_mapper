@@ -371,17 +371,7 @@ class Setup(object):
         """ Call to write the outputs after calling assign"""
         self.writemap(dir=dir)
         filename=os.path.join(dir,self.name+'.m2fs').replace(':','-')
-        self.config.write_plist(filename)
-    
-#        for s in self.assign_with:
-#            s.writemap(dir=dir)
-#            s.writeplist(dir=dir)
-
-
-
-
-
-
+#        self.config.write_plist(filename)
 
 
 _KNOWN_SETUPS={}
