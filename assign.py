@@ -464,6 +464,17 @@ def _assign_fibers(setups):
     _condense_cassette_assignments([c for c in cassettes if c.on_right])
 
     #Rejigger the fibers
+    #Must do an updown the a lr a few times for the assumptions in the lr
+    #rejigger to hold and it to be clean, this is clearly indicative of me
+    #overlooking some test to do it in one pass in the LR rejigger.
+
+    _rejigger_cassette_assignments([c for c in cassettes if c.on_left])
+    _rejigger_cassette_assignments_lr(cassettes)
+    _rejigger_cassette_assignments([c for c in cassettes if c.on_left])
+    _rejigger_cassette_assignments_lr(cassettes)
+
+
+    #finally to updown rejiggering to enforce ordering rules
     _rejigger_cassette_assignments([c for c in cassettes if c.on_left])
     _rejigger_cassette_assignments([c for c in cassettes if c.on_right])
 
@@ -519,6 +530,90 @@ def _condense_cassette_assignments(cassettes):
         
         #Update sort of to check
         to_check.sort(key= lambda x: x.n_avail)
+
+def _rejigger_cassette_assignments_lr(cassettes):
+    """
+    Go through the cassettes swapping holes to eliminate
+    horizontal excursions
+    
+    call after rejiggering left cassettes but before right cassettes
+    """
+    #work from top to bottom (or bottom to top, doesn't matter) cassette by
+    # cassette
+    #find all the assigned fibers in the y range of the cassette on the other
+    #side of the plate
+    # for any that are more on this side of the plate than fibers in this
+    #cassette attempt a trade
+
+    right_cassettes=[c for c in cassettes if c.on_right]
+    left_cassettes=[c for c in cassettes if c.on_left]
+    left_cassettes.sort(key=lambda c: c.pos[1])
+#    import ipdb;ipdb.set_trace()
+    for cassette in left_cassettes:
+
+        swappable_targets=[t for t in cassette.targets if t.is_assignable()]
+                                    
+        if not swappable_targets: continue
+        
+        #get bounding y region for swappable targets
+        i=left_cassettes.index(cassette)
+        if i==0:
+            cassette_min_y=float('-inf')
+        else:
+            cassette_min_y=min([t.hole.y for t in left_cassettes[i-1].targets])
+        
+        if i==len(left_cassettes)-1:
+            cassette_max_y=float('inf')
+        else:
+            cassette_max_y=max([t.hole.y for t in left_cassettes[i+1].targets])
+
+
+        swappable_other_targets=[t for c in right_cassettes
+                                 for t in c.targets if
+                                 t.hole.y<=cassette_max_y and
+                                 t.hole.y>=cassette_min_y and
+                                 t.is_assignable(cassette=cassette)]
+        
+        if not swappable_other_targets: continue
+        
+#        import numpy as np
+#        involved_fib=np.array([t.hole.y for t in swappable_targets+swappable_other_targets])
+#        if min(min(abs(1.729-involved_fib)),min(abs(1.4879-involved_fib))) < .0001:
+#            import ipdb;ipdb.set_trace()
+
+        other_max_x=max([t.hole.x for t in swappable_other_targets])
+        
+        #Consider only targets with x values less that the max of other
+        swappable_targets=[t for t in swappable_targets if t.hole.x < other_max_x]
+        if not swappable_targets: continue
+
+
+        #work from right to left while swappable targets are more right than
+        # the left most swappable_other_targets
+        swappable_targets.sort(key=operator.attrgetter('hole.x'))
+        swappable_other_targets.sort(key=operator.attrgetter('hole.x'),
+                                     reverse=True)
+        for t in swappable_targets:
+            for ot in swappable_other_targets:
+                #try a trade with the furthest right if it
+                if ot.hole.x > t.hole.x:
+                    if t.is_assignable(cassette=ot.assigned_cassette):
+                        ocassette=cassettes.get_cassette(ot.assigned_cassette)
+                        #Unassign
+                        ocassette.unassign(ot)
+                        cassette.unassign(t)
+                        #Assign
+                        ocassette.assign(t)
+                        cassette.assign(ot)
+                        break
+                    else:
+                        pass
+                        #maybe it can be traded with another (unlikely branch)
+                else:
+                    #we are done with both loops
+                    break
+            if ot.hole.x > t.hole.x:
+                break
 
 
 def _rejigger_cassette_assignments(cassettes):
