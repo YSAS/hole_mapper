@@ -46,6 +46,16 @@ def load_dotsetup(file):
                                                            section)
         log.error(err)
         raise IOError(err)
+    
+    snames=[s.name for s in setupdefs]
+    err=False
+    for x in set(snames):
+        cnt=snames.count(x)
+        if cnt > 1:
+            log.error('{} has {} defined {} times'.format(file, x, cnt))
+            err=True
+    if err:
+        return []
     return setupdefs
 
 
