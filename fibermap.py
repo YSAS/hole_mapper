@@ -72,7 +72,7 @@ def load_dotfibermap(filename, usecache=True, metadata_only=False):
                 #Section is key value pairs
                 d={}
                 for l in sec['lines']:
-                    k,v=l.split('=')
+                    k,_,v=l.partition('=')
                     d[k.strip()]=v.strip()
                 sec['processed']=d
             else:
