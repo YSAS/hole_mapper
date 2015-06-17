@@ -26,11 +26,11 @@ def load_dotconfigdef(filename):
         section_dict={}
         for l in (l for l in lines if l and l[0]!='#'):
             k,v=l.split('=')
-            assert k.strip() not in section_dict
+            assert k.strip().lower() not in section_dict
             assert v.strip()
-            section_dict[k.strip()]=v.strip()
+            section_dict[k.strip().lower()]=v.strip()
 
-        name=os.path.basename(filename)[:-10]
+        name=os.path.basename(filename)[:-10].lower()
         kwords=_config_dict_from_dotsetup_dict(section_dict,'R')
         configR=M2FSArmConfig('R', **kwords)
         kwords=_config_dict_from_dotsetup_dict(section_dict,'B')
@@ -55,13 +55,13 @@ def get_config(configname):
 
 def _config_dict_from_dotsetup_dict(section_dict, side):
     
-    get_key= lambda d, key, side : d.get(key+side, d.get(key, None))
+    get_key= lambda d, key, side : d.get(key+side.lower(), d.get(key, None))
     
     
     def get_active_fibers_key(d, n, side):
-        return d.get('active_fibers{}{}'.format(n,side),
+        return d.get('active_fibers{}{}'.format(n,side.lower()),
                      d.get('active_fibers{}'.format(n),
-                           d.get('active_fibers{}'.format(side),
+                           d.get('active_fibers{}'.format(side.lower()),
                                  d.get('active_fibers', None))))
     
     conf_name=get_key(section_dict, 'config', side)

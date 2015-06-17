@@ -355,7 +355,10 @@ class Target(object):
             return False
         elif cassette:
             #TODO: Note this breaks if the usability of the cassettes evolves during assignment
-            return cassette.name in self._preset_usable_cassette_names
+            try:
+                return cassette.name in self._preset_usable_cassette_names
+            except AttributeError:
+                return cassette in self._preset_usable_cassette_names
         else:
             return True
 

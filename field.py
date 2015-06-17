@@ -17,6 +17,8 @@ from errors import ConstraintError
 import numpy as np
 import re
 
+from settings import DEFAULT_MAXSKY, DEFAULT_MINSKY
+
 REQUIRED_FIELD_KEYS=['ra', 'dec', 'epoch', 'id', 'type', 'priority']
 FIELD_KEYS=REQUIRED_FIELD_KEYS+['pm_ra','pm_dec']
 REQUIRED_FIELD_RECORD_ENTRIES=['ra', 'dec', 'epoch', 'type']
@@ -29,7 +31,8 @@ class FieldCatalog(object):
                  acquisitions=None, skys=None, standards=None):
         """sh should be a target"""
         
-        self.file=file
+        self.file=os.path.basename(file)
+        self.full_file=file
         self.field_name=name
         self._obsdate=obsdate
         self.sh=sh if sh else Target(type='C')
@@ -42,8 +45,8 @@ class FieldCatalog(object):
         
         self.holesxy_info=None
         self.mustkeep=False
-        self.maxsky=1000
-        self.minsky=0
+        self.maxsky=DEFAULT_MAXSKY
+        self.minsky=DEFAULT_MINSKY
         self.filler_targ=False
         self._processed=False
     
@@ -267,7 +270,7 @@ class FieldCatalog(object):
         x=[h.x for h in holes]
         y=[h.y for h in holes]
         d=[h.conflict_d for h in holes]
-        pri=[h.target.priority for h in holes]
+        pri=[-1e100 if h.target.is_sky else h.target.priority for h in holes]
 
         #Now do it again but allowing some overlap
         coll_graph=build_overlap_graph_cartesian(x, y, d, overlap_pct_r_ok=
@@ -382,7 +385,7 @@ def load_dotfield(file):
     returns FieldCatalog() or raises error if file has issues.
     """
     
-    field_cat=FieldCatalog(file=os.path.basename(file))
+    field_cat=FieldCatalog(file=file)
 
     try:
         lines=open(file,'r').readlines()

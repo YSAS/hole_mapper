@@ -214,11 +214,14 @@ class App(Tkinter.Tk):
         self.show_conflicts=True
 
         #Info output
-        self.info_str=Tkinter.StringVar(value='Red: 000  Blue: 000  Total: 0000')
+        self.info_str=Tkinter.StringVar(value='Total Holes: 0')
         Tkinter.Label(frame2, textvariable=self.info_str).pack(anchor='w')
     
     def status_string(self):
-        return 'Foobar'
+        nholes=sum([len(x.drillable_dictlist())
+                    for x in self.manager.selected_fields])
+        nholes+=len(self.manager.plate_drillable_dictlist())
+        return 'Total Holes: {}'.format(nholes)
     
     def reset(self):
         self.manager.reset()
@@ -263,18 +266,44 @@ class App(Tkinter.Tk):
         cols=('RA', 'Dec', 'nT','nS', 'nLost',
               'Drillable Targ', 'Drillable Sky')
         self.tree = tree = ttk.Treeview(new, columns=cols)
-        tree.heading('#0',text='Name')
+        
+        def tree_col_sort(tv, reverse, col=''):
+            if col=='#0':
+                l=[(k,k) for k in tv.get_children('')]
+            else:
+                l = [(tv.set(k, col), k) for k in tv.get_children('')]
+            
+            
+            #sort like numbers if possible
+            try:
+                l=[(float(x[0]),x[1]) for x in l]
+            except ValueError:
+                pass
+    
+            l.sort(reverse=reverse)
+
+            # rearrange items in sorted positions
+            for index, (val, k) in enumerate(l): tv.move(k, '', index)
+
+            # reverse sort next time
+            tv.heading(col, command=lambda: tree_col_sort(tv, not reverse,
+                                                          col=col))
+    
+        tree.heading('#0',text='Name',
+                     command=lambda: tree_col_sort(tree, False, col='#0'))
         for c in cols:
-            tree.heading(c,text=c)
+            tree.heading(c,text=c,
+                         command=lambda c=c: tree_col_sort(tree, False, col=c))
         
         for f in self.manager.fields:
             tree.insert('', 'end', f.name, text=f.name, tags=(),
                         values=(f.sh.ra.sexstr, f.sh.dec.sexstr,
                                 len(f.targets),len(f.skys), f.n_conflicts,
                                 f.n_drillable_targs,f.n_drillable_skys))
+
         tree.bind('<Button-2>', self.field_settings)
         tree.bind('<ButtonRelease-1>', func=self.select_fields)
-        tree.pack()
+        tree.pack(fill=Tkinter.BOTH, expand=1)
         tree.focus()
     #    tree.tag_configure('ttk', background='yellow')
     #    tree.tag_bind('ttk', '<1>', itemClicked); # the item clicked can be found via tree.focus()

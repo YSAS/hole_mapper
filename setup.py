@@ -46,6 +46,16 @@ def load_dotsetup(file):
                                                            section)
         log.error(err)
         raise IOError(err)
+    
+    snames=[s.name for s in setupdefs]
+    err=False
+    for x in set(snames):
+        cnt=snames.count(x)
+        if cnt > 1:
+            log.error('{} has {} defined {} times'.format(file, x, cnt))
+            err=True
+    if err:
+        return []
     return setupdefs
 
 
@@ -97,7 +107,7 @@ class SetupDefinition(object):
         self.file=file
         self.platename=platename
         self.fieldname=fieldname
-        self.configname=configname
+        self.configname=configname.lower()
         self.assign_to=assign_to.lower()
         self.assign_given=extra.pop('assign_given','')
         if self.assign_to not in ['single', 'any', 'r','b']:
@@ -371,17 +381,7 @@ class Setup(object):
         """ Call to write the outputs after calling assign"""
         self.writemap(dir=dir)
         filename=os.path.join(dir,self.name+'.m2fs').replace(':','-')
-        self.config.write_plist(filename)
-    
-#        for s in self.assign_with:
-#            s.writemap(dir=dir)
-#            s.writeplist(dir=dir)
-
-
-
-
-
-
+#        self.config.write_plist(filename)
 
 
 _KNOWN_SETUPS={}

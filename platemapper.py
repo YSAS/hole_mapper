@@ -95,7 +95,7 @@ class App(Tkinter.Tk):
         self.parent = parent
         self.manager=platemanager.Manager()
         self._initialize_main()
-        self._initialize_projector()
+#        self._initialize_projector()
         self.setup_info_window()
     
     def _initialize_projector(self):
@@ -195,10 +195,10 @@ class App(Tkinter.Tk):
 
     def show(self):
         self.canvas.clear()
-        self.proj_can.clear()
+#        self.proj_can.clear()
         self.info_str.set(self.status_string())
         self.manager.draw(self.canvas)
-        self.manager.draw_image(self.proj_can)
+#        self.manager.draw_image(self.proj_can)
 
     def setup_info_window(self):
     
@@ -207,15 +207,38 @@ class App(Tkinter.Tk):
         cols=('Nneeded', 'Nusable')
         tree = ttk.Treeview(new, columns=cols)
         
-        tree.heading('#0',text='Name')
+        def tree_col_sort(tv, reverse, col=''):
+            if col=='#0':
+                l=[(k,k) for k in tv.get_children('')]
+            else:
+                l = [(tv.set(k, col), k) for k in tv.get_children('')]
+            
+            #sort like numbers if possible
+            try:
+                l=[(float(x[0]),x[1]) for x in l]
+            except ValueError:
+                pass
+    
+            l.sort(reverse=reverse)
+
+            # rearrange items in sorted positions
+            for index, (val, k) in enumerate(l): tv.move(k, '', index)
+
+            # reverse sort next time
+            tv.heading(col, command=lambda: tree_col_sort(tv, not reverse,
+                                                          col=col))
+        
+        tree.heading('#0',text='Name',
+                     command=lambda: tree_col_sort(tree, False, col='#0'))
         for c in cols:
-            tree.heading(c,text=c)
+            tree.heading(c,text=c,
+                         command=lambda c=c: tree_col_sort(tree, False, col=c))
         
         for setup in get_all_setups():
             tree.insert('', 'end', setup.name, text=setup.name, tags=(),
                         values=(setup.n_needed_fibers, setup.n_usable_fibers))
         tree.bind(sequence='<<TreeviewSelect>>', func=self.pick_setups)
-        tree.pack()
+        tree.pack(fill=Tkinter.BOTH, expand=1)
         tree.focus()
 
     def pick_setups(self, event):

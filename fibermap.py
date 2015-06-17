@@ -17,19 +17,16 @@ _log=getLogger('fibermap')
 
 _FIBERMAP_CACHE={}
 
-def hashfile(filepath):
+def hashfile(filepath, contents=None):
     sha1 = hashlib.sha1()
-    with open(filepath, 'rb') as f:
-        sha1.update(f.read())
+    if contents:
+        sha1.update(contents)
+    else:
+        with open(filepath, 'rb') as f: sha1.update(f.read())
     return sha1.hexdigest()
 
-def load_dotfibermap(filename):
+def load_dotfibermap(filename, usecache=True, metadata_only=False):
     """Does not return a discreete instance of the map. don't change it!"""
-    try:
-        if _FIBERMAP_CACHE[filename]['hash']==hashfile(filename):
-            return _FIBERMAP_CACHE[filename]['map']
-    except KeyError:
-        pass
     
     #Read file
     try:
@@ -37,6 +34,15 @@ def load_dotfibermap(filename):
             lines=f.readlines()
     except IOError as e:
         raise e
+    
+    sha1=hashfile('',''.join(lines))
+    
+    if usecache:
+        try:
+            if _FIBERMAP_CACHE[filename].sha1==sha1:
+                return _FIBERMAP_CACHE[filename]
+        except KeyError:
+            pass
 
     #Break file into sections
     lines=[l.strip() for l in lines]
@@ -66,34 +72,39 @@ def load_dotfibermap(filename):
                 #Section is key value pairs
                 d={}
                 for l in sec['lines']:
-                    k,v=l.split('=')
+                    k,_,v=l.partition('=')
                     d[k.strip()]=v.strip()
                 sec['processed']=d
             else:
-                #Section is dictlist records
-                if 'assignments' in sec_name:
-                    req=REQUIRED_ASSIGNMENTS_SECTION_KEYS
-                elif 'unused' in sec_name:
-                    req=REQUIRED_UNUSED_SECTION_KEYS
-                elif 'guides' in sec_name:
-                    req=REQUIRED_GUIDES_SECTION_KEYS
+                if metadata_only:
+                    sec['processed']={}
                 else:
-                    req=[]
+                    #Section is dictlist records
+                    if 'assignments' in sec_name:
+                        req=REQUIRED_ASSIGNMENTS_SECTION_KEYS
+                    elif 'unused' in sec_name:
+                        req=REQUIRED_UNUSED_SECTION_KEYS
+                    elif 'guides' in sec_name:
+                        req=REQUIRED_GUIDES_SECTION_KEYS
+                    else:
+                        req=[]
 
-                keys=_parse_header_row(sec['lines'][0], REQUIRED=req)
-                user_keys=[k for k in keys if k not in req]
+                    keys=_parse_header_row(sec['lines'][0], REQUIRED=req)
+                    user_keys=[k for k in keys if k not in req]
 
-    #            import ipdb;ipdb.set_trace()
-                dicts=[_parse_record_row(l, keys, user_keys)
-                       for l in sec['lines'][1:]]
-                sec['processed']=dicts
+        #            import ipdb;ipdb.set_trace()
+                    dicts=[_parse_record_row(l, keys, user_keys)
+                           for l in sec['lines'][1:]]
+                    sec['processed']=dicts
         
         dict=sections['setup']['processed']
 
         assigned=sections['assignments']['processed']
 
-        map=Fibermap(sections['setup']['processed'], assigned)
-        _FIBERMAP_CACHE[filename]={'hash':hashfile(filename), 'map':map}
+        map=Fibermap(sections['setup']['processed'], assigned, filename, sha1)
+
+        if usecache:
+            _FIBERMAP_CACHE[filename]=map
 
         #Finally the plate
         return map
@@ -106,11 +117,13 @@ class FibermapError(Exception):
     pass
 
 class Fibermap(object):
-    def __init__(self, info, assigned):
+    def __init__(self, info, assigned, file, sha1):
         """info is a dictionary of keys in the [setup] section
         assigned is a list of dicts from the [assigned] section"""
         self.dict=info
         self.assigned=assigned
+        self.sha1=sha1
+        self.file=file
 
     @property
     def name(self):
