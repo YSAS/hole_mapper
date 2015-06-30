@@ -45,6 +45,7 @@ class FieldCatalog(object):
         
         self.holesxy_info=None
         self.mustkeep=False
+        self._mustkeep_priority=None
         self.maxsky=DEFAULT_MAXSKY
         self.minsky=DEFAULT_MINSKY
         self.filler_targ=False
@@ -75,6 +76,8 @@ class FieldCatalog(object):
         return self.sh.dec
 
     def add_target(self,targ):
+#        assert ((targ.ra,targ.dec,targ.epoch,targ.pm_ra,targ.pm_dec) not in
+#            [(t.ra,t.dec,t.epoch,t.pm_ra,t.pm_dec) for t in self.all_targets])
         if targ.is_sky:
             self.skys.append(targ)
         elif targ.is_target:
@@ -101,8 +104,18 @@ class FieldCatalog(object):
         targ.field=self
     
     @property
+    def mustkeep_priority(self):
+        """ return the priority above which a target must be drilled,
+            meaningless if mustkeep is not set
+        """
+        if self._mustkeep_priority is None:
+            return self.max_priority
+        else:
+            return self._mustkeep_priority
+    
+    @property
     def max_priority(self):
-        """max priority of type T in the catalog """
+        """max priority of type T in the catalog caches itself"""
         try:
             return self._max_priority
         except AttributeError:
@@ -187,10 +200,15 @@ class FieldCatalog(object):
         sh_rec=_dictlist_to_records([sh_dict],
                                     ['id','epoch','pm_ra','pm_dec'])
 
+        if self._mustkeep_priority is None:
+            mustkeep_str=str(self.mustkeep)
+        else:
+            mustkeep_str=str(self._mustkeep_priority)
+        
         ret={'name':self.name,
              'file':self.file,
              'obsdate':str(self.obsdate),
-             'mustkeep':str(self.mustkeep),
+             'mustkeep':mustkeep_str,
              'minsky':str(self.minsky),
              'maxsky':str(self.maxsky),
              '(ra, dec)':'{} {}'.format(self.sh.ra.sexstr,self.sh.dec.sexstr),
@@ -259,6 +277,7 @@ class FieldCatalog(object):
         to_drop=[]
         for n in ndxs:
             dropped=coll_graph.drop_conflicting_with(n)
+#            print 'Hole {} is {} has collisions {} will drop.'.format(n,holes[n].target.type, dropped)
             to_drop+=dropped
             for i in dropped:
                 holes[i].target.conflicting=holes[n].target
@@ -284,6 +303,15 @@ class FieldCatalog(object):
         drillable=[holes[i].target for i in keep]
         undrillable=[holes[i].target for i in drop]
         
+        if len([x for x in undrillable if x.is_guide or x.is_acquisition]):
+            gi=[i for i in drop if holes[i].target.is_guide]
+            ci=[coll_graph.collisions(i) for i in gi]
+            
+            log.critical('Somehow there are guides &/or acquisitions being'
+                         'dropped within a field. They should always win over'
+                         'targets!')
+            import ipdb;ipdb.set_trace()
+    
         #determine cause of conflict
         for d, t in zip(drop, undrillable):
             t.conflicting=[holes[i].target for i in coll_graph.collisions(d)]
@@ -363,12 +391,21 @@ class FieldCatalog(object):
     @property
     def n_mustkeep_conflicts(self):
         """return number of mustkeeps with conflicts, nonzero means 
-        constraints aren't met """
+        constraints aren't met 
+        excludes ones that are offplate
+        """
         if not self.mustkeep:
             return 0
         else:
-            return len([t for t in self.targets if
-                        t.priority==self.max_priority and t.conflicting])
+            req_w_conflicts=[t for t in self.targets if
+                             t.must_be_drilled and (t.conflicting
+                             and not t.has_no_external_conflicts)]
+            req_w_iconflicts=[t for t in self.targets if
+                             t.must_be_drilled and (t.conflicting
+                             and t.has_no_external_conflicts)]
+            log.warn('{} has {}'.format(self.name, len(req_w_iconflicts))+
+                     ' internal conflicts that violate mustkeep.')
+            return len(req_w_conflicts)
 
     def undrillable_dictlist(self, flat=False):
         ret=[t.info for t in self.all_targets
@@ -388,7 +425,7 @@ def load_dotfield(file):
     field_cat=FieldCatalog(file=file)
 
     try:
-        lines=open(file,'r').readlines()
+        lines=open(file,'rU').readlines()
     except IOError as e:
         raise e
 
@@ -396,7 +433,6 @@ def load_dotfield(file):
     lines=[l.strip() for l in lines]
 
     have_name=False
-
 
     #Go through all lines with soemthing in them
     for l in (l for l in lines if l):
@@ -423,21 +459,29 @@ def load_dotfield(file):
             elif k=='name':
                 field_cat.field_name=v
             elif k in ['mustkeep']:
-                log.info('Dropping highest priority targets is forbidden for field {} in {}'.format(
-                    field_cat.field_name, file))
-                v.lower() in ['true','yes']
                 mk=True if v.lower() in ['true','yes'] else False
+                try:
+                    field_cat._mustkeep_priority=float(v.lower())
+                    mk=True
+                except ValueError:
+                    pass
                 if v.lower() not in ['true','yes','false','no']:
                     log.warn('Interpreting mustkeep={} as {}'.format(v,mk))
                 field_cat.mustkeep=mk
+                if mk:
+                    log.info('Dropping targets is restricted by mustkeep'
+                             'is forbidden for field {} in {}'.format(
+                             field_cat.field_name,file))
             elif k =='minsky':
-                #todo: verify minsky value
+                if not int(v)>=0:
+                    raise IOError('minsky must be >=0 in {}'.format(file))
                 field_cat.minsky=int(v)
             elif k =='maxsky':
-                #todo: verify maxsky value
+                if not int(v)>=0:
+                    raise IOError('maxsky must be >=0 in {}'.format(file))
                 field_cat.maxsky=int(v)
             else:
-                field_cat.user[k]=int(v)
+                field_cat.user[k]=v
                 
         elif l.lower().startswith('ra'):
             try:
@@ -455,6 +499,10 @@ def load_dotfield(file):
                 raise IOError('Failed at {}({}):\n  {}\n  {}'.format(
                                file,lines.index(l), l ,str(e)))
 
+    if field_cat.maxsky<field_cat.minsky:
+        raise IOError('maxsky ({}) less than minsky({}) in {}'.format(
+                        field_cat.maxsky,field_cat.minsky,file))
+
     return field_cat
 
 
@@ -468,9 +516,13 @@ class Field(object):
         self.info=field_info #Dict, see keys returned by fieldcatalog.info
         try:
             self.info['mustkeep']=self.info.get('mustkeep','false').lower()
-            self.info['mustkeep']=self.info['mustkeep']=='true'
+            try:
+                float(self.info['mustkeep'])
+            except ValueError:
+                if self.info['mustkeep'] not in ('true','false'):
+                    raise TypeError()
         except TypeError:
-            raise ValueError('mustkeep must be a string value')
+            raise ValueError('mustkeep must be floatable, true, or false')
 
         self.name=field_info['name']
         self.undrilled=undrilled
@@ -499,7 +551,22 @@ class Field(object):
         except AttributeError:
             self._max_priority=max([t.priority for t in self.targets])
         return self._max_priority
-        
+    
+    @property
+    def mustkeep(self):
+        try:
+            float(self.info['mustkeep'])
+            return True
+        except ValueError:
+            return self.info['mustkeep']=='true'
+    
+    @property
+    def mustkeep_priority(self):
+        try:
+            return float(self.info['mustkeep'])
+        except ValueError:
+            return self.max_priority
+    
     @property
     def ra(self):
         return self.info['(ra, dec)'].split()[0]

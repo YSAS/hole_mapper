@@ -171,10 +171,30 @@ class Setup(object):
     
     @property
     def mustkeep(self):
-        """should keep all the highest priority targets"""
+        """should keep all the targets above self.mustkeep_priority"""
         if 'mustkeep' in self.setupdef.extra:
-            return self.setupdef.extra['mustkeep']
-        return self.field.info.get('mustkeep', False)
+            try:
+                if type(self.setupdef.extra['mustkeep']) == bool:
+                    return self.setupdef.extra['mustkeep']
+                float(self.setupdef.extra['mustkeep'])
+                return True
+            except ValueError:
+                return self.setupdef.extra['mustkeep']
+        return self.field.mustkeep
+    
+    @property
+    def mustkeep_priority(self):
+        """should keep all the highest priority targets
+            meaningless if self.mustkeep does not return true"""
+        if 'mustkeep' in self.setupdef.extra:
+            try:
+                if type(self.setupdef.extra['mustkeep']) == bool:
+                    raise ValueError
+                return float(self.setupdef.extra['mustkeep'])
+            except ValueError:
+                return self.field.max_priority
+        else:
+            return self.field.mustkeep_priority
     
     @property
     def keepall(self):
@@ -221,7 +241,7 @@ class Setup(object):
         ret['fieldfile']=ret.pop('file')
         if self.setupdef.assign_given:
             ret['assign_given']= self.setupdef.assign_given
-        ret['mustkeep']=self.mustkeep
+        ret['mustkeep']=self.mustkeep_priority if self.mustkeep else False
 #        import ipdb;ipdb.set_trace()
         addit={'assign_with':', '.join(s.name for s in self.assign_with),
                'plate':self.plate.name, 'config':self.config.name,

@@ -152,7 +152,16 @@ class Target(object):
             self._conflicting=set(targets)
         else:
             self._conflicting=set([targets])
-    
+
+    @property
+    def has_no_external_conflicts(self):
+        for t in self._conflicting:
+            if t.id=='offplate' or t.field==self.field:
+                continue
+            else:
+                return False
+        return True
+
     @property
     def hole(self):
         return self._hole
@@ -194,7 +203,8 @@ class Target(object):
         if self.field is None:
             #STANDARD targets don't have fields
             return False
-        return self.field.mustkeep and self.priority==self.field.max_priority
+        return ((self.field.mustkeep_priority<=self.priority) and
+                self.field.mustkeep)
 
     @property
     def conflicting_ids(self):

@@ -12,6 +12,10 @@ class Hole(object):
     def __hash__(self):
         return "{}{}{}{}".format(self.x, self.y, self.z, self.d).__hash__()
 
+    def __eq__(self,other):
+        return (self.x==other.x and self.y==other.y and self.z==other.z and
+                self.d==other.d)
+
     @property
     def info(self):
         ret=self.holeinfo

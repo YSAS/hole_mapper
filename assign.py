@@ -230,37 +230,91 @@ def _assign_fibers(setups):
         to_assign.extend([setup_targets[i] for i in keep])
 
     #Filter the ensemble together respecting mustkeep and keepall
+    #this filtering process will for example kill every sky in one setup
+    #in favor of the skys in the other if they have a lower weight and they all
+    #conflict
     #to_assign=[t for t in to_assign if t.setup==setups[0]]
     x=[t.hole.x for t in to_assign]
     y=[t.hole.y for t in to_assign]
     d=[t.hole.conflict_d for t in to_assign]
 
-    weights=[t.priority/(t.field.max_priority if t.field.max_priority else 1)
-             for t in to_assign]
-    #target.must_be_drilled not necessarily the same thing as
-    # t.priority==t.field.max_priority and t.setup.mustkeep
-    uncuttable=[i for i,t in enumerate(to_assign)
-                if (t.priority==t.field.max_priority and t.setup.mustkeep) or
-                   t.setup.keepall]
+#    #determine the indexes of skys and give them deterministically random
+#    # weights less than minweight
+#    #this works bust pathological case randomly gives all skys in one setup
+#    # higher pri than others, doesn't respect minsky
+#    minw=min(weights)
+#    import random
+#    seedbackup=random.getstate()
+#    skyi=[i for i,t in enumerate(to_assign) if t.is_sky]
+#    random.seed(0)
+#    for i in skyi: weights[i]=minw-random.random()-1
+#    random.setstate(seedbackup)
+
+    #setup mustkeep can override field settings
+    uncuttable=[i for i,t in enumerate(to_assign) if t.setup.mustkeep and
+                t.priority >= t.setup.mustkeep_priority and t.is_target]
     
     coll_graph=build_overlap_graph_cartesian(x, y, d) #Nothing can conflict
 
-    try:
-        keep=coll_graph.crappy_min_vertex_cover_cut(uncuttable=uncuttable,
-                                                    weights=weights)
-    except GraphCutError as e:
+
+    #first cut anything that conflicts with something uncuttable
+    # if an uncuttable conflicts with an uncuttable warn the user
+    fatal_conflicts=[]
+    for i in uncuttable:
+        for k in coll_graph.collisions(i):
+            if k in uncuttable:
+                fatal_conflicts.append(i)
+                break
+    if fatal_conflicts:
+        _log.warn('There are {} skys/targets '.format(len(fatal_conflicts))+
+                 'that must be kept that interfere with others that also '
+                 'must be kept.')
         raise ConstraintError('Collisions among targets affected by mustkeep '
-                              'or keepall make assignment impossible.')
+                              'make assignment impossible.')
 
-    assert set(uncuttable).issubset(set(keep))
+    #Drop things that collide with uncuttable things this may drop
+    #uncuttable targets, but the user has been warned
+    discard=[]
+    for i in uncuttable: discard.extend(coll_graph.drop_conflicting_with(i))
 
-    to_assign=[to_assign[i] for i in keep]
+    #Now go through the setups round-robin taking the highest priority
+    #target and discarding the others
+    #There are edge cases where min sky would not be met here
+    # one what do deal with this would be to do conditional discards if
+    #a collision involves skys, but this would need iterating and adding a
+    #sky back might create a conflict (say if the sky that was dropped
+    # conflited with two targets but they didn't conflict with each other
+    s_i=0
+    while len(setups)>1 and not coll_graph.is_disconnected:
+        #get all collisions belonging to setup[s_i] and sort by priority
+        in_s_i=[i for i in coll_graph.get_colliding_nodes()
+                if to_assign[i] in setups[s_i].to_assign]
+        pri=[to_assign[i].priority for i in in_s_i]
+        in_s_i, _ = zip(*sorted(zip(in_s_i, pri)))
+        discard.extend(coll_graph.drop_conflicting_with(in_s_i[0]))
+        s_i=(s_i+1) % len(setups)
+
+    to_assign=[t for i,t in enumerate(to_assign) if i not in discard]
+
+    #check minsky
+    for s in setups:
+        skys_kept=[t for t in to_assign if t.is_sky and t in s.to_assign]
+        if len(skys_kept) < s.minsky:
+            _log.warn('There are only {} '.format(len(skys_kept))+
+                     'skys after filtering for collisions for '
+                     '{} but minsky={}'.format(s.name,s.minsky))
+            raise ConstraintError('Collisions among setups '
+                                  'means minksy not met.')
+
+
+    #end of filter
     
     #Reset all the assignments
-    for s in setups:
-        s.reset()
+    for s in setups: s.reset()
     
     cassettes=setups[0].cassette_config
+
+    #HMMM this might need combining
     
     #Grab all skys and objects that don't have assignments
     unassigned_skys=[t for t in to_assign if t.is_sky and not t.is_assigned]
@@ -279,7 +333,10 @@ def _assign_fibers(setups):
     unassignable=[]
 
 
-    #this doesn't work with pultible setups, esp. when there are excessive
+
+
+    #IS THIS COMMENT CURRENT?
+    #this doesn't work with multible setups, esp. when there are excessive
     # numbers of targets in one/both
     #we need to compute n_skip seperately if the setups are being assigned to
     #disjoint sets of fibers and then skip within each setup.
@@ -293,6 +350,7 @@ def _assign_fibers(setups):
     # should penalize in proportion to each setup's contribution to the
     #total number of targets
     n_skip_map={}
+    # if all going to both
     if len([s for s in setups if s.assigning_to!='both'])==0:
         #nskip is total_number_of_things_needing_fibers - number_of_available_fibers
         n_skip=(sum(len([x for x in to_assign if x in s.to_assign
@@ -306,6 +364,8 @@ def _assign_fibers(setups):
                 n_skip_map[s]+=1
                 extra_skip-=1
     else:
+#        Is this a bug? what about the setups with assigning_to==both
+
         #R side
         r_setups=[s for s in setups if s.assigning_to=='r']
         if r_setups:
@@ -395,7 +455,7 @@ def _assign_fibers(setups):
 #            if n_skip <1:
 #                break
 
-#    import ipdb;ipdb.set_trace()
+
 
     #Not sure why the skys and targets need to be done separately
     #we only have as many targets and skys as fibers now
@@ -460,24 +520,34 @@ def _assign_fibers(setups):
     cassettes.map()
 
     #Compact the assignments (get rid of underutillized cassettes)
+    
+    #I don't think these inherently need to be left or right
+    #esp since I've got to rejigger anyway, but that is the way it has
+    # been tested
     _condense_cassette_assignments([c for c in cassettes if c.on_left])
     _condense_cassette_assignments([c for c in cassettes if c.on_right])
+#    _condense_cassette_assignments([c for c in cassettes])
 
     #Rejigger the fibers
-    #Must do an updown the a lr a few times for the assumptions in the lr
-    #rejigger to hold and it to be clean, this is clearly indicative of me
-    #overlooking some test to do it in one pass in the LR rejigger.
 
     _rejigger_cassette_assignments([c for c in cassettes if c.on_left])
-    _rejigger_cassette_assignments_lr(cassettes)
-    _rejigger_cassette_assignments([c for c in cassettes if c.on_left])
-    _rejigger_cassette_assignments_lr(cassettes)
+    _rejigger_cassette_assignments([c for c in cassettes if c.on_right])
+    unsided=True
+    if len(setups)>1:
+        for s in setups:
+            if s.assign_to in ('r','b'):
+                unsided=False
+                break
+    _rejigger_cassette_assignments_lr(cassettes, unsided=unsided)
+#    _rejigger_cassette_assignments([c for c in cassettes if c.on_left])
+#    _rejigger_cassette_assignments_lr(cassettes, unsided=unsided)
+#    _rejigger_cassette_assignments_lr(cassettes)
 
 
     #finally to updown rejiggering to enforce ordering rules
     _rejigger_cassette_assignments([c for c in cassettes if c.on_left])
     _rejigger_cassette_assignments([c for c in cassettes if c.on_right])
-
+#
     #Remap fibers
     cassettes.map(remap=True)
     
@@ -531,7 +601,7 @@ def _condense_cassette_assignments(cassettes):
         #Update sort of to check
         to_check.sort(key= lambda x: x.n_avail)
 
-def _rejigger_cassette_assignments_lr(cassettes):
+def _rejigger_cassette_assignments_lr(cassettes, unsided=True):
     """
     Go through the cassettes swapping holes to eliminate
     horizontal excursions
@@ -548,26 +618,44 @@ def _rejigger_cassette_assignments_lr(cassettes):
     right_cassettes=[c for c in cassettes if c.on_right]
     left_cassettes=[c for c in cassettes if c.on_left]
     left_cassettes.sort(key=lambda c: c.pos[1])
-#    import ipdb;ipdb.set_trace()
     for cassette in left_cassettes:
-
+#        if cassette.name[:-1] in ['R7', 'R8']:
+#            import ipdb;ipdb.set_trace()
         swappable_targets=[t for t in cassette.targets if t.is_assignable()]
                                     
         if not swappable_targets: continue
         
         #get bounding y region for swappable targets
         i=left_cassettes.index(cassette)
-        if i==0:
+        cbelow_i=i-1
+        while (cbelow_i>0 and
+               (not left_cassettes[cbelow_i].targets or
+               (left_cassettes[cbelow_i].side!=cassette.side or unsided))):
+            cbelow_i-=1
+        if cbelow_i<=0:
             cassette_min_y=float('-inf')
         else:
-            cassette_min_y=min([t.hole.y for t in left_cassettes[i-1].targets])
-        
-        if i==len(left_cassettes)-1:
-            cassette_max_y=float('inf')
-        else:
-            cassette_max_y=max([t.hole.y for t in left_cassettes[i+1].targets])
+            cassette_min_y=max([t.hole.y
+                                for t in left_cassettes[cbelow_i].targets])
 
-
+        cabove_i=i+1
+        while (cabove_i<len(left_cassettes) and
+               (not left_cassettes[cabove_i].targets or
+               (left_cassettes[cabove_i].side!=cassette.side or unsided))):
+            cabove_i+=1
+        try:
+            if cabove_i>=len(left_cassettes):
+                cassette_max_y=float('inf')
+            else:
+               cassette_max_y=min([t.hole.y
+                                   for t in left_cassettes[cabove_i].targets])
+        except ValueError:
+            import ipdb;ipdb.set_trace()
+#        _log.debug('RLR:  {}({}) - {} - {}({})'.format(
+#           left_cassettes[cbelow_i].name if cbelow_i>=0 else 'X',
+#           cassette_min_y, cassette.name,
+#           left_cassettes[cabove_i].name if cabove_i<len(left_cassettes) else 'X',
+#           cassette_max_y))
         swappable_other_targets=[t for c in right_cassettes
                                  for t in c.targets if
                                  t.hole.y<=cassette_max_y and
@@ -576,14 +664,11 @@ def _rejigger_cassette_assignments_lr(cassettes):
         
         if not swappable_other_targets: continue
         
-#        import numpy as np
-#        involved_fib=np.array([t.hole.y for t in swappable_targets+swappable_other_targets])
-#        if min(min(abs(1.729-involved_fib)),min(abs(1.4879-involved_fib))) < .0001:
-#            import ipdb;ipdb.set_trace()
 
         other_max_x=max([t.hole.x for t in swappable_other_targets])
         
         #Consider only targets with x values less that the max of other
+        # because x increases to left
         swappable_targets=[t for t in swappable_targets if t.hole.x < other_max_x]
         if not swappable_targets: continue
 
@@ -594,8 +679,10 @@ def _rejigger_cassette_assignments_lr(cassettes):
         swappable_other_targets.sort(key=operator.attrgetter('hole.x'),
                                      reverse=True)
         for t in swappable_targets:
+            swapped=False
             for ot in swappable_other_targets:
                 #try a trade with the furthest right if it
+#                _log.debug('?Swap {} w/ {}'.format(t.hole.position,ot.hole.position))
                 if ot.hole.x > t.hole.x:
                     if t.is_assignable(cassette=ot.assigned_cassette):
                         ocassette=cassettes.get_cassette(ot.assigned_cassette)
@@ -605,6 +692,8 @@ def _rejigger_cassette_assignments_lr(cassettes):
                         #Assign
                         ocassette.assign(t)
                         cassette.assign(ot)
+#                        _log.debug('    Yes')
+                        swapped=True
                         break
                     else:
                         pass
@@ -612,8 +701,8 @@ def _rejigger_cassette_assignments_lr(cassettes):
                 else:
                     #we are done with both loops
                     break
-            if ot.hole.x > t.hole.x:
-                break
+            #remove other target from conisderation in further swaps
+            if swapped: swappable_other_targets.remove(ot)
 
 
 def _rejigger_cassette_assignments(cassettes):
@@ -629,15 +718,11 @@ def _rejigger_cassette_assignments(cassettes):
         swappable_cassette_targets=[t for t in cassette.targets
                                     if t.is_assignable()]
 
-#        if not swappable_cassette_targets:
-#            import ipdb;ipdb.set_trace()
-
         swappable_higher_targets=[t for c in higer_cassettes
                                     for t in c.targets
                                     if t.is_assignable(cassette=cassette)]
         
         if not swappable_higher_targets:
-#            import ipdb;ipdb.set_trace()
             continue
         
         targets=swappable_cassette_targets+swappable_higher_targets

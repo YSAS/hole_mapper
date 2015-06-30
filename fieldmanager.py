@@ -89,6 +89,20 @@ def write_drill(name, plate_holes, fields, dir='./'):
     
     for diam in diams:
         dicts_for_file=[d for d in dicts if d['d']==diam]
+        
+        #warn if duplicate holes only unique holes to file
+        hole_tuples=[]
+        dicts_for_file_filtered=[]
+        for d in dicts_for_file:
+            ht=(d['x'],d['y'],d['z'],d['d'])
+            try:
+                ndx=hole_tuples.index(ht)
+                print 'Hole for {} {} already written for {}'.format(d['type'],d['id'],dicts_for_file[ndx]['id'])
+            except ValueError:
+                dicts_for_file_filtered.append(d)
+            hole_tuples.append(ht)
+        dicts_for_file=dicts_for_file_filtered
+        
         with open(file_fmt_str.format(dir, name, diam),'w') as fp:
 
             recs=_dictlist_to_records(dicts_for_file, DRILLFILE_REQUIRED_COLS,
@@ -162,7 +176,7 @@ class Manager(object):
 
     def get_holes(self, holeIDs):
         ret=[]
-        for f in self.fields:
+        for f in self.selected_fields:
             for h in f.holes():
                 if str(hash(h)) in holeIDs:
                     ret.append(h)
@@ -204,8 +218,7 @@ class Manager(object):
     
         #Draw fields
         for i,f in enumerate(self.selected_fields):
-            if not f.is_processed:
-                f.process()
+            if not f.is_processed: f.process()
             
             c=COLOR_SEQUENCE[i%len(COLOR_SEQUENCE)]
             for h in f.holes():
@@ -242,8 +255,8 @@ class Manager(object):
         for f in self.selected_fields:
             if f.n_drillable_skys<f.minsky:
                 raise ConstraintError("A feud between undroppable targets and "
-                                      "the minsky constraint precludes these "
-                                      "fields from coexisting.")
+                                      "the minsky={} precludes these "
+                                      "fields from coexisting.".format(f.minsky))
             if f.n_mustkeep_conflicts:
                 raise ConstraintError("A feud between undroppable targets "
                                       "precludes these fields from coexisting.")
@@ -300,24 +313,31 @@ class Manager(object):
         determines conflits within the set of holes accounting for 
         interfield issues
         """
-        
+        ALLOW_PERFECT=True
         
         x=[h.x for h in holes]
         y=[h.y for h in holes]
         d=[h.conflict_d for h in holes]
         
         #Nothing can conflict with guides or acquisitions
-        coll_graph=build_overlap_graph_cartesian(x,y,d)
+        coll_graph=build_overlap_graph_cartesian(x,y,d,
+                                                 allow_perfect=ALLOW_PERFECT)
 
         #Take care of Guides & Acquisitions
         to_keep=[]
         discard=[]
         
         #Guides
+        #this only decides to keep or drop guides in each field, it does not
+        # go through and decide what to do about conflicts
+        # after this code we could well have decided to keep guide a
+        # in field A and and guide b in field B and have a & b be fundamentally
+        # incompatible. this is handled later
         for f in self.selected_fields:
             #sort guides according to number of collisions
             #take all with no collisions and as many with collisions needed
             #until have at least min required
+            # do not take any that conflict with something that can't be dropped
 
             #get guide hole indicies & number of collisions
             hndxs=[(i,len(coll_graph.collisions(i)))
@@ -376,6 +396,11 @@ class Manager(object):
         for t in foo_processed:
             assert t in foo_guides
         
+        
+        #I guess technically I should update the graph here
+        # a guide that was dropped (because it interfered with some other guide)
+        #may have also interfered with an acquisituon
+        
         #Acquisitions
         for f in self.selected_fields:
             #sort acquisitions according to number of collisions
@@ -423,10 +448,15 @@ class Manager(object):
                 discard+=with_coll
                             
             if len(keep) < min(MIN_ACQUISITIONS, len(f.acquisitions)):
+                import ipdb;ipdb.set_trace()
                 raise ConstraintError("Can't keep enough acquisitions for {} due to collisions with undroppable targets".format(f.name))
             
             #Keep the guides from the field
             to_keep+=keep
+    
+        for ndx in to_keep:
+            if ndx in discard:
+                import ipdb;ipdb.set_trace()
     
         #Update the graph & flag the targets that had conflicts
         for ndx in discard:
@@ -454,7 +484,8 @@ class Manager(object):
         
         #Rebuild the graph allowing partial overlap
         coll_graph=build_overlap_graph_cartesian(x, y, d, overlap_pct_r_ok=
-                                                 DRILLABLE_PCT_R_OVERLAP_OK)
+                                                 DRILLABLE_PCT_R_OVERLAP_OK,
+                                                 allow_perfect=ALLOW_PERFECT)
 
 
         #Redistribute priorities onto the same scale
