@@ -1,4 +1,3 @@
-from target import Target
 import os.path
 from logger import getLogger
 from pathconf import FIBERMAP_DIRECTORY

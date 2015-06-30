@@ -252,8 +252,17 @@ def _assign_fibers(setups):
 
     #setup mustkeep can override field settings
     uncuttable=[i for i,t in enumerate(to_assign) if t.setup.mustkeep and
-                t.priority >= t.setup.mustkeep_priority and t.is_target]
+                t.priority >= t.setup.mustkeep_priority and t.is_target or
+                t.preset_fiber is not None]
+
+    n_uncuttable_skys={s:len([i for i in uncuttable
+                              if to_assign[i].is_sky and
+                              to_assign[i] in s.to_assign]) for s in setups}
     
+    for s in setups:
+        if n_uncuttable_skys[s]:
+            _log.info('{} has {} uncuttable skys.'.format(s.name,n_uncuttable_skys[s]))
+            
     coll_graph=build_overlap_graph_cartesian(x, y, d) #Nothing can conflict
 
 
@@ -285,18 +294,28 @@ def _assign_fibers(setups):
     #sky back might create a conflict (say if the sky that was dropped
     # conflited with two targets but they didn't conflict with each other
     s_i=0
+
+    #This is discarding overlapping skys more than needed in the case of preset skys
     while len(setups)>1 and not coll_graph.is_disconnected:
         #get all collisions belonging to setup[s_i] and sort by priority
         in_s_i=[i for i in coll_graph.get_colliding_nodes()
                 if to_assign[i] in setups[s_i].to_assign]
         pri=[to_assign[i].priority for i in in_s_i]
         in_s_i, _ = zip(*sorted(zip(in_s_i, pri)))
-        discard.extend(coll_graph.drop_conflicting_with(in_s_i[0]))
+        
+        #if in_s_i[0] is a sky and setups[s_i].maxsky met via uncuttable skys
+        if (to_assign[in_s_i[0]].is_sky and
+            n_uncuttable_skys[setups[s_i]] >= setups[s_i].maxsky):
+            discard.append(in_s_i[0])
+            coll_graph.drop(in_s_i[0])
+        else:
+            discard.extend(coll_graph.drop_conflicting_with(in_s_i[0]))
         s_i=(s_i+1) % len(setups)
 
     to_assign=[t for i,t in enumerate(to_assign) if i not in discard]
 
-    #check minsky
+    #check minsky (& max sky)
+    skys_to_drop=[]
     for s in setups:
         skys_kept=[t for t in to_assign if t.is_sky and t in s.to_assign]
         if len(skys_kept) < s.minsky:
@@ -304,8 +323,17 @@ def _assign_fibers(setups):
                      'skys after filtering for collisions for '
                      '{} but minsky={}'.format(s.name,s.minsky))
             raise ConstraintError('Collisions among setups '
-                                  'means minksy not met.')
+                                  'means minksy not met {} vs {}.'.format(
+                                  s.minsky,len(skys_kept)))
 
+        #test enforce maxsky respecting preset assignments
+        skys_kept.sort(key=operator.attrgetter('priority'), reverse=True)
+        skys_to_drop.extend([to_assign.index(sk) for sk in skys_kept[s.maxsky:]
+                             if not sk.is_assigned])
+
+    #test enforce maxsky
+    to_assign=[to_assign[i] for i in xrange(len(to_assign))
+                if i not in skys_to_drop]
 
     #end of filter
     
@@ -323,7 +351,7 @@ def _assign_fibers(setups):
 
     #Grab targets with assignments and associate them with their cassettes
     assigned=[t for t in to_assign if t.is_assigned]
-    print("{} targets had preset assignments".format(len(assigned)))
+    _log.info("{} targets had preset assignments".format(len(assigned)))
     try:
         for t in assigned: cassettes.assign(t, t.fiber.cassette_name)
     except ValueError:
@@ -635,7 +663,7 @@ def _rejigger_cassette_assignments_lr(cassettes, unsided=True):
         if cbelow_i<=0:
             cassette_min_y=float('-inf')
         else:
-            cassette_min_y=max([t.hole.y
+            cassette_min_y=min([t.hole.y
                                 for t in left_cassettes[cbelow_i].targets])
 
         cabove_i=i+1
@@ -647,7 +675,7 @@ def _rejigger_cassette_assignments_lr(cassettes, unsided=True):
             if cabove_i>=len(left_cassettes):
                 cassette_max_y=float('inf')
             else:
-               cassette_max_y=min([t.hole.y
+               cassette_max_y=max([t.hole.y
                                    for t in left_cassettes[cabove_i].targets])
         except ValueError:
             import ipdb;ipdb.set_trace()

@@ -194,9 +194,10 @@ class Target(object):
         else:
             return self.additional_holes
 
-#    @property
-#    def required_slit(self):
-#        """Return the required slit per the target, then per the setup"""
+    @property
+    def required_slit(self):
+        """Return the required slit per the target, then per the setup"""
+        raise RuntimeError('Not Implemented')
 
     @property
     def must_be_drilled(self):

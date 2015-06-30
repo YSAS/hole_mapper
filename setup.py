@@ -2,12 +2,14 @@ from ConfigParser import RawConfigParser
 import os.path
 from glob import glob
 from plate import get_plate
+from fiber import Fiber
 from cassettes import CassetteConfig, DEAD_FIBERS
 from cassettes import CASSETTE_NAMES, RED_CASSETTE_NAMES, BLUE_CASSETTE_NAMES
 from pathconf import SETUP_DIRECTORY
 from readerswriters import _dictlist_to_records, _format_attrib_nicely
 from logger import getLogger
 from config import get_config
+from settings import DEFAULT_MAXSKY, DEFAULT_MINSKY
 from assign import assign
 import hashlib
 import fibermap
@@ -110,6 +112,7 @@ class SetupDefinition(object):
         self.configname=configname.lower()
         self.assign_to=assign_to.lower()
         self.assign_given=extra.pop('assign_given','')
+        self.assign_as=extra.pop('assign_as','')
         if self.assign_to not in ['single', 'any', 'r','b']:
             raise ValueError('Supported values for assign_to are '
                              'single and any. Fix file {}'.format(self.file))
@@ -128,7 +131,7 @@ class SetupDefinition(object):
             self.extra.get('mustkeep',None)!=None or
             self.extra.get('keepall',False)):
             hashstr=':'+hashlib.sha1(self.assign_to+
-                                     self.assign_given+
+                                     self.assign_given+self.assign_as+
                                      str(self.extra.get('mustkeep',None))+
                                      str(self.extra.get('keepall',False))).hexdigest()[:6]
         else:
@@ -157,6 +160,8 @@ class Setup(object):
         
         #Fetch cassettes
         self.cassette_config=CassetteConfig(usable=config)
+    
+        self._assign_as_loaded=False
     
         for t in self.field.all_targets:
             t.setup=self
@@ -232,7 +237,11 @@ class Setup(object):
 
     @property
     def minsky(self):
-        return int(self.field.info.get('minsky',0))
+        return int(self.field.info.get('minsky',DEFAULT_MINSKY))
+
+    @property
+    def maxsky(self):
+        return int(self.field.info.get('maxsky',DEFAULT_MAXSKY))
 
     @property
     def info(self):
@@ -270,6 +279,11 @@ class Setup(object):
             pass
         self._assign_with=tuple(setups)
     
+    """
+    
+    looks like need to set preset_fiberto Fiber(name) for each thing to assign
+    also looks like preset fiber sets fiber to a copyt of itself at initialization should do that to or call reset assignment for now
+    """
     @property
     def to_assign(self):
         """
@@ -287,7 +301,41 @@ class Setup(object):
             get_map=fm.dict.get('assign_given','')
         
         targs=[t for t in self.field.targets if t.id not in previously]
-        return self.field.skys+targs
+        
+        to_assign=self.field.skys+targs
+        
+        #assign as
+        get_map=self.setupdef.assign_as
+        if not get_map or self._assign_as_loaded: return to_assign
+        
+        log.info('Using assignments from {} for common targets by ID'.format(
+                      get_map))
+        fm=fibermap.get_fibermap_for_setup(get_map)
+        previously=[x for x in fm.mapping.items()
+                    if x[1] not in ('unplugged','unassigned')]
+        if len(set([x[1] for x in previously]))!=len(previously):
+            import ipdb;ipdb.set_trace()
+            log.critical('Non-Unique IDs in assign_as '
+                         'fibermap {}. Unable to assign_as'.format(get_map))
+            return to_assign
+        if len(set([x.id for x in to_assign]))!=len(to_assign):
+            import ipdb;ipdb.set_trace()
+            log.critical('Non-Unique IDs in this setup '
+                         '({}). Unable to assign_as'.format(self.name))
+            return to_assign
+        
+        ids=[t.id for t in to_assign]
+        for fiber, id in previously:
+            
+            try:
+                ndx=ids.index(id)
+                to_assign[ndx].preset_fiber=Fiber(fiber)
+                to_assign[ndx].fiber=to_assign[ndx].preset_fiber
+            except ValueError:
+                pass
+        self._assign_as_loaded=True
+        
+        return to_assign
     
     @property
     def uses_b_side(self):

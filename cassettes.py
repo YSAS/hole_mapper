@@ -196,7 +196,6 @@ class Cassette(object):
             raise Exception('Cassette Full')
 
         if target.fiber:
-            print "assigning hole with preset fiber"
             if target.fiber.cassette_name!=self.name:
                 raise ValueError('target not compatible with cassette')
             if self.fibers[target.fiber.number].target:
