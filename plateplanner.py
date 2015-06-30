@@ -218,6 +218,9 @@ class App(Tkinter.Tk):
         Tkinter.Label(frame2, textvariable=self.info_str).pack(anchor='w')
     
     def status_string(self):
+        """
+        The number of total holes includes duplicates (e.g. S shared btwn fields)
+        """
         nholes=sum([len(x.drillable_dictlist())
                     for x in self.manager.selected_fields])
         nholes+=len(self.manager.plate_drillable_dictlist())
@@ -255,7 +258,7 @@ class App(Tkinter.Tk):
     def load_fields(self):
         file=tkFileDialog.askdirectory(initialdir='./')
         file=os.path.normpath(file)
-        print file
+        log.info('Looking for .field files in {}'.format(file))
         if file:
             self.manager.load(file)
 
