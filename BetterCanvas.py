@@ -53,8 +53,6 @@ class BetterCanvas(Tkinter.Canvas):
               self.canvasCoordy(y1), kw)  
 
     def drawDashedLine(self, *args, **kw):
-        
-        
         self.drawLine(*args, **kw)
 
     def drawLine(self, *args, **kw):
