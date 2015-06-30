@@ -4,7 +4,8 @@ import numpy as np
 class GraphCutError(Exception):
     pass
 
-def build_overlap_graph_cartesian(x, y, d, overlap_pct_r_ok=0):
+def build_overlap_graph_cartesian(x, y, d, overlap_pct_r_ok=0,
+                                  allow_perfect=False):
     """
     Generate a dict of lists for crappy_min_vertex_cover_cut
     with edges between points that conflict
@@ -18,6 +19,8 @@ def build_overlap_graph_cartesian(x, y, d, overlap_pct_r_ok=0):
     x--(-)y overlaps for y by 1 radius and .5 for x
     default allowable_overlap
     
+    allow_perfect allows overlap if position is exact match and diam is same
+    
     """
     edges={}
     x=np.array(x)
@@ -30,14 +33,21 @@ def build_overlap_graph_cartesian(x, y, d, overlap_pct_r_ok=0):
         seps_sq=(x-xx)**2+(y-yy)**2
         neighbors=[]
         min_clearance=r+r[i]*(1-overlap_pct_r_ok)
-        neigh=np.where(seps_sq < min_clearance**2)[0].tolist()
-        try:
-            neigh.remove(i) #no connection to yourself
-        except ValueError:
-            import ipdb;ipdb.set_trace()
-        if neigh:
-            edges[i]=neigh
-    
+        neigh_mask=seps_sq < min_clearance**2
+        if allow_perfect:
+            perfect_match=(seps_sq==0) & (r[i]==r)
+            neigh_mask=neigh_mask & ~perfect_match
+            neigh=np.where(neigh_mask)[0].tolist()
+        else:
+            neigh=np.where(neigh_mask)[0].tolist()
+            try:
+                neigh.remove(i) #no connection to yourself
+            except ValueError:
+                import ipdb;ipdb.set_trace()
+        assert i not in neigh
+
+        if neigh: edges[i]=neigh
+
     for k in edges.keys():
         for other in edges[k]:
             if other not in edges:
@@ -109,11 +119,9 @@ class CollisionGraph(object):
         
         nodes=range(self._nnodes)
         #default to first node is most important
-        if not weights:
-            weights=[0]*self._nnodes
+        if not weights: weights=[0]*self._nnodes
 
-        if not uncuttable:
-            uncuttable=[]
+        if not uncuttable: uncuttable=[]
 
         edgegraph=deepcopy(self._graph)
         edgegraph=OrderedDict(edgegraph)
