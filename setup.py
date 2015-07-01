@@ -292,13 +292,17 @@ class Setup(object):
         
         """
         get_map=self.setupdef.assign_given
-        previously=[]
-        while get_map:
-            log.info('Excluding previously assigned from {}'.format(
-                      get_map))
-            fm=fibermap.get_fibermap_for_setup(get_map)
-            previously+=fm.mapping.values()
-            get_map=fm.dict.get('assign_given','')
+        try:
+            previously=self._previously_assigned
+        except AttributeError:
+            previously=[]
+            while get_map:
+                log.info('Excluding previously assigned from {}'.format(
+                          get_map))
+                fm=fibermap.get_fibermap_for_setup(get_map)
+                previously+=fm.mapping.values()
+                get_map=fm.dict.get('assign_given','')
+            self._previously_assigned=previously
         
         targs=[t for t in self.field.targets if t.id not in previously]
         

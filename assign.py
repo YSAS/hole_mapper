@@ -12,7 +12,6 @@ def assign(setups):
     constraints such as
     which spectrograph to assign to
     """
-    print "Assigning {}".format([s.name for s in setups])
     #Field targets and skys do not overlab with any guides
     #or acquisitions in any setups, because such cases were culled when
     #creating the plate
