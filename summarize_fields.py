@@ -21,6 +21,9 @@ def _make_fmt_string(keys, recs):
 
 
 if __name__ =='__main__':
+
+    raise Exception('Not current')
+
     args=_parse_cl()
     files = [os.path.join(dirpath, f)
              for dirpath, dirnames, files in os.walk(args.dir)

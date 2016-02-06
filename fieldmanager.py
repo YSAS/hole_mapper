@@ -552,6 +552,8 @@ class Manager(object):
 
         #rank each sky by -sum of weights of things it interferes with
         # to penalize skys that interfere with things the most
+        #this is acually the exact opposite of what you want need to get rid of
+        #the negative. see note at l588
         sky_pri=[-sum([holes[i].target.fm_priority for i in
                       coll_graph.collisions(holes.index(s))])
                  for s in filler_sky]
@@ -578,18 +580,25 @@ class Manager(object):
                 #Get conflicting holes
                 collwith_ndxs=coll_graph.collisions(coll_ndx)
                 conflicts=set([holes[i].target for i in collwith_ndxs])
-#                if lowest piroirty and not sky
-#                if lowest pri andfee sky left
                 #use fm_priority not priority, also the <= is critical here
                 if ((coll_targ.fm_priority <=
                      max(t.fm_priority for t in conflicts)) and
                     ((not coll_targ.is_sky) or
                      coll_targ.field.n_drillable_skys>coll_targ.field.minsky)):
+                    #is this thing less important that the most important thing
+                    # it interferes with and it is not a sky or minsky is met
+                    #otherwise we take the other branch greedily takeing the sky
+                    #We are going through low fm_priority to high so the first
+                    #test should always be met, but this implies that the most
+                    #desirable skys should have the lowest fm_priority, which is
+                    # both backwards and not what is presently coded
+                    
                     #Drop the target
                     coll_targ.conflicting=conflicts
                     coll_graph.drop(coll_ndx)
                 else:
                     #Drop everything that conflicts with it
+                    #this is the rare branch
                     dropped=coll_graph.drop_conflicting_with(coll_ndx)
                     for i in dropped:
                         holes[i].target.conflicting=holes[coll_ndx].target

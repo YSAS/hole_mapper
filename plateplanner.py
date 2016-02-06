@@ -362,5 +362,5 @@ class PopupWindow(object):
 if __name__ == "__main__":
     log.info('Starting...')
     app = App(None)
-    app.title('Hole Mapper')
+    app.title('Plate Planner')
     app.mainloop()

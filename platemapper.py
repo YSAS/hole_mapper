@@ -13,7 +13,7 @@ import argparse
 from logger import getLogger
 import tkMessageBox
 import errors
-log=getLogger('plateplanner')
+log=getLogger('platemapper')
 
 
 class HoleInfoDialog:
@@ -139,7 +139,7 @@ class App(Tkinter.Tk):
         chei=whei-bhei
         wwid=chei+swid
         self.geometry("%ix%i"%(wwid,whei))
-        self.title("Foo Bar")
+        self.title("Plate Mapper")
         
         #The sidebar
         frame = Tkinter.Frame(self, width=swid, bd=0, bg=None)#None)
@@ -162,16 +162,16 @@ class App(Tkinter.Tk):
                        command=self.setup_info_window).pack()
         Tkinter.Button(frame, text="Make plug",
                        command=self.make_plug).pack()
-        Tkinter.Button(frame, text="Toggle Conflicts",
-                       command=self.toggle_conflicts).pack()
-        self.show_conflicts=True
+#        Tkinter.Button(frame, text="Toggle Conflicts",
+#                       command=self.toggle_conflicts).pack()
+#        self.show_conflicts=True
 
         #Info output
         self.info_str=Tkinter.StringVar(value=self.status_string())
         Tkinter.Label(frame2, textvariable=self.info_str).pack(anchor='w')
     
     def status_string(self):
-        return 'Foobar'
+        return ''
     
     def canvasclick(self, event):
         #Get holes that are within a few pixels of the mouse position
@@ -189,9 +189,9 @@ class App(Tkinter.Tk):
             holes=self.manager.get_holes(holeIDs)
             HoleInfoDialog(self.parent, self.canvas, holes)
 
-    def toggle_conflicts(self):
-        self.show_conflicts=not self.show_conflicts
-        self.show()
+#    def toggle_conflicts(self):
+#        self.show_conflicts=not self.show_conflicts
+#        self.show()
 
     def show(self):
         self.canvas.clear()
@@ -284,5 +284,5 @@ if __name__ == "__main__":
     args=parse_cl()
     pathconf.ROOT=args.dir
     app = App(None)
-    app.title('Hole Mapper')
+    app.title('Plate Mapper')
     app.mainloop()

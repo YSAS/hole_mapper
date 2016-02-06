@@ -469,7 +469,7 @@ def load_dotfield(file):
                     log.warn('Interpreting mustkeep={} as {}'.format(v,mk))
                 field_cat.mustkeep=mk
                 if mk:
-                    log.info('Dropping targets is restricted by mustkeep'
+                    log.info('Dropping targets is restricted by mustkeep '
                              'is forbidden for field {} in {}'.format(
                              field_cat.field_name,file))
             elif k =='minsky':
