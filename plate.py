@@ -104,70 +104,70 @@ def load_dotplate(filename, singleton_ok=False, debug=False, usecache=True,
                 raise PlateError(err.format(os.path.basename(filename)))
             sections[curr_section]['lines'].append(l)
 
-    try:
-        #Process sections
-        for sec_name, sec in sections.items():
-            if '=' in sec['lines'][0]:
-                #Section is key value pairs
-                d={}
-                for l in sec['lines']:
-                    k,_,v=l.partition('=')
-                    d[k.strip()]=v.strip()
-                sec['processed']=d
+#    try:
+    #Process sections
+    for sec_name, sec in sections.items():
+        if '=' in sec['lines'][0]:
+            #Section is key value pairs
+            d={}
+            for l in sec['lines']:
+                k,_,v=l.partition('=')
+                d[k.strip()]=v.strip()
+            sec['processed']=d
+        else:
+            #Section is dictlist records
+            if 'undrilled' in sec_name:
+                req=REQUIRED_UNDRILLED_SECTION_KEYS
+            elif 'plateholes' == sec_name:
+                req=REQUIRED_PLATEHOLE_SECTION_KEYS
+            elif 'standards' in sec_name:
+                req=REQUIRED_STANDARDS_SECTION_KEYS
             else:
-                #Section is dictlist records
-                if 'undrilled' in sec_name:
-                    req=REQUIRED_UNDRILLED_SECTION_KEYS
-                elif 'plateholes' == sec_name:
-                    req=REQUIRED_PLATEHOLE_SECTION_KEYS
-                elif 'standards' in sec_name:
-                    req=REQUIRED_STANDARDS_SECTION_KEYS
-                else:
-                    req=REQUIRED_DRILLED_SECTION_KEYS
+                req=REQUIRED_DRILLED_SECTION_KEYS
 
-                keys=_parse_header_row(sec['lines'][0], REQUIRED=req)
-                user_keys=[k for k in keys if k not in req]
+            keys=_parse_header_row(sec['lines'][0], REQUIRED=req)
+            user_keys=[k for k in keys if k not in req]
 
-                dicts=[]
-                for l in sec['lines'][1:]:
-                    #TODO: Check for required values?
-                    dicts.append(_parse_record_row(l, keys, user_keys))
-                sec['processed']=dicts
-        
-        #Create the plate
-        
-        #Plateholes
-        plate_holes=[Target(**r) for r in sections['plateholes']['processed']]
+            dicts=[]
+            for l in sec['lines'][1:]:
+                #TODO: Check for required values?
+                dicts.append(_parse_record_row(l, keys, user_keys))
+            sec['processed']=dicts
+    
+    #Create the plate
+    
+    #Plateholes
+    plate_holes=[Target(**r) for r in sections['plateholes']['processed']]
 
-        #Fields
-        fields=[]
-        field_sec_names=[k for k in sections if 'field' in k and ':' not in k]
-        for fsec in field_sec_names:
-            field_dict=sections[fsec]['processed']
-            if metadata_only:
-                undrilled=[]
-                drilled=[]
-            else:
-                undrilled=map(lambda x: Target(**x),
-                              sections[fsec+':undrilled']['processed'])
-                drilled=map(lambda x: Target(**x),
-                            sections[fsec+':drilled']['processed'])
-            standards=map(lambda x: Target(**x),
-                        sections[fsec+':standards']['processed'])
-            fields.append(Field(field_dict, drilled, undrilled, standards))
+    #Fields
+    fields=[]
+    field_sec_names=[k for k in sections if 'field' in k and ':' not in k]
+    for fsec in field_sec_names:
+        field_dict=sections[fsec]['processed']
+        if metadata_only:
+            undrilled=[]
+            drilled=[]
+        else:
+            undrilled=map(lambda x: Target(**x),
+                          sections[fsec+':undrilled']['processed'])
+            drilled=map(lambda x: Target(**x),
+                        sections[fsec+':drilled']['processed'])
+        standards=map(lambda x: Target(**x),
+                    sections[fsec+':standards']['processed'])
+        fields.append(Field(field_dict, drilled, undrilled, standards))
 
-        #Finally the plate
-        plate=Plate(sections['plate']['processed'], plate_holes, fields, sha1)
+    #Finally the plate
+    plate=Plate(sections['plate']['processed'], plate_holes, fields, sha1)
 
-        if usecache:
-            _PLATE_CACHE[filename]=plate
+    if usecache:
+        _PLATE_CACHE[filename]=plate
 
-        return plate
+    return plate
 
-    except Exception as e:
-        if debug:
-            import ipdb;ipdb.set_trace()
-        raise PlateError(str(e))
+#    except Exception as e:
+#        if debug:
+#            import ipdb;ipdb.set_trace()
+#        raise PlateError(str(e))
 
 def get_plate(platename):
     try:
