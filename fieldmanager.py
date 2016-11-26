@@ -30,7 +30,10 @@ DRILLFILE_REQUIRED_COLS=['x','y','z','d','type','id']
 #deltara=np.rad2deg*arccos(cos(180*np.deg2rad/3600)*sec(dec)**2 - tan(dec)**2)
 
 def write_dotplate(name, plate_holes, fields, dir='./'):
-    filename='{}{}.plate'.format(dir, name)
+    filename=os.path.join(dir,'{}.plate'.format(name))
+
+#    if os.path.exists(filename):
+#        raise IOError('File exists')
 
     #get list of crap for the plate
     with open(filename,'w') as fp:
@@ -147,7 +150,7 @@ class Manager(object):
                 field=load_dotfield(f)
                 if [x for x in self.fields if
                     x.name==field.name
-                    and x.file!=field.file]:
+                    and x.full_file!=field.full_file]:
                     exist=[x for x in self.fields if x.name==field.name][0]
                     log.error("Duplicate field names found")
                     tkMessageBox.showerror('Duplicate field name',
