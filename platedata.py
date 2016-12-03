@@ -142,7 +142,9 @@ def get_all_plate_names():
     interface consumes significantly less memory than that in plate.py
     """
     _update_plate_metadata_cache()
-    return [p.name for p in _plate_metadata_cache.values()]
+    names=[p.name for p in _plate_metadata_cache.values()]
+    names.sort(key = lambda x:x.lower())
+    return names
 
 def get_metadata(platenameOrList):
     """
