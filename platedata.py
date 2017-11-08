@@ -15,10 +15,24 @@ For targetWeb
 
 """
 
+#import hashlib
+#
+#def hash_bytestr_iter(bytesiter, hasher, ashexstr=False):
+#    for block in bytesiter:
+#        hasher.update(block)
+#    return (hasher.hexdigest() if ashexstr else hasher.digest())
+#
+#def file_as_blockiter(afile, blocksize=65536):
+#    with afile:
+#        block = afile.read(blocksize)
+#        while len(block) > 0:
+#            yield block
+#            block = afile.read(blocksize)
 
 
 import logger, plate, fibermap
 import os
+import cPickle as pickle
 
 _log=logger.getLogger('platedata')
 _file_mtimes={}
@@ -97,22 +111,24 @@ def _update_fibermap_metadata_cache():
 
 
 
-def _update_plate_metadata_cache():
+def _update_plate_metadata_cache(cachefile=None):
     """
     build/maintain a cache of the info in the platefiles
     only load files whose file sys mod time differes from the last call
     """
     global _plate_metadata_cache, _file_mtimes
     
-#    if _plate_metadata_cache is None:
-#        try:
-#            with open(METADATA_CACHE_FILE,'rb') as f:
-#                _plate_metadata_cache, _file_mtimes=pickle.load(f)
-#        except Exception:
-#            pass
-
     #Get list of all platefiles
     platefile=plate.get_all_plate_filenames()
+    
+    if _plate_metadata_cache is None and cachefile is not None:
+        try:
+            with open(cachefile,'r') as f:
+                cache,mtimes = pickle.load(f)
+            _plate_metadata_cache = cache
+            _file_mtimes = mtimes
+        except Exception:
+            _log.warning('Unable to load plate metadata cache file {}'.format(cachefile))
     
     #Go through list and load any that have been modified
     cache_dirty=False
@@ -127,26 +143,26 @@ def _update_plate_metadata_cache():
             cache_dirty=True
             _file_mtimes[f]=mtime
 
-#    if cache_dirty:
-#        try:
-#            with open(METADATA_CACHE_FILE,'rb') as f:
-#                pickle.dump((_plate_metadata_cache, _file_mtimes),f)
-#        except Exception as e:
-#            l_og.error('Unable to save plate metadata cache')
+    if cache_dirty and cachefile is not None:
+        try:
+            with open(cachefile,'w') as f:
+                pickle.dump((_plate_metadata_cache, _file_mtimes), f, protocol=2)
+        except Exception as e:
+            _log.warning('Unable to save plate metadata cache')
 
-def get_all_plate_names():
+def get_all_plate_names(cachefile=None):
     """ 
     return a list of all known plate names
     refreshes the platemetadata cache
     
     interface consumes significantly less memory than that in plate.py
     """
-    _update_plate_metadata_cache()
+    _update_plate_metadata_cache(cachefile=cachefile)
     names=[p.name for p in _plate_metadata_cache.values()]
     names.sort(key = lambda x:x.lower())
     return names
 
-def get_metadata(platenameOrList):
+def get_metadata(platenameOrList, cachefile=None):
     """
     platenameOrList - a plate name or list of plate names
     
@@ -164,7 +180,7 @@ def get_metadata(platenameOrList):
     refreshes the platemetadata cache
 
     """
-    _update_plate_metadata_cache()
+    _update_plate_metadata_cache(cachefile=cachefile)
     if type(platenameOrList) in (list,tuple):
         ret=[]
         for platename in platenameOrList:
