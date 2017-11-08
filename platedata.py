@@ -121,12 +121,13 @@ def _update_plate_metadata_cache(cachefile=None):
     #Get list of all platefiles
     platefile=plate.get_all_plate_filenames()
     
-    if _plate_metadata_cache is None and cachefile is not None:
+    if _plate_metadata_cache and cachefile is not None:
         try:
             with open(cachefile,'r') as f:
-                cache,mtimes = pickle.load(f)
+                cache, mtimes = pickle.load(f)
             _plate_metadata_cache = cache
             _file_mtimes = mtimes
+            _log.info('Loaded plate metadata cache file {}'.format(cachefile))
         except Exception:
             _log.warning('Unable to load plate metadata cache file {}'.format(cachefile))
     
@@ -135,6 +136,7 @@ def _update_plate_metadata_cache(cachefile=None):
     for f in platefile:
         mtime=os.stat(f).st_mtime
         if mtime!=_file_mtimes.get(f,None):
+            #import ipdb;ipdb.set_trace()
 #        if _plate_metadata_cache.get(f, None) is None:
             _log.info('Refreshing metadata for {}'.format(f))
             p=plate.load_dotplate(f, usecache=False, metadata_only=True)
