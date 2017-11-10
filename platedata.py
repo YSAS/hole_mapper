@@ -121,7 +121,7 @@ def _update_plate_metadata_cache(cachefile=None):
     #Get list of all platefiles
     platefile=plate.get_all_plate_filenames()
     
-    if _plate_metadata_cache and cachefile is not None:
+    if not _plate_metadata_cache and cachefile is not None:
         try:
             with open(cachefile,'r') as f:
                 cache, mtimes = pickle.load(f)
