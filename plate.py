@@ -115,6 +115,10 @@ def load_dotplate(filename, singleton_ok=False, debug=False, usecache=True,
                 d[k.strip()]=v.strip()
             sec['processed']=d
         else:
+            
+            if metadata_only and 'drilled' in sec_name:
+                continue
+            
             #Section is dictlist records
             if 'undrilled' in sec_name:
                 req=REQUIRED_UNDRILLED_SECTION_KEYS
