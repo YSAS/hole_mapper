@@ -28,7 +28,7 @@ python module m2fsholesxy ! in
             real*8 intent(out) :: azimuth
             real*8 intent(out) :: elevation
             real*8 intent(out) :: airmass
-            integer, optional,intent(hide),depend(rastars) :: nmax=len(rastars)+100
+            integer, optional,intent(hide),depend(rastars) :: nmax=len(rastars)*4
             integer intent(out) :: nout
         end subroutine m2fsholesxy
         subroutine m2fsholesxyplate(rafield,decfield,epochfield,fieldrot,nstar,rastars,decstars,epochstars,xm,ym,zm,sizem,type_out,nmax) ! in :m2fsholesxy:m2fsholesxy.f90
