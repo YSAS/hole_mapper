@@ -36,6 +36,11 @@ class BetterCanvas(Tkinter.Canvas):
         self.sanitizeColorKW(kw)
         self.create_oval(x1,y1,x2,y2, kw)
 
+    def drawCross(self, (x,y), hwid=10):
+        x=self.canvasCoordx(x)
+        y=self.canvasCoordy(y)
+        return (self.create_line(x-hwid,y,x+hwid,y), self.create_line(x,y-hwid,x,y+hwid))
+    
     def drawSquare(self,(x,y), len, **kw):
         self.sanitizeColorKW(kw)
         self.create_rectangle(
