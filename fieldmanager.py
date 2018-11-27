@@ -13,7 +13,7 @@ from errors import ConstraintError
 log=getLogger('plateplanner.foo')
 from settings import MIN_GUIDES, MIN_ACQUISITIONS
 
-COLOR_SEQUENCE=['red','blue','purple','green','black','teal','pink','orange']
+COLOR_SEQUENCE=['red','blue','purple','green','black','cyan','pink','orange', 'gold', 'gray']
 
 
 
