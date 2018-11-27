@@ -170,8 +170,30 @@ class Target(object):
     def hole(self, hole):
         self._hole=hole
         if hole:
+            #dists={c:self._hole.distance(cp)
+                #for c, cp in CASSETTE_POSITIONS.iteritems()}
+            
+            #The original code found the distance to cassettes. Due to the
+            #circular nature of the aperature the middle cassettes were less
+            #likely to be selected. This updates calculates distance from a
+            #a reflected line at the same x value as the farthest cassettes
+            #Extreme X values are +-0.49913419848462176
+            #The multiplier increases the slope of the line
+            #Higher multiplier = more favor towards center
+            multi=100
+            CASSETTE_LINE = CASSETTE_POSITIONS.copy()
+            x_array =[]
+            for c in CASSETTE_POSITIONS:
+                x_array.append(CASSETTE_POSITIONS[c][0])
+            x_line = max(x_array)
+            for c in CASSETTE_LINE:
+                if CASSETTE_LINE[c][0] < 0:
+                    x_value=multi*(-x_line - CASSETTE_LINE[c][0]) - x_line
+                else:
+                    x_value=multi*(x_line - CASSETTE_LINE[c][0]) + x_line
+                CASSETTE_LINE[c] = (x_value, CASSETTE_LINE[c][1])
             dists={c:self._hole.distance(cp)
-                    for c, cp in CASSETTE_POSITIONS.iteritems()}
+                for c, cp in CASSETTE_LINE.iteritems()}
             self._cassette_distances=dists
             self._hole.target=self
 
@@ -324,9 +346,10 @@ class Target(object):
         """Return name of nearest usable cassette """
         if not self._usable_cassette_names:
             return None
-        
+
         usable=[(c, self._cassette_distances[c])
                 for c in self._usable_cassette_names]
+        
                 
         return min(usable, key=operator.itemgetter(1))[0]
 
