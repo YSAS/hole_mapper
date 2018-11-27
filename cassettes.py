@@ -134,6 +134,20 @@ BLUE_CASSETTE_NAMES=['B'+str(i)+j for i in range(1,9) for j in 'hl']
 RED_CASSETTE_NAMES=['R'+str(i)+j for i in range(1,9) for j in 'hl']
 
 CASSETTE_POSITIONS=_init_cassette_positions()
+    
+#The original code found the distance to cassettes. Due to the
+#circular nature of the aperature the middle cassettes were less
+#likely to be selected. This updates calculates distance from a
+#a reflected line at the same x value as the farthest cassettes
+#Extreme X values are +-0.49913419848462176
+#The multiplier increases the slope of the line
+#Higher multiplier = more favor towards center
+multi=100
+CASSETTE_LINE = CASSETTE_POSITIONS.copy()
+x_line = max([x for x, y in CASSETTE_POSITIONS.values()])
+for c, (x, y) in CASSETTE_LINE.items():
+    x_value = -multi*(x_line + x) - x_line if x < 0 else  multi*(x_line - x) + x_line
+    CASSETTE_LINE[c] = (x_value, y)
 
 class Cassette(object):
     def __init__(self, name, usable=None):
