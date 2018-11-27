@@ -9,7 +9,8 @@ KNOWN_SLITS=['180','125','95','75','58','45']
 KNOWN_FILTERS=['BK7', 'Mgb_O69',' CalRT_O41','HotJupiter','Mgb_Rev2',
               'Halpha_Li', 'IanR_O77_80','Mgb-Rev2','CalRT_O41',
               'BStar_O80_87', 'BulgeGC_1','Mg_Wide','EP_RRLyr','JS_Blue',
-              '5Targ_O65-87', 'MedRes_MgB']
+               '5Targ_O65-87', 'MedRes_MgB', 'Mgb_MedRes', 'MedRes_Ba(23)',
+               'Dupree_Blue']
 
 def _load_configs():
     setupfiles=glob(CONFIGDEF_DIRECTORY()+'*.configdef')
@@ -167,9 +168,11 @@ class M2FSArmConfig(object):
         try:
             ndx=lowerfilt.index(filter.lower())
         except ValueError:
-            raise ValueError('Congrats on your purchase of the '
-                             '{} filter. '.format(filter)+
-                             'Please add it to KNOWN_FILTERS in config.py')
+            raise ValueError(('\n
+                             '{} filter is not a KNOWN FILTER.\n
+                             'KNOWN FILTERS are: {}\n
+                             'Please add it to KNOWN_FILTERS in config.py\n').format(filter,KNOWN_FILTERS))
+        
         self.filter=KNOWN_FILTERS[ndx]
 
     
