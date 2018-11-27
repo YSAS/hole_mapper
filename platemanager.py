@@ -140,12 +140,9 @@ class Manager(object):
                                 fcolor=guide_color(i))
         
         for i, setup in enumerate(self.selected_setups):
-            lbl=setup.name+' ({})'.format(guide_color(i))
-            # color=guide_color(i)
-            side=setup.assigning_to
-            color='blue' if side=='b' else ('red' if side=='r' else 'black')
-            canvas.drawText((0, PROJ_PLATE_LABEL_Y-(i)*0.05*PLATE_RADIUS),
-                            lbl, color=color, center=0)
+            canvas.drawText((0,PROJ_PLATE_LABEL_Y-(i)*0.05*PLATE_RADIUS),
+                            setup.name, color=guide_color(i),center=0)
+
 
     def draw_image(self, canvas, channel='all',radmult=.75):
         
