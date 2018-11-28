@@ -1,4 +1,5 @@
 import operator
+import os
 import os.path
 from logger import getLogger
 from dimensions import PLATE_RADIUS, SH_RADIUS, DRILLABLE_PCT_R_OVERLAP_OK
@@ -29,11 +30,21 @@ DRILLFILE_REQUIRED_COLS=['x','y','z','d','type','id']
 
 #deltara=np.rad2deg*arccos(cos(180*np.deg2rad/3600)*sec(dec)**2 - tan(dec)**2)
 
-def write_dotplate(name, plate_holes, fields, dir='./'):
-    filename=os.path.join(dir,'{}.plate'.format(name))
+def walklevel(some_dir, level=1):
+    """This special function is used to replace os.walk.
+        It offers more control over recursion
+        """
+    some_dir = some_dir.rstrip(os.path.sep)
+    assert os.path.isdir(some_dir)
+    num_sep = some_dir.count(os.path.sep)
+    for root, dirs, files in os.walk(some_dir):
+        yield root, dirs, files
+        num_sep_this = root.count(os.path.sep)
+        if num_sep + level <= num_sep_this:
+            del dirs[:]
 
-#    if os.path.exists(filename):
-#        raise IOError('File exists')
+def write_dotplate(name, plate_holes, fields, dir='./'):
+    filename='{}{}.plate'.format(dir, name)
 
     #get list of crap for the plate
     with open(filename,'w') as fp:
@@ -120,6 +131,7 @@ class Manager(object):
     def __init__(self):
         self.fields=[]
         self.selected_fields=[]
+        self.current_highlight=[]
         log.info('Started Manager')
         self.plate_holes=[]
         mech=get_plate_holes()
@@ -130,13 +142,16 @@ class Manager(object):
                 t.id='STANDARD'
             self.plate_holes.append(t)
 
-    def load(self, file):
+    def load(self, file, level=0):
         """ 
         load .field file(s)
+
+        level sets the level of recursive searches. 0 no recursion. Level 1 adds one layer of recursion.
+        walklevel Can be replaced with os.walk for infinite recursion
         """
         if not os.path.isfile(file):
             files=[os.path.join(dirpath, f)
-                   for dirpath, dirnames, files in os.walk(file)
+                   for dirpath, dirnames, files in walklevel(file, level=level)
                    for f in files if os.path.splitext(f)[1].lower()=='.field']
         else:
             files=[file]
@@ -150,7 +165,7 @@ class Manager(object):
                 field=load_dotfield(f)
                 if [x for x in self.fields if
                     x.name==field.name
-                    and x.full_file!=field.full_file]:
+                    and x.file!=field.file]:
                     exist=[x for x in self.fields if x.name==field.name][0]
                     log.error("Duplicate field names found")
                     tkMessageBox.showerror('Duplicate field name',
@@ -174,6 +189,9 @@ class Manager(object):
         for f in self.fields: f.reset()
 
     def clear(self):
+        """
+        Clears currently selected directories
+        """
         self.fields=[]
         self.selected_fields=[]
 
@@ -184,8 +202,28 @@ class Manager(object):
                 if str(hash(h)) in holeIDs:
                     ret.append(h)
         return ret
+    
+    def highlight_hole(self, canvas, id, field_id):
+        """
+        Highlights holes with matching ID.
+        """
+        for highlights in self.current_highlight:
+            for highlight in highlights:
+                canvas.delete(highlight)
 
-    def _drawHole(self, hole, canvas, color=None, fcolor='White', radmult=1.0):
+        self.current_highlight = []
+
+        highlight_flag = False
+        for f in self.selected_fields:
+            for h in f.holes():
+                if h.info['id'] == id and not (field_id and h.info['field'] != field_id):
+                    highlight_flag = True  # Confirms highlight
+                    self._drawHole(h, canvas, highlight=True)
+
+        if not highlight_flag and not id == 'clear_command': #Bypasses clear command
+            log.warning('No objects match that ID')
+    
+    def _drawHole(self, hole, canvas, color=None, fcolor='White', radmult=1.0, highlight=False):
         
         drawimage=False
         
@@ -196,6 +234,8 @@ class Manager(object):
         
         if drawimage:
             canvas.drawCircle(pos, rad, outline=color, fill=fcolor)
+        elif highlight: #For targets that only need to be highlighted
+            self.current_highlight.append(canvas.drawCross(pos))
         else:
 #            if canvas.find_withtag(hashtag):
 #                log.info("drawing dupe in dark green @ {} IDs: {}".format(
@@ -206,11 +246,14 @@ class Manager(object):
                               activefill='Green', activeoutline='Green',
                               disabledfill='Orange', disabledoutline='Orange')
 
-    def draw(self, canvas, show_conflicts=True):
+    def draw(self, canvas, show_conflicts, show_skies, show_aligns, show_name=''):
         
         #Make a circle of appropriate size in the window
         canvas.drawCircle( (0,0) , PLATE_RADIUS)
         canvas.drawCircle( (0,0) , SH_RADIUS)
+        
+        #Add plot name at top
+        canvas.drawText((10, 13), show_name)
         
         #Draw Plate holes
         for t in self.plate_holes:
@@ -226,14 +269,20 @@ class Manager(object):
             c=COLOR_SEQUENCE[i%len(COLOR_SEQUENCE)]
             for h in f.holes():
                 fcolor=c if h.target.conflicting else 'White'
-                if h.target.conflicting !=None:
-#                    log.warn('{} conflicts with {}'.format(
-#                                         h.target, h.target.conflicting_ids))
-                    if show_conflicts:
-                        self._drawHole(h, canvas, color=c, fcolor=fcolor)
+                if h.target.conflicting is not None and show_conflicts:
+#                    log.warn('{} conflicts with {}'.format(h.target, h.target.conflicting_ids))
+                    self._drawHole(h, canvas, color=c, fcolor=fcolor)
+                elif h.target.is_sky and show_skies:
+                    self._drawHole(h, canvas, color=c, fcolor=fcolor)
+                elif h.target.is_acquisition and show_aligns:
+                    self._drawHole(h, canvas, color=c, fcolor=fcolor)
                 else:
                     self._drawHole(h, canvas, color=c, fcolor=fcolor)
     
+    @property
+    def nconflicts(self):
+       return sum([int(h.target.conflicting is not None) for f in self.selected_fields for h in f.holes()])
+
     def select_fields(self, field_names):
         old=set([f.name for f in self.selected_fields])
 
