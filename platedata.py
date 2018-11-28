@@ -122,6 +122,7 @@ def _update_plate_metadata_cache(cachefile=None):
     platefile=plate.get_all_plate_filenames()
     
     if not _plate_metadata_cache and cachefile is not None:
+        _log.info('Plate metadata cache empty. Attempting to populate with file {}'.format(cachefile))
         try:
             with open(cachefile,'r') as f:
                 cache, mtimes = pickle.load(f)
