@@ -168,9 +168,9 @@ class M2FSArmConfig(object):
         try:
             ndx=lowerfilt.index(filter.lower())
         except ValueError:
-            raise ValueError(('\n
-                             '{} filter is not a KNOWN FILTER.\n
-                             'KNOWN FILTERS are: {}\n
+            raise ValueError(('\n'
+                             '{} filter is not a KNOWN FILTER.\n'
+                             'KNOWN FILTERS are: {}\n'
                              'Please add it to KNOWN_FILTERS in config.py\n').format(filter,KNOWN_FILTERS))
         
         self.filter=KNOWN_FILTERS[ndx]
