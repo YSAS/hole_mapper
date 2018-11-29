@@ -31,6 +31,22 @@ python module m2fsholesxy ! in
             integer, optional,intent(hide),depend(rastars) :: nmax=len(rastars)*4
             integer intent(out) :: nout
         end subroutine m2fsholesxy
+        subroutine m2fsholesxyplate(rafield,decfield,epochfield,fieldrot,nstar,rastars,decstars,epochstars,xm,ym,zm,sizem,type_out,nmax) ! in :m2fsholesxy:m2fsholesxy.f90
+            real*8 intent(in) :: rafield
+            real*8 intent(in) :: decfield
+            real*8 intent(in) :: epochfield
+            real*8 intent(in) :: fieldrot
+            integer, optional,intent(hide),check(len(rastars)>=nstar),depend(rastars) :: nstar=len(rastars)
+            real*8 dimension(nstar),intent(in) :: rastars
+            real*8 dimension(nstar),intent(in),depend(nstar) :: decstars
+            real*8 dimension(nstar),intent(in),depend(nstar) :: epochstars
+            real*8 dimension(nmax),intent(out),depend(nmax) :: xm
+            real*8 dimension(nmax),intent(out),depend(nmax) :: ym
+            real*8 dimension(nmax),intent(out),depend(nmax) :: zm
+            real*8 dimension(nmax),intent(out),depend(nmax) :: sizem
+            character dimension(nmax,1),intent(out,c),depend(nmax) :: type_out
+            integer, optional,intent(hide),depend(rastars) :: nmax=len(rastars)+7
+        end subroutine m2fsholesxyplate
     end interface 
 end python module m2fsholesxy
 
