@@ -320,7 +320,7 @@ class App(Tkinter.Tk):
         """
         The total number of conflicts
         """
-        return 'Total Conflicts: {}'.format(self.manager.conflict_counter())
+        return 'Total Conflicts: {}'.format(self.manager.nconflicts)
 
     def tar_sky_status_string(self):
         """
