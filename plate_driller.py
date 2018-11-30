@@ -281,15 +281,13 @@ class App(Tkinter.Tk):
         Tkinter.Label(self.frame2,text='').pack() #Adds a blank line
 
         #The following produces up to 20 individual field outputs
-        #However, there are currently only 10 unique colors
-        #Could be changed if wanted, though make sure to update the colors in
-        #fieldmanager.py if identical colors are desired
+        #However, there are currently only 10 unique colors defined in fieldmanager.py
         self.counter = range(0, 20)
         self.fname = [None]*len(self.counter)
-        for initial_count in self.counter:
-            self.fname[initial_count] = Tkinter.StringVar(value='')
-            Tkinter.Label(self.frame2,textvariable=self.fname[initial_count],
-                          foreground=fieldmanager.COLOR_SEQUENCE[initial_count%10]).pack(anchor='w')
+        for i in self.counter:
+            self.fname[i] = Tkinter.StringVar(value='')
+            color=fieldmanager.COLOR_SEQUENCE[i%len(fieldmanager.COLOR_SEQUENCE)]
+            Tkinter.Label(self.frame2, textvariable=self.fname[i], foreground=color).pack(anchor='w')
     
     def total_status_string(self):
         """
