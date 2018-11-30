@@ -174,7 +174,6 @@ class Manager(object):
                 else:
                     log.info("Loaded {}".format(field.name))
                     self.fields.append(field)
-        
         except IOError as e:
             log.warn(str(e))
 
@@ -210,15 +209,13 @@ class Manager(object):
         for highlights in self.current_highlight:
             for highlight in highlights:
                 canvas.delete(highlight)
-
         self.current_highlight = []
 
         highlight_flag = False
-        for f in self.selected_fields:
-            for h in f.holes():
-                if h.info['id'] == id and not (field_id and h.info['field'] != field_id):
-                    highlight_flag = True  # Confirms highlight
-                    self._drawHole(h, canvas, highlight=True)
+        for h in f.holes() (f for f in self.selected_fields):
+            if h.info['id'] == id and not (field_id and h.info['field'] != field_id):
+                highlight_flag = True  # Confirms highlight
+                self._drawHole(h, canvas, highlight=True)
 
         if not highlight_flag and not id == 'clear_command': #Bypasses clear command
             log.warning('No objects match that ID')
@@ -261,7 +258,7 @@ class Manager(object):
                 self._drawHole(t.hole, canvas, color='black', fcolor='black')
             elif not t.conflicting:
                 self._drawHole(t.hole, canvas, color='black')
-    
+
         #Draw fields
         for i,f in enumerate(self.selected_fields):
             if not f.is_processed: f.process()
@@ -269,13 +266,15 @@ class Manager(object):
             c=COLOR_SEQUENCE[i%len(COLOR_SEQUENCE)]
             for h in f.holes():
                 fcolor=c if h.target.conflicting else 'White'
-                if h.target.conflicting is not None and show_conflicts:
-#                    log.warn('{} conflicts with {}'.format(h.target, h.target.conflicting_ids))
-                    self._drawHole(h, canvas, color=c, fcolor=fcolor)
-                elif h.target.is_sky and show_skies:
-                    self._drawHole(h, canvas, color=c, fcolor=fcolor)
-                elif h.target.is_acquisition and show_aligns:
-                    self._drawHole(h, canvas, color=c, fcolor=fcolor)
+                if h.target.conflicting is not None:
+                    if show_conflicts:
+                        self._drawHole(h, canvas, color=c, fcolor=fcolor)
+                elif h.target.is_sky:
+                    if show_skies:
+                        self._drawHole(h, canvas, color=c, fcolor=fcolor)
+                elif h.target.is_acquisition:
+                    if show_aligns:
+                        self._drawHole(h, canvas, color=c, fcolor=fcolor)
                 else:
                     self._drawHole(h, canvas, color=c, fcolor=fcolor)
     
