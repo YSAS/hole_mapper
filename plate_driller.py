@@ -285,13 +285,11 @@ class App(Tkinter.Tk):
         #Could be changed if wanted, though make sure to update the colors in
         #fieldmanager.py if identical colors are desired
         self.counter = range(0, 20)
-        self.fname = [None]*20
-        color_sequence=['red','blue','purple','green','black','cyan',
-                        'pink','orange', 'gold', 'gray']
+        self.fname = [None]*len(self.counter)
         for initial_count in self.counter:
             self.fname[initial_count] = Tkinter.StringVar(value='')
             Tkinter.Label(self.frame2,textvariable=self.fname[initial_count],
-                          foreground=color_sequence[initial_count%10]).pack(anchor='w')
+                          foreground=fieldmanager.COLOR_SEQUENCE[initial_count%10]).pack(anchor='w')
     
     def total_status_string(self):
         """
@@ -302,7 +300,7 @@ class App(Tkinter.Tk):
         nholes+=len(self.manager.plate_drillable_dictlist())
         return 'Total Holes: {}'.format(nholes)
 
-    def individual_field(self):
+    def individual_field_string(self):
         """
         Produces a hole count for each individual field. Counter loops
         were setup to prevent repeated labeling.
@@ -424,7 +422,7 @@ class App(Tkinter.Tk):
         
         #This update individual field information
         for self.count in self.counter:
-            self.fname[self.count].set(self.individual_field())
+            self.fname[self.count].set(self.individual_field_string())
         
         self.manager.draw(self.canvas, show_conflicts=self.show_conflicts,
                           show_skies=self.show_skies, show_aligns=self.show_aligns, show_name = self.name)
