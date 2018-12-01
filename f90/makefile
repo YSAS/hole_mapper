@@ -1,5 +1,6 @@
 f2py m2fsholesxy.f90 -m m2fsholesxy -h m2fsholesxy.pyf only: m2fsholesxy :
-#manually edit m2fsholesxy.pyf
+#manually edit m2fsholesxy.pyf replacing
+#integer, optional,intent(hide),depend(rastars) :: nmax=len(rastars)*4
 f2py -c m2fsholesxy.pyf *.f90 -m m2fsholesxy
 
 
