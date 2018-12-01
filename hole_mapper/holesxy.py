@@ -55,7 +55,7 @@ def compute_hole_positions(field_ra,field_dec,field_epoch, date,
 # change         if(type.ne.'F'.and.type.ne.'T') then
 # to         if(type.ne.'F'.and.type.ne.'B') and recompile
     typestars[typestars=='T']='O'
-    from m2fsholesxy import m2fsholesxy as m2hxy
+    from .f90.m2fsholesxy import m2fsholesxy as m2hxy
     x,y,z,d,type_out, st,ha,az,el,airmass,nout = m2hxy(ut, utdate, latitude,
           longitude, elevation, rafield, decfield, epochfield, fieldrot,
           rastars, decstars, epochstars, typestars)
