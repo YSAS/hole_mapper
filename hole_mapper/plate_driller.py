@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 """Current Changes:
     1. region around line 240 was decreased from 2. This should decrease
     the odds of multiple holes being selected on click.
