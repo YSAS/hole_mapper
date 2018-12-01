@@ -53,6 +53,7 @@ setuptools.setup(
                               "Operating System :: POSIX",
                               "Development Status :: 1 - Planning",
                               "Intended Audience :: Science/Research"),
+                 install_requires=['numpy>=1.8.0', 'jbastro'],
                  cmdclass={'install': CustomInstall,'develop': CustomDevelop}
                  )
 
