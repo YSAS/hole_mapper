@@ -26,17 +26,17 @@
 
 import Tkinter
 import ttk
-import BetterCanvas
 import os
 import argparse
-import fieldmanager
-from dimensions import PLATE_RADIUS
-from ttkcalendar import date_time_picker
 import tkFileDialog
-from datetime import datetime
-from logger import getLogger
-from errors import ConstraintError
 import tkMessageBox
+from datetime import datetime
+from hole_mapper import BetterCanvas
+from hole_mapper import fieldmanager
+from hole_mapper.dimensions import PLATE_RADIUS
+from hole_mapper.logger import getLogger
+from hole_mapper.errors import ConstraintError
+
 log=getLogger('plate_driller')
 
 

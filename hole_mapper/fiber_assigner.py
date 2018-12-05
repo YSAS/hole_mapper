@@ -1,18 +1,18 @@
 #!/usr/bin/env python2
 import Tkinter
 import ttk
-import BetterCanvas
 import os
 import argparse
-import platemanager
-import pathconf
-from dimensions import PLATE_RADIUS
-from ttkcalendar import date_time_picker
-from setup import get_all_setups
-from logger import getLogger
 import tkMessageBox
 import tkFileDialog
-import errors
+from hole_mapper.logger import getLogger
+from hole_mapper import BetterCanvas
+from hole_mapper import platemanager
+from hole_mapper import pathconf
+from hole_mapper.dimensions import PLATE_RADIUS
+from hole_mapper.setup import get_all_setups
+from hole_mapper import errors
+
 log=getLogger('fiber_assigner')
 
 
