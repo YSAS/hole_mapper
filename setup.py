@@ -54,6 +54,7 @@ setuptools.setup(
                               "Development Status :: 1 - Planning",
                               "Intended Audience :: Science/Research"),
                  install_requires=['numpy>=1.8.0', 'jbastro'],
+                 dependency_links=['https://github.com/baileyji/jbastro/tarball/master#egg=jbastro-0.5'],
                  cmdclass={'install': CustomInstall,'develop': CustomDevelop}
                  )
 
