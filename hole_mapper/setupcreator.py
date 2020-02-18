@@ -5,9 +5,7 @@ from flask_wtf import Form
 from wtforms import SelectMultipleField, SubmitField, BooleanField,RadioField
 from wtforms import validators
 from m2fs.plate.summarize import generate_tlist_file, generate_summary_file
-import sys, time, threading, os, re
-sys.path.append(sys.path[0]+'/../lib/')
-from m2fsConfig import m2fsConfig
+import os
 from glob import glob
 import plate
 
