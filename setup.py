@@ -14,6 +14,8 @@ def compile():
     # replace 'integer, optional,intent(hide),depend(rastars) :: nmax=len(rastars)+100'
     # with 'integer, optional,intent(hide),depend(rastars) :: nmax=len(rastars)*4'
     #and add that to the repository
+    if 'arm' in os.uname()[-1]:
+        return
     cmd = 'f2py -c ./m2fsholesxy.pyf ./*.f90 -m m2fsholesxy'
     try:
         subprocess.check_call(cmd, cwd='./hole_mapper/f90/', shell=True)
@@ -33,7 +35,7 @@ class CustomDevelop(develop, object):
         compile()
         super(CustomDevelop,self).run()
 
-with open("README.md", "r") as fh:
+with open("readme.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
